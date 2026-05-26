@@ -145,7 +145,7 @@ This regenerates all 8 PWA icon sizes (72-512px) from the SVG using `sharp`.
 
 Pushes to `main` trigger `.github/workflows/deploy.yml`, which builds and deploys **everything** (hosting, functions, Firestore rules, Firestore indexes).
 
-**One-time setup**: create a service account with deploy permissions, generate a JSON key, and add it to GitHub as the secret `FIREBASE_SERVICE_ACCOUNT`.
+**One-time setup**: create a service account with deploy permissions, generate a JSON key, and add it to GitHub as the secret `FIREBASE_SERVICE_ACCOUNT_GOALDEN_693DC` (Firebase CLI's default name). The fastest path is `firebase init hosting:github` — it creates the SA, grants Hosting + Functions roles, sets the GitHub secret, and uploads the key all in one go. Alternatively, do it manually with the `gcloud` commands below.
 
 Easiest path (requires `gcloud` CLI):
 
@@ -164,7 +164,8 @@ gcloud projects add-iam-policy-binding goalden-693dc \
 gcloud iam service-accounts keys create key.json \
   --iam-account=github-actions-deploy@goalden-693dc.iam.gserviceaccount.com
 
-# 4. Copy the file contents into the GitHub secret named FIREBASE_SERVICE_ACCOUNT
+# 4. Copy the file contents into the GitHub secret named
+#    FIREBASE_SERVICE_ACCOUNT_GOALDEN_693DC
 #    (repo → Settings → Secrets and variables → Actions → New repository secret)
 
 # 5. Delete the local key file so it can't leak
