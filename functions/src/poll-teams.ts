@@ -93,7 +93,7 @@ export async function runPollTeams(token: string): Promise<{
  */
 export const pollTeams = onSchedule(
   {
-    schedule: 'every 60 minutes',
+    schedule: 'every 1 hours',
     region: 'europe-west1',
     secrets: [FOOTBALL_DATA_TOKEN],
     maxInstances: 1,
