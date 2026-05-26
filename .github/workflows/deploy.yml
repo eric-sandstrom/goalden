@@ -1,0 +1,79 @@
+# Auto-deploy to Firebase on push to main.
+#
+# Deploys: Hosting (Angular app) + Cloud Functions + Firestore rules + indexes.
+#
+# Authentication uses FIREBASE_TOKEN — generated locally with
+# `firebase login:ci` and stored as a GitHub Actions secret. The token has
+# the same permissions as the user who generated it, so make sure the
+# account that ran `firebase login:ci` has owner/editor access to the
+# Firebase project (goalden-693dc).
+#
+# Required GitHub secrets:
+#   - FIREBASE_TOKEN     CI auth token from `firebase login:ci`
+#   - FOOTBALL_DATA_TOKEN  Not used here, but the deployed functions need it.
+#                          Set via `firebase functions:secrets:set
+#                          FOOTBALL_DATA_TOKEN` separately (one-time setup).
+
+name: Deploy to Firebase
+
+on:
+  push:
+    branches: [main]
+  # Lets you re-deploy manually from the Actions tab without pushing a commit.
+  workflow_dispatch:
+
+# Cancel in-progress deploys if a newer commit lands on main. Prevents two
+# deploys racing each other and ending up in an inconsistent state.
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          # Cache root npm; functions/ has its own lockfile and gets a
+          # separate cache step below.
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Cache functions dependencies
+        uses: actions/cache@v4
+        with:
+          path: functions/node_modules
+          key: ${{ runner.os }}-functions-${{ hashFiles('functions/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-functions-
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install functions dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Build Angular app
+        run: npm run build
+
+      - name: Build Cloud Functions
+        run: npm run build
+        working-directory: functions
+
+      - name: Deploy to Firebase
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          npx firebase-tools@latest deploy \
+            --only hosting,functions,firestore:rules,firestore:indexes \
+            --project goalden-693dc \
+            --non-interactive

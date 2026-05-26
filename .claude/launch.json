@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Angular",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 4200
+    },
+    {
+      "name": "Firebase Emulators",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "emulators"],
+      "port": 4000
+    }
+  ]
+}

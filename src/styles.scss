@@ -1,0 +1,102 @@
+@use '@angular/material' as mat;
+
+html {
+  height: 100dvh;
+  overflow: hidden;
+
+  // Default color-scheme set on :root so descendants inherit and Material's
+  // light-dark() tokens resolve correctly on first paint, before ThemeService
+  // has a chance to override based on the user's saved preference.
+  color-scheme: light dark;
+
+  @include mat.theme((
+    color: (
+      primary: mat.$green-palette,
+      tertiary: mat.$yellow-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+body {
+  // Intentionally no `color-scheme` here — would override the :root value via
+  // inheritance and prevent ThemeService from forcing light or dark.
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+app-root {
+  display: block;
+  height: 100%;
+  overflow: hidden;
+}
+
+// =============================================================================
+// Layout utilities
+// =============================================================================
+//
+// The app has NO global scroller — the body is locked to viewport height and
+// scrolling happens inside whichever element opts in.
+//
+// .page          - fills its parent (the shell's content area). Flex column,
+//                  no internal scrolling. Children manage their own scroll.
+// .page-scroll   - flex: 1 child of a .page. Owns vertical scroll.
+// .card-grow     - a `<mat-card>` that fills available space; its content
+//                  becomes the scroll region.
+// .card-scroll   - inside a `.card-grow`, marks the scrollable region.
+
+.page {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 1rem;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 1rem;
+}
+
+.page-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card-grow {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.card-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+// =============================================================================
+// Snackbar positioning
+// =============================================================================
+//
+// Snackbars are rendered in a CDK overlay at the bottom of the viewport, which
+// would collide with our fixed bottom nav. Lift them up by the bottom-nav
+// height plus the iOS safe-area inset.
+
+.mat-mdc-snack-bar-container {
+  margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+}

@@ -1,0 +1,223 @@
+rules_version = '2';
+
+// Goalden Firestore security rules.
+//
+// Philosophy:
+//   1. Reads — open to any authenticated user where the data is intended for
+//      cross-user features (leaderboards, league discovery via invite code).
+//      Owner-only otherwise.
+//   2. Writes — clients write ONLY their own predictions / podium picks /
+//      user profile, with strict field whitelists and validation. Everything
+//      else (fixtures, totals, leagues, league members, leagues_public) is
+//      server-only via Cloud Functions / Admin SDK.
+//   3. Lock-time enforcement — predictions writeable only while the relevant
+//      fixture is still TIMED and its kickoff is in the future. Podium picks
+//      writeable only until the tournament opening date.
+//
+// Anything not explicitly allowed below is denied by the catch-all at the
+// bottom of the file.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----- helpers ---------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isLeagueMember(leagueId) {
+      return exists(/databases/$(database)/documents/leagues/$(leagueId)/members/$(request.auth.uid));
+    }
+
+    function fixture(matchId) {
+      return get(/databases/$(database)/documents/fixtures/$(matchId)).data;
+    }
+
+    function validDisplayName(name) {
+      return name is string && name.size() >= 2 && name.size() <= 30;
+    }
+
+    function isUnscoredPrediction() {
+      return request.resource.data.points == null
+        && request.resource.data.submittedAt is timestamp;
+    }
+
+    // ----- users -----------------------------------------------------------
+    //
+    // Any signed-in user can READ any profile (needed for the global
+    // leaderboard, league member lookups, and the user's own profile view).
+    //
+    // The owner can CREATE / UPDATE their own profile, but only the
+    // displayName / photoURL fields. `totals` is server-only and lives in the
+    // same doc as a nested map — never let the client touch it.
+    //
+    // DO NOT add sensitive fields (email, phone, address, etc.) to this doc;
+    // they would be world-readable.
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+
+      allow create: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'createdAt'])
+        && validDisplayName(request.resource.data.displayName);
+
+      allow update: if isSelf(uid)
+        && changedKeys().hasOnly(['displayName', 'photoURL'])
+        && validDisplayName(request.resource.data.displayName);
+
+      allow delete: if false;
+    }
+
+    // ----- fixtures --------------------------------------------------------
+    //
+    // World-readable (for any signed-in user). All writes server-only.
+
+    match /fixtures/{matchId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ----- teams -----------------------------------------------------------
+    //
+    // Team info, coach, and squad. World-readable for signed-in users so we
+    // can show the Teams browse view, link from fixture rows, etc. Writes
+    // are server-only via the hourly pollTeams Cloud Function.
+
+    match /teams/{teamId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ----- cache/teams -----------------------------------------------------
+    //
+    // Aggregated rollup of every team doc, rewritten by pollTeams on every
+    // run. Clients (TeamsService) read this single document instead of
+    // querying the entire `teams` collection, saving ~48 reads per cold
+    // cache miss.
+
+    match /cache/{doc} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ----- predictions: match scores --------------------------------------
+    //
+    // Owner-only read/write. Writes are restricted to:
+    //   - Exactly the expected field set (no smuggling in `points` /
+    //     `pointsCategory` — those are server-written).
+    //   - matchId field must match the document path's matchId.
+    //   - homeScore / awayScore must be integers in [0, 99].
+    //   - Lock-time enforced server-side via the fixture doc: status must be
+    //     `TIMED` AND kickoff in the future.
+
+    match /predictions/{uid}/matches/{matchId} {
+      allow read: if isSelf(uid);
+
+      allow create, update: if isSelf(uid)
+        && request.resource.data.keys().hasOnly([
+          'matchId', 'homeScore', 'awayScore', 'submittedAt', 'points'
+        ])
+        && request.resource.data.matchId == matchId
+        && request.resource.data.homeScore is int
+        && request.resource.data.homeScore >= 0
+        && request.resource.data.homeScore <= 99
+        && request.resource.data.awayScore is int
+        && request.resource.data.awayScore >= 0
+        && request.resource.data.awayScore <= 99
+        && isUnscoredPrediction()
+        && fixture(matchId).status == 'TIMED'
+        && fixture(matchId).utcKickoff > request.time;
+
+      allow delete: if false;
+    }
+
+    // ----- predictions: podium picks ---------------------------------------
+    //
+    // Owner-only. Three team ids, all different. Locks at the first match
+    // kickoff of the tournament (hardcoded to UTC midnight 2026-06-11 — to be
+    // refined to the actual opening match instant when finalised).
+
+    match /predictions/{uid}/podium/picks {
+      allow read: if isSelf(uid);
+
+      allow create, update: if isSelf(uid)
+        && request.resource.data.keys().hasOnly([
+          'winnerTeamId', 'secondTeamId', 'thirdTeamId', 'submittedAt', 'points'
+        ])
+        && request.resource.data.winnerTeamId is int
+        && request.resource.data.secondTeamId is int
+        && request.resource.data.thirdTeamId is int
+        && request.resource.data.winnerTeamId != request.resource.data.secondTeamId
+        && request.resource.data.winnerTeamId != request.resource.data.thirdTeamId
+        && request.resource.data.secondTeamId != request.resource.data.thirdTeamId
+        && isUnscoredPrediction()
+        && request.time < timestamp.date(2026, 6, 11);
+
+      allow delete: if false;
+    }
+
+    // ----- leagues ---------------------------------------------------------
+    //
+    // Members of a league can read the league doc + the members subcollection.
+    // All writes are server-only via Cloud Functions (createLeague, joinLeague,
+    // leaveLeague, deleteLeague, regenerateInviteCode, transferOwnership,
+    // kickMember).
+
+    match /leagues/{leagueId} {
+      allow read: if isSignedIn() && isLeagueMember(leagueId);
+      allow write: if false;
+    }
+
+    match /leagues/{leagueId}/members/{memberUid} {
+      allow read: if isSignedIn() && isLeagueMember(leagueId);
+      allow write: if false;
+    }
+
+    // Collection-group access to `members` subcollections.
+    //
+    // Firestore evaluates collection-group queries against rule paths that use
+    // the recursive wildcard. The path-specific rule above does not match
+    // `collectionGroup('members')` queries — without this block, the LeaguesService
+    // "find leagues I'm in" query falls through to the catch-all deny.
+    //
+    // IMPORTANT: we compare against `resource.data.uid` (the doc's stored uid
+    // field), NOT the `{memberUid}` path variable. Firestore can't bind path
+    // variables during LIST-query static analysis, so a path-variable check
+    // would fail with "Null value error" for the collection-group LIST. The
+    // doc-field check works because the client's query (`where('uid', '==',
+    // myUid)`) lets Firestore statically prove the rule holds for every match.
+    match /{path=**}/members/{memberUid} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ----- leagues_public --------------------------------------------------
+    //
+    // The /j/{code} landing page reads a single doc by invite code to display
+    // the league name + member count before the user has joined.
+    //
+    // Single-document GET is allowed for any signed-in user. LIST is denied so
+    // an attacker can't iterate the collection to harvest every active invite
+    // code in the system.
+
+    match /leagues_public/{inviteCode} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow write: if false;
+    }
+
+    // ----- catch-all -------------------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

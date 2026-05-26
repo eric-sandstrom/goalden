@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Goalden PWA icon — source of truth.
+
+  Construction of the gold "G":
+    1. Counter-clockwise arc covers ~296° leaving an opening on the right.
+    2. From the lower end of the arc the path continues UP along the right edge
+       of the opening (the vertical "hook" that distinguishes a G from a C).
+    3. Then LEFT into the bowl — the horizontal arm — terminating just past
+       the centre.
+
+  Drawing it as ONE continuous stroked path keeps the strokes visually
+  connected at the corners (no floating bars) and ensures consistent line
+  weight throughout. `stroke-linejoin=round` smooths the inner L corner where
+  the hook meets the arm.
+
+  All raster PWA sizes (72/96/128/144/152/192/384/512) are generated from this
+  file by `tools/generate-icons.mjs`.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Goalden">
+  <!-- Background: rounded square in Goalden green -->
+  <rect width="512" height="512" rx="96" ry="96" fill="#0F7B3A"/>
+
+  <defs>
+    <!-- Subtle radial shading for depth (graceful fallback to flat colour) -->
+    <radialGradient id="ringShade" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0%" stop-color="#F4C842"/>
+      <stop offset="100%" stop-color="#D4A017"/>
+    </radialGradient>
+  </defs>
+
+  <!-- The "G" as one continuous path:
+       outer arc (CCW) → vertical hook on the right of the opening → horizontal arm -->
+  <path
+    d="M 370 184
+       A 144 144 0 1 0 370 328
+       L 370 256
+       L 286 256"
+    fill="none"
+    stroke="url(#ringShade)"
+    stroke-width="62"
+    stroke-linecap="butt"
+    stroke-linejoin="round"/>
+</svg>
