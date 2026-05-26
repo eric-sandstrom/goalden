@@ -145,13 +145,35 @@ This regenerates all 8 PWA icon sizes (72-512px) from the SVG using `sharp`.
 
 Pushes to `main` trigger `.github/workflows/deploy.yml`, which builds and deploys **everything** (hosting, functions, Firestore rules, Firestore indexes).
 
-**Required GitHub secrets** (set under repo Settings → Secrets and variables → Actions):
+**One-time setup**: create a service account with deploy permissions, generate a JSON key, and add it to GitHub as the secret `FIREBASE_SERVICE_ACCOUNT`.
 
-| Secret | How to get it |
-|---|---|
-| `FIREBASE_TOKEN` | Locally: `firebase login:ci` — copy the token it prints |
+Easiest path (requires `gcloud` CLI):
 
-You can also re-deploy without a commit via **Actions tab → Deploy to Firebase → Run workflow**.
+```bash
+# 1. Create the service account
+gcloud iam service-accounts create github-actions-deploy \
+  --display-name="GitHub Actions Deploy" \
+  --project=goalden-693dc
+
+# 2. Grant the Firebase Admin role (covers hosting, functions, rules, indexes)
+gcloud projects add-iam-policy-binding goalden-693dc \
+  --member="serviceAccount:github-actions-deploy@goalden-693dc.iam.gserviceaccount.com" \
+  --role="roles/firebase.admin"
+
+# 3. Generate a JSON key (writes ./key.json — keep it secret, delete after upload)
+gcloud iam service-accounts keys create key.json \
+  --iam-account=github-actions-deploy@goalden-693dc.iam.gserviceaccount.com
+
+# 4. Copy the file contents into the GitHub secret named FIREBASE_SERVICE_ACCOUNT
+#    (repo → Settings → Secrets and variables → Actions → New repository secret)
+
+# 5. Delete the local key file so it can't leak
+rm key.json
+```
+
+No `gcloud`? Use the [Google Cloud Console UI](https://console.cloud.google.com/iam-admin/serviceaccounts) — pick the `goalden-693dc` project, **Create Service Account**, grant **Firebase Admin** under "Grant this service account access to project", then on the resulting account use **Keys → Add Key → Create new key → JSON**. Paste that JSON into the GitHub secret.
+
+You can re-deploy without a commit via **Actions tab → Deploy to Firebase → Run workflow**.
 
 ### Manual deploy (for emergencies)
 

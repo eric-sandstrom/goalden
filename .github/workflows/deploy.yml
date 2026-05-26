@@ -2,17 +2,21 @@
 #
 # Deploys: Hosting (Angular app) + Cloud Functions + Firestore rules + indexes.
 #
-# Authentication uses FIREBASE_TOKEN — generated locally with
-# `firebase login:ci` and stored as a GitHub Actions secret. The token has
-# the same permissions as the user who generated it, so make sure the
-# account that ran `firebase login:ci` has owner/editor access to the
-# Firebase project (goalden-693dc).
+# Authentication uses a Google Cloud service account. firebase-tools v15+
+# dropped support for the old FIREBASE_TOKEN env var, so we now pass a
+# service account JSON via google-github-actions/auth which writes it to a
+# tempfile and exports GOOGLE_APPLICATION_CREDENTIALS — firebase-tools then
+# picks it up automatically.
 #
-# Required GitHub secrets:
-#   - FIREBASE_TOKEN     CI auth token from `firebase login:ci`
-#   - FOOTBALL_DATA_TOKEN  Not used here, but the deployed functions need it.
-#                          Set via `firebase functions:secrets:set
-#                          FOOTBALL_DATA_TOKEN` separately (one-time setup).
+# Required GitHub secret:
+#   FIREBASE_SERVICE_ACCOUNT   The full JSON contents of a service account
+#                              key with the `Firebase Admin` role on the
+#                              goalden-693dc project. See README for setup.
+#
+# Required Firebase Functions secret (set once locally, separate from GitHub):
+#   FOOTBALL_DATA_TOKEN        Used by the deployed pollFootballData and
+#                              pollTeams crons. Set with
+#                              `firebase functions:secrets:set FOOTBALL_DATA_TOKEN`.
 
 name: Deploy to Firebase
 
@@ -69,9 +73,15 @@ jobs:
         run: npm run build
         working-directory: functions
 
+      # Writes the JSON key to a temp file and exports
+      # GOOGLE_APPLICATION_CREDENTIALS automatically. firebase-tools picks
+      # this up without any extra flags.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
       - name: Deploy to Firebase
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           npx firebase-tools@latest deploy \
             --only hosting,functions,firestore:rules,firestore:indexes \
