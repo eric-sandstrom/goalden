@@ -219,7 +219,7 @@ interface LeagueRow {
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
                   @if (canManageMember(row)) {
                     <button
                       mat-icon-button
@@ -247,6 +247,8 @@ interface LeagueRow {
                 mat-row
                 *matRowDef="let row; columns: columns"
                 [class.me]="row.uid === myUid()"
+                [class.clickable]="row.uid !== myUid()"
+                (click)="openUser(row)"
               ></tr>
             </table>
           </div>
@@ -351,6 +353,14 @@ interface LeagueRow {
       background: var(--mat-sys-secondary-container);
     }
     tr.me td { color: var(--mat-sys-on-secondary-container); }
+    /* Make other-user rows feel tappable — hover tint + pointer cursor. */
+    tr.clickable {
+      cursor: pointer;
+      transition: background-color 120ms ease;
+    }
+    tr.clickable:hover {
+      background: var(--mat-sys-surface-container-low);
+    }
     .state {
       display: flex;
       justify-content: center;
@@ -596,6 +606,14 @@ export class LeagueDetailComponent {
         duration: 4000,
       });
     }
+  }
+
+  /** Navigate to another user's profile. Tapping your own row is a no-op
+   *  since seeing your own stats from the league context isn't useful —
+   *  you'd just use the /profile tab. */
+  protected openUser(row: LeagueRow): void {
+    if (row.uid === this.myUid()) return;
+    void this.router.navigate(['/users', row.uid]);
   }
 
   protected async confirmKick(row: LeagueRow): Promise<void> {

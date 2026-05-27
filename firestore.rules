@@ -127,16 +127,17 @@ service cloud.firestore {
 
     // ----- predictions: match scores --------------------------------------
     //
-    // Owner-only read/write. Writes are restricted to:
-    //   - Exactly the expected field set (no smuggling in `points` /
-    //     `pointsCategory` — those are server-written).
-    //   - matchId field must match the document path's matchId.
-    //   - homeScore / awayScore must be integers in [0, 99].
-    //   - Lock-time enforced server-side via the fixture doc: status must be
-    //     `TIMED` AND kickoff in the future.
+    // Read: owner anytime; any signed-in user once the fixture is locked
+    //   (status != 'TIMED'). The lock prevents using other users' picks to
+    //   game your own. After lock, predictions are public for league
+    //   comparisons + the per-user profile view.
+    // Write: owner only, with strict field whitelist + lock-time check.
 
     match /predictions/{uid}/matches/{matchId} {
-      allow read: if isSelf(uid);
+      allow read: if isSelf(uid)
+        || (isSignedIn()
+          && exists(/databases/$(database)/documents/fixtures/$(matchId))
+          && fixture(matchId).status != 'TIMED');
 
       allow create, update: if isSelf(uid)
         && request.resource.data.keys().hasOnly([
@@ -158,12 +159,14 @@ service cloud.firestore {
 
     // ----- predictions: podium picks ---------------------------------------
     //
-    // Owner-only. Three team ids, all different. Locks at the first match
-    // kickoff of the tournament (hardcoded to UTC midnight 2026-06-11 — to be
-    // refined to the actual opening match instant when finalised).
+    // Read: owner anytime; any signed-in user after the podium lock
+    //   (tournament opening UTC 2026-06-11). Pre-lock the picks stay
+    //   secret so users can't copy each other's bracket strategy.
+    // Write: owner only, with strict field whitelist + lock-time check.
 
     match /predictions/{uid}/podium/picks {
-      allow read: if isSelf(uid);
+      allow read: if isSelf(uid)
+        || (isSignedIn() && request.time >= timestamp.date(2026, 6, 11));
 
       allow create, update: if isSelf(uid)
         && request.resource.data.keys().hasOnly([

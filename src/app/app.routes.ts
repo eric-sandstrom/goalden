@@ -85,6 +85,13 @@ export const routes: Routes = [
           import('./features/profile/profile.component').then((m) => m.ProfileComponent),
       },
       {
+        path: 'users/:uid',
+        loadComponent: () =>
+          import('./features/user-profile/user-profile.component').then(
+            (m) => m.UserProfileComponent,
+          ),
+      },
+      {
         path: 'dev',
         canActivate: [devOnlyGuard],
         loadComponent: () =>
