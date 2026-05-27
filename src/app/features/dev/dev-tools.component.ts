@@ -299,6 +299,14 @@ type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
             <button
               type="button"
               mat-stroked-button
+              [disabled]="running()"
+              (click)="clearPersonality()"
+            >
+              <mat-icon>auto_awesome</mat-icon> Clear personality
+            </button>
+            <button
+              type="button"
+              mat-stroked-button
               class="scenario miss"
               [disabled]="running()"
               (click)="resetState({ clearMatchPredictions: true, clearPodium: true, resetTotals: true })"
@@ -321,7 +329,9 @@ type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
     }
     .container {
       padding: 1rem;
-      max-width: 640px;
+      /* Match the .page utility's max-width so every routed view inside
+         the shell shares the same content column. */
+      max-width: 720px;
       width: 100%;
       margin: 0 auto;
       overflow-y: auto;
@@ -594,6 +604,15 @@ export class DevToolsComponent {
     if (flags.clearPodium) parts.push('podium');
     if (flags.resetTotals) parts.push('totals');
     await this.runCallable('devResetMyState', flags, `Cleared ${parts.join(', ')}`);
+  }
+
+  /**
+   * Wipe the caller's predictor-personality doc. Lets you regenerate
+   * without waiting out the 12 h cooldown — useful when iterating on
+   * the Gemini prompt or the deterministic fallback's reasoning copy.
+   */
+  protected async clearPersonality(): Promise<void> {
+    await this.runCallable('devClearMyPersonality', {}, 'Personality cleared');
   }
 
   // --------------------------------------------------------------------------

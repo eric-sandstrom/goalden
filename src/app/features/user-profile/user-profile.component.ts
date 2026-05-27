@@ -8,7 +8,6 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -16,15 +15,18 @@ import { DocumentData, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { AuthService } from '../../core/services/auth.service';
 import { FixturesService } from '../../core/services/fixtures.service';
+import { PersonalityService } from '../../core/services/personality.service';
 import {
   MatchPrediction,
   PredictionsService,
 } from '../../core/services/predictions.service';
 import { Fixture, isLocked } from '../../core/models/fixture.model';
+import { Personality } from '../../core/models/personality.model';
 import { PodiumPick } from '../../core/models/podium.model';
 import { UserTotals, parseTotals } from '../../core/services/user.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { FixtureRowComponent } from '../predict/fixture-row.component';
+import { PredictorPersonalityCardComponent } from '../profile/predictor-personality-card.component';
 
 interface OtherUserDoc {
   readonly uid: string;
@@ -37,21 +39,16 @@ interface OtherUserDoc {
   selector: 'app-user-profile',
   imports: [
     NgOptimizedImage,
-    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
     SkelComponent,
     FixtureRowComponent,
+    PredictorPersonalityCardComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="page">
-      <a mat-button routerLink="/leagues" class="back-link">
-        <mat-icon>arrow_back</mat-icon>
-        Back
-      </a>
-
       @if (!loaded()) {
         <mat-card appearance="outlined" class="hero-card">
           <mat-card-header>
@@ -100,6 +97,14 @@ interface OtherUserDoc {
             </div>
           </mat-card-content>
         </mat-card>
+
+        <!-- Predictor personality (visitor mode — no Generate button). -->
+        <app-predictor-personality-card
+          [personality]="otherPersonality()"
+          [loaded]="loaded()"
+          [ownerMode]="false"
+          [subjectName]="u.displayName"
+        />
 
         @if (podiumPick(); as podium) {
           <mat-card appearance="outlined">
@@ -175,9 +180,6 @@ interface OtherUserDoc {
       min-height: 0;
       overflow: hidden;
       width: 100%;
-    }
-    .back-link {
-      align-self: flex-start;
     }
     .hero-card {
       min-height: 120px;
@@ -268,7 +270,7 @@ export class UserProfileComponent {
   private readonly auth = inject(AuthService);
   private readonly fixtures = inject(FixturesService);
   private readonly predictions = inject(PredictionsService);
-  private readonly router = inject(Router);
+  private readonly personalityService = inject(PersonalityService);
 
   /** Wired from the route param via withComponentInputBinding(). */
   readonly uid = input.required<string>();
@@ -276,19 +278,19 @@ export class UserProfileComponent {
   protected readonly otherUser = signal<OtherUserDoc | null>(null);
   protected readonly otherPredictions = signal<ReadonlyMap<string, MatchPrediction>>(new Map());
   protected readonly podiumPick = signal<PodiumPick | null>(null);
+  /** Visited user's personality. Null until loaded; remains null if they
+   *  have never generated one. The card renders an empty state in that
+   *  case (no Generate button — owner-mode is false here). */
+  protected readonly otherPersonality = signal<Personality | null>(null);
   protected readonly loaded = signal(false);
 
   constructor() {
-    // If someone navigates to their own /users/:uid, send them to /profile
-    // (the editable surface). Other users land here normally.
+    // /users/:uid is the public-profile surface for any user, including
+    // the signed-in one — it shows their (locked) match predictions,
+    // podium picks and totals. Editing yourself happens on /profile;
+    // viewing yourself "from the outside" happens here.
     effect(() => {
-      const targetUid = this.uid();
-      const selfUid = this.auth.uid();
-      if (selfUid && targetUid === selfUid) {
-        void this.router.navigate(['/profile']);
-        return;
-      }
-      void this.loadAll(targetUid);
+      void this.loadAll(this.uid());
     });
   }
 
@@ -322,11 +324,13 @@ export class UserProfileComponent {
 
   private async loadAll(uid: string): Promise<void> {
     this.loaded.set(false);
+    this.otherPersonality.set(null);
     try {
       const [userOk] = await Promise.all([
         this.loadUserDoc(uid),
         this.loadLockedPredictions(uid),
         this.loadPodium(uid),
+        this.loadPersonality(uid),
       ]);
       if (!userOk) {
         this.otherUser.set(null);
@@ -383,6 +387,14 @@ export class UserProfileComponent {
       if (r) map.set(r.matchId, r);
     }
     this.otherPredictions.set(map);
+  }
+
+  /** Loads the target user's AI-generated personality if they have one.
+   *  Any signed-in user can read it via the open subcollection rule.
+   *  Null result = never generated; the card renders an empty state. */
+  private async loadPersonality(uid: string): Promise<void> {
+    const result = await this.personalityService.getPersonality(uid);
+    this.otherPersonality.set(result);
   }
 
   /** Loads the target user's podium picks if they've submitted any.

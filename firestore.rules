@@ -93,6 +93,23 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ----- personality -----------------------------------------------------
+    //
+    // AI-generated predictor personality lives under each user's profile.
+    // Read by any signed-in user (the card is shown on /users/:uid for
+    // friends in your league); WRITES happen only via the
+    // `generatePredictorPersonality` callable (Admin SDK, bypasses rules).
+    //
+    // The doc is at users/{uid}/personality/current. Listing the subcollection
+    // is never needed by the client, so we keep `list` denied as a small
+    // belt-and-braces measure.
+
+    match /users/{uid}/personality/{docId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow write: if false;
+    }
+
     // ----- fixtures --------------------------------------------------------
     //
     // World-readable (for any signed-in user). All writes server-only.
@@ -192,13 +209,34 @@ service cloud.firestore {
     // kickMember).
 
     match /leagues/{leagueId} {
-      // Any signed-in user can read a public or global league (so the
-      // browse / global lists work without being a member). Private
-      // leagues stay gated to members only.
-      allow read: if isSignedIn()
-        && (isLeagueMember(leagueId)
+      // GET: members can always read the league doc; non-members can
+      // read public/global leagues. `resource != null` guards against
+      // listeners that were attached to a since-deleted doc — without
+      // it, `resource.data.get(...)` throws "Null value error" and
+      // Firestore surfaces a permission-denied to the client.
+      allow get: if isSignedIn() && resource != null && (
+        isLeagueMember(leagueId)
           || resource.data.get('type', 'private') == 'public'
-          || resource.data.get('type', 'private') == 'global');
+          || resource.data.get('type', 'private') == 'global'
+      );
+
+      // LIST: split from GET because Firestore's static analyzer can't
+      // verify a rule for a collection query when one branch is a
+      // dynamic exists() (isLeagueMember). The OR causes the analyzer
+      // to bail with "Type error. Received: [string] Expected: [bool]".
+      //
+      // Listing this collection only ever happens via
+      //   query(collection('leagues'), where('type', '==', 'public'|'global'))
+      // for the browse-public-leagues + global-leagues screens. The
+      // analyzer can prove the rule holds when the query filters by
+      // `type`, so we keep the surface narrow.
+      //
+      // Private-league discovery happens via the collectionGroup('members')
+      // query below, NOT by listing this collection — so members never
+      // need this rule to grant LIST on their private leagues.
+      allow list: if isSignedIn()
+        && resource.data.get('type', 'private') in ['public', 'global'];
+
       allow write: if false;
     }
 

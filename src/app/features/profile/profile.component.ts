@@ -9,6 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
+import { PersonalityService } from '../../core/services/personality.service';
 import {
   ColorMode,
   PRESET_CUSTOM,
@@ -18,6 +19,7 @@ import {
   VariantName,
 } from '../../core/services/theme.service';
 import { UserService } from '../../core/services/user.service';
+import { PredictorPersonalityCardComponent } from './predictor-personality-card.component';
 
 @Component({
   selector: 'app-profile',
@@ -30,6 +32,7 @@ import { UserService } from '../../core/services/user.service';
     MatIconModule,
     MatSelectModule,
     MatSliderModule,
+    PredictorPersonalityCardComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -50,6 +53,19 @@ import { UserService } from '../../core/services/user.service';
           </button>
         </mat-card-actions>
       </mat-card>
+
+      <!-- ===================================================================
+           Predictor personality
+           Second from the top, between the identity hero and the utility
+           cards below. AI-generated badge based on the user's pick
+           patterns; owner-mode shows the Generate/Regenerate button.
+      ==================================================================== -->
+      <app-predictor-personality-card
+        [personality]="personality.myPersonality()"
+        [loaded]="personality.loaded()"
+        [ownerMode]="true"
+        [eligibility]="personality.eligibility()"
+      />
 
       <!-- ===================================================================
            Browse links
@@ -352,7 +368,9 @@ import { UserService } from '../../core/services/user.service';
     }
     .profile {
       padding: 1.5rem 1rem;
-      max-width: 560px;
+      /* Match the .page utility's max-width so every routed view inside
+         the shell shares the same content column. */
+      max-width: 720px;
       width: 100%;
       margin: 0 auto;
       display: flex;
@@ -652,6 +670,9 @@ export class ProfileComponent {
   private readonly userService = inject(UserService);
   private readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);
+  /** Exposed as `protected` because the template binds the personality
+   *  card's inputs directly off the service signals. */
+  protected readonly personality = inject(PersonalityService);
 
   // Unique IDs so the <label for> bindings address the right inputs even if
   // multiple instances of this component ever live in the DOM together.

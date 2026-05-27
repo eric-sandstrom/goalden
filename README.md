@@ -1,6 +1,6 @@
 # Goalden
 
-FIFA World Cup 2026 prediction app — match scores, podium picks, friend leagues, and global leaderboards. Built with **Angular 21** (zoneless, signals, Material 3) on a **Firebase** backend (Firestore, Cloud Functions, Auth, Hosting). PWA-installable.
+FIFA World Cup 2026 prediction app — match scores, podium picks, friend leagues, global leaderboards, and an AI-generated "predictor personality" for each user. Built with **Angular 21** (zoneless, signals, Material 3) on a **Firebase** backend (Firestore, Cloud Functions, Auth, Hosting). PWA-installable.
 
 > Name is a portmanteau of *goal* + *golden*. Theme colours follow.
 
@@ -32,6 +32,7 @@ First run: click **Poll fixtures** and **Poll teams** in the `/dev` page so the 
 | Java JDK | 21 | required by the Firestore emulator |
 | Firebase CLI | latest | `npm i -g firebase-tools` |
 | Football-data.org API key | free tier | sign up at [football-data.org](https://www.football-data.org/) |
+| Gemini API key | free tier (optional) | sign up at [aistudio.google.com](https://aistudio.google.com/) — powers the predictor-personality reasoning text. Without it the feature still works (deterministic fallback), just without AI-written reasoning. |
 
 ---
 
@@ -54,15 +55,32 @@ firebase use --add
 
 …and pick your own Firebase project.
 
-### 3. Set the football-data API key
+### 3. Set Firebase Functions secrets
 
-The cron functions read fixtures and squads from football-data.org. The token is stored as a Firebase Functions secret, not in source code.
+The Cloud Functions need two secrets:
+
+- **`FOOTBALL_DATA_TOKEN`** — used by `pollFootballData` and `pollTeams` to read fixtures and squads from football-data.org. **Required.**
+- **`GEMINI_API_KEY`** — used by `generatePredictorPersonality` to write AI reasoning text for the predictor-personality card. **Optional** — if absent, the feature falls back to a deterministic best-fit with generic reasoning text.
+
+Set them once per project via the CLI:
 
 ```bash
 firebase functions:secrets:set FOOTBALL_DATA_TOKEN
+firebase functions:secrets:set GEMINI_API_KEY
 ```
 
-Paste your API key when prompted. The emulators read the secret value from `.secret.local` — see [Firebase docs on secrets](https://firebase.google.com/docs/functions/config-env#secret-emulator) if you need to override it for local testing.
+Paste each value when prompted. The CLI stores them in Google Cloud Secret Manager; deployed functions pull from there automatically.
+
+#### Emulator: `.secret.local`
+
+The Firebase Functions emulator does **not** read from Secret Manager. To make `defineSecret().value()` work locally, create `functions/.secret.local` with both keys in dotenv format:
+
+```
+FOOTBALL_DATA_TOKEN=your-football-data-key
+GEMINI_API_KEY=AIzaSy...your-gemini-key
+```
+
+This file is already covered by `functions/.gitignore` (`*.local`) — do not commit it. The values can be read back from Secret Manager at any time via `firebase functions:secrets:access <NAME>`.
 
 ### 4. Optional: seed the emulator with fixtures
 
@@ -203,6 +221,10 @@ firebase deploy --only firestore:rules
 │       ├── poll-teams.ts            Hourly cron: teams + rollup
 │       ├── score-match.ts           Firestore trigger: scoring engine
 │       ├── leagues.ts               Callables for league CRUD
+│       ├── global-leagues.ts        Admin-managed global leagues + auto-enroll
+│       ├── personality.ts           Callable: generate predictor personality (Gemini)
+│       ├── data/                    Static lookup tables (FIFA rankings, etc.)
+│       ├── lib/                     Shared helpers (scoring, invite codes, stats)
 │       └── dev-*.ts                 Emulator-only dev callables
 ├── public/
 │   ├── icons/              PWA icons + master SVG
@@ -255,6 +277,31 @@ Cloud Function pollTeams ──────► teams/{id} docs + cache/teams rol
 ```
 
 Clients cache the rollup docs in `localStorage` with a short TTL (5 min for fixtures, 24 h for teams). The live scoreboard maintains a separate small `onSnapshot` listener filtered to `IN_PLAY` / `PAUSED` matches only, so real-time scoring works without paying for the full 104-doc listener.
+
+---
+
+## Predictor personality (AI)
+
+Each user has a "predictor personality" card on `/profile` and `/users/:uid` — an AI-labelled archetype like 🎲 *Against All Odds* or ⚽ *Goal Rush*, plus a short reasoning sentence written by Gemini about the user's specific pick pattern.
+
+Pipeline:
+
+```
+User taps "Generate" on /profile
+   ↓
+generatePredictorPersonality callable
+   ├─ Eligibility gate: ≥3 picks, ≥3 new since last gen, ≥12 h since last gen
+   ├─ Read predictions + matched fixture metadata
+   ├─ Compute deterministic stats (upset %, avg goals, score entropy, ...)
+   │  using the snapshot in functions/src/data/fifa-rankings.ts
+   ├─ Call Gemini 2.0 Flash with structured-output enum schema
+   │  └─ Fall through to deterministic best-fit on any Gemini error
+   └─ Write users/{uid}/personality/current
+```
+
+Ten fixed archetypes form the taxonomy (Against All Odds, The Statistician, Home Sweet Home, Goal Rush, The Wall, Draw Dealer, Chaos Goblin, Hometown Hero, Sniper, Late Bloomer). The deterministic detection in `functions/src/lib/personality-stats.ts` is also what feeds Gemini's prompt — Gemini's job is to choose the archetype and write the reasoning text, not to do arithmetic.
+
+The card uses an open Firestore read (`users/{uid}/personality/current` — any signed-in user) so league mates can compare. Writes are server-only via the callable; cooldown and pick-count rules are enforced both client-side (UX) and server-side (authoritative).
 
 ---
 
