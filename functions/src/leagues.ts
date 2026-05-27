@@ -24,10 +24,20 @@ function validName(name: unknown): name is string {
 
 export const createLeague = onCall({ region: 'europe-west1' }, async (request) => {
   const uid = requireAuth(request);
-  const { name } = request.data ?? {};
+  const { name, type: rawType } = request.data ?? {};
   if (!validName(name)) {
     throw new HttpsError('invalid-argument', `name must be ${NAME_MIN}-${NAME_MAX} chars`);
   }
+  // User-created leagues are private by default; public adds discoverability
+  // + code-less join. Global leagues must go through createGlobalLeague so
+  // we explicitly reject that here.
+  if (rawType !== undefined && rawType !== 'private' && rawType !== 'public') {
+    throw new HttpsError(
+      'invalid-argument',
+      'type must be "private" or "public" (use createGlobalLeague for global)',
+    );
+  }
+  const type: 'private' | 'public' = rawType === 'public' ? 'public' : 'private';
 
   const db = getFirestore();
   const inviteCode = await generateUniqueInviteCode();
@@ -39,6 +49,7 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
   const batch = db.batch();
   batch.set(leagueRef, {
     name: trimmed,
+    type,
     ownerId: uid,
     inviteCode,
     memberCount: 1,
@@ -49,6 +60,10 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
     role: 'owner',
     joinedAt: FieldValue.serverTimestamp(),
   });
+  // leagues_public mirror still gets written for public AND private leagues
+  // because both can be joined via invite code. The browse listing for
+  // public leagues reads the main leagues collection directly (since
+  // public reads are allowed by rules).
   batch.set(publicRef, {
     leagueId: leagueRef.id,
     name: trimmed,
@@ -56,8 +71,8 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
   });
   await batch.commit();
 
-  logger.info(`League created: ${leagueRef.id} (${inviteCode}) by ${uid}`);
-  return { leagueId: leagueRef.id, inviteCode };
+  logger.info(`${type} league created: ${leagueRef.id} (${inviteCode}) by ${uid}`);
+  return { leagueId: leagueRef.id, inviteCode, type };
 });
 
 // ---------------------------------------------------------------------------
@@ -66,20 +81,53 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
 
 export const joinLeague = onCall({ region: 'europe-west1' }, async (request) => {
   const uid = requireAuth(request);
-  const { inviteCode } = request.data ?? {};
-  if (typeof inviteCode !== 'string' || inviteCode.length === 0) {
-    throw new HttpsError('invalid-argument', 'inviteCode required');
+  const { inviteCode, leagueId: directLeagueId } = request.data ?? {};
+
+  // Two valid join paths:
+  //   1) inviteCode  → looks up leagues_public/{code} → resolves leagueId
+  //   2) leagueId    → direct join, only valid when the league is public
+  // Exactly one must be supplied.
+  if (
+    (typeof inviteCode !== 'string' || inviteCode.length === 0) &&
+    (typeof directLeagueId !== 'string' || directLeagueId.length === 0)
+  ) {
+    throw new HttpsError('invalid-argument', 'Provide inviteCode or leagueId');
   }
-  const normalized = inviteCode.toUpperCase().trim();
 
   const db = getFirestore();
-  const publicRef = db.collection('leagues_public').doc(normalized);
-  const publicSnap = await publicRef.get();
-  if (!publicSnap.exists) {
-    throw new HttpsError('not-found', 'Invalid invite code');
+  let leagueId: string;
+  let publicMirrorRef: FirebaseFirestore.DocumentReference | null = null;
+
+  if (typeof directLeagueId === 'string' && directLeagueId.length > 0) {
+    // Direct join — only allowed for public leagues. We still need to
+    // resolve the invite code to update the leagues_public mirror's
+    // memberCount in the same transaction.
+    leagueId = directLeagueId;
+    const leagueSnap = await db.collection('leagues').doc(leagueId).get();
+    if (!leagueSnap.exists) {
+      throw new HttpsError('not-found', 'League does not exist');
+    }
+    const data = leagueSnap.data()!;
+    if (data['type'] !== 'public') {
+      throw new HttpsError(
+        'permission-denied',
+        'This league requires an invite code',
+      );
+    }
+    if (typeof data['inviteCode'] === 'string' && data['inviteCode'].length > 0) {
+      publicMirrorRef = db.collection('leagues_public').doc(data['inviteCode']);
+    }
+  } else {
+    // Invite-code path (existing behaviour).
+    const normalized = (inviteCode as string).toUpperCase().trim();
+    publicMirrorRef = db.collection('leagues_public').doc(normalized);
+    const publicSnap = await publicMirrorRef.get();
+    if (!publicSnap.exists) {
+      throw new HttpsError('not-found', 'Invalid invite code');
+    }
+    leagueId = publicSnap.data()?.['leagueId'] as string;
   }
 
-  const leagueId = publicSnap.data()?.['leagueId'] as string;
   const leagueRef = db.collection('leagues').doc(leagueId);
   const memberRef = leagueRef.collection('members').doc(uid);
 
@@ -102,7 +150,9 @@ export const joinLeague = onCall({ region: 'europe-west1' }, async (request) => 
       joinedAt: FieldValue.serverTimestamp(),
     });
     tx.update(leagueRef, { memberCount: FieldValue.increment(1) });
-    tx.update(publicRef, { memberCount: FieldValue.increment(1) });
+    if (publicMirrorRef) {
+      tx.update(publicMirrorRef, { memberCount: FieldValue.increment(1) });
+    }
   });
 
   logger.info(`User ${uid} joined league ${leagueId}`);

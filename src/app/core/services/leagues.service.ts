@@ -196,7 +196,8 @@ export class LeaguesService {
 
   private parseLeague(id: string, data: Record<string, unknown>): League {
     const rawType = data['type'];
-    const type = rawType === 'global' ? 'global' : 'private';
+    const type =
+      rawType === 'global' ? 'global' : rawType === 'public' ? 'public' : 'private';
     const globalConfig = type === 'global' ? parseGlobalConfig(data['globalConfig']) : null;
     return {
       id,
@@ -277,12 +278,15 @@ export class LeaguesService {
   // Callable wrappers
   // ---------------------------------------------------------------------------
 
-  async createLeague(name: string): Promise<{ leagueId: string; inviteCode: string }> {
-    const call = httpsCallable<{ name: string }, { leagueId: string; inviteCode: string }>(
-      this.functions,
-      'createLeague',
-    );
-    const res = await call({ name });
+  async createLeague(
+    name: string,
+    type: 'private' | 'public' = 'private',
+  ): Promise<{ leagueId: string; inviteCode: string; type: 'private' | 'public' }> {
+    const call = httpsCallable<
+      { name: string; type: 'private' | 'public' },
+      { leagueId: string; inviteCode: string; type: 'private' | 'public' }
+    >(this.functions, 'createLeague');
+    const res = await call({ name, type });
     return res.data;
   }
 
@@ -293,6 +297,26 @@ export class LeaguesService {
     );
     const res = await call({ inviteCode });
     return res.data;
+  }
+
+  async joinPublicLeague(leagueId: string): Promise<{ leagueId: string }> {
+    const call = httpsCallable<{ leagueId: string }, { leagueId: string }>(
+      this.functions,
+      'joinLeague',
+    );
+    const res = await call({ leagueId });
+    return res.data;
+  }
+
+  /** Snapshot listener over every public league. Used by the leagues-browse
+   *  section so users can discover and join without an invite code. */
+  listenToPublicLeagues(cb: (leagues: readonly League[]) => void): () => void {
+    const q = query(collection(this.db, 'leagues'), where('type', '==', 'public'));
+    return onSnapshot(q, (snap) => {
+      const list: League[] = [];
+      snap.forEach((d) => list.push(this.parseLeague(d.id, d.data())));
+      cb(list);
+    });
   }
 
   async leaveLeague(leagueId: string): Promise<void> {

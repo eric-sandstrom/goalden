@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -14,6 +15,7 @@ import { LeaguesService } from '../../core/services/leagues.service';
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatDialogModule,
     MatFormFieldModule,
     MatIconModule,
@@ -42,6 +44,27 @@ import { LeaguesService } from '../../core/services/leagues.service';
             <mat-error>At least 2 characters</mat-error>
           }
         </mat-form-field>
+
+        <div class="type-row">
+          <span class="type-label">Visibility</span>
+          <mat-button-toggle-group formControlName="type" hideSingleSelectionIndicator>
+            <mat-button-toggle value="private">
+              <mat-icon>lock</mat-icon>
+              Private
+            </mat-button-toggle>
+            <mat-button-toggle value="public">
+              <mat-icon>public</mat-icon>
+              Public
+            </mat-button-toggle>
+          </mat-button-toggle-group>
+          <p class="type-hint">
+            @if (form.controls.type.value === 'private') {
+              Invite-only — share the code or link.
+            } @else {
+              Anyone can find and join — no invite needed.
+            }
+          </p>
+        </div>
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -74,6 +97,24 @@ import { LeaguesService } from '../../core/services/leagues.service';
       width: 100%;
       min-width: 320px;
     }
+    .type-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+    .type-label {
+      font-size: 0.85rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .type-row mat-button-toggle-group {
+      align-self: stretch;
+    }
+    .type-hint {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
   `,
 })
 export class CreateLeagueDialogComponent {
@@ -86,6 +127,7 @@ export class CreateLeagueDialogComponent {
 
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(40)]],
+    type: ['private' as 'private' | 'public', Validators.required],
   });
 
   protected cancel(): void {
@@ -96,7 +138,8 @@ export class CreateLeagueDialogComponent {
     if (this.form.invalid) return;
     this.creating.set(true);
     try {
-      const { leagueId } = await this.leagues.createLeague(this.form.controls.name.value);
+      const value = this.form.getRawValue();
+      const { leagueId } = await this.leagues.createLeague(value.name, value.type);
       this.dialogRef.close(leagueId);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Could not create league';

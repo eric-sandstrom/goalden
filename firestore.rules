@@ -189,7 +189,13 @@ service cloud.firestore {
     // kickMember).
 
     match /leagues/{leagueId} {
-      allow read: if isSignedIn() && isLeagueMember(leagueId);
+      // Any signed-in user can read a public or global league (so the
+      // browse / global lists work without being a member). Private
+      // leagues stay gated to members only.
+      allow read: if isSignedIn()
+        && (isLeagueMember(leagueId)
+          || resource.data.get('type', 'private') == 'public'
+          || resource.data.get('type', 'private') == 'global');
       allow write: if false;
     }
 

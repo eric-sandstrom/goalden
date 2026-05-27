@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,6 +19,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { League } from '../../core/models/league.model';
 import { LeaguesService } from '../../core/services/leagues.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { CreateLeagueDialogComponent } from './create-league-dialog.component';
@@ -104,26 +112,56 @@ import { CreateLeagueDialogComponent } from './create-league-dialog.component';
           <p>You aren't in any leagues yet. Create one or join via a code.</p>
         </mat-card>
       } @else {
-        <mat-card appearance="outlined" class="card-grow my-leagues-card">
+        <mat-card appearance="outlined" class="my-leagues-card">
           <mat-card-header>
             <mat-icon matCardAvatar>groups</mat-icon>
             <mat-card-title>Your leagues</mat-card-title>
           </mat-card-header>
-          <div class="card-scroll">
-            <mat-nav-list>
-              @for (item of myList(); track item.league.id) {
-                <a mat-list-item [routerLink]="['/leagues', item.league.id]">
-                  <mat-icon matListItemIcon>
-                    {{ item.role === 'owner' ? 'workspace_premium' : 'groups' }}
-                  </mat-icon>
-                  <span matListItemTitle>{{ item.league.name }}</span>
-                  <span matListItemLine>
-                    {{ item.league.memberCount }} members · {{ item.role }}
-                  </span>
-                </a>
-              }
-            </mat-nav-list>
-          </div>
+          <mat-nav-list>
+            @for (item of myList(); track item.league.id) {
+              <a mat-list-item [routerLink]="['/leagues', item.league.id]">
+                <mat-icon matListItemIcon>{{ leagueIcon(item.league.type, item.role) }}</mat-icon>
+                <span matListItemTitle>{{ item.league.name }}</span>
+                <span matListItemLine>
+                  {{ item.league.memberCount }} members · {{ leagueRoleLabel(item) }}
+                </span>
+              </a>
+            }
+          </mat-nav-list>
+        </mat-card>
+      }
+
+      <!-- ===================================================================
+           Discover: public leagues the user hasn't joined yet
+      ==================================================================== -->
+      @if (discoverable().length > 0) {
+        <mat-card appearance="outlined" class="discover-card">
+          <mat-card-header>
+            <mat-icon matCardAvatar>public</mat-icon>
+            <mat-card-title>Discover</mat-card-title>
+            <mat-card-subtitle>Public leagues — join with one tap</mat-card-subtitle>
+          </mat-card-header>
+          <mat-nav-list>
+            @for (league of discoverable(); track league.id) {
+              <mat-list-item>
+                <mat-icon matListItemIcon>public</mat-icon>
+                <span matListItemTitle>{{ league.name }}</span>
+                <span matListItemLine>{{ league.memberCount }} members</span>
+                <button
+                  mat-stroked-button
+                  matListItemMeta
+                  [disabled]="joiningId() === league.id"
+                  (click)="joinPublic(league)"
+                >
+                  @if (joiningId() === league.id) {
+                    <mat-progress-spinner mode="indeterminate" diameter="18" />
+                  } @else {
+                    Join
+                  }
+                </button>
+              </mat-list-item>
+            }
+          </mat-nav-list>
         </mat-card>
       }
     </section>
@@ -191,15 +229,62 @@ export class LeaguesComponent {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loaded = this.leagues.fullyLoaded;
   protected readonly myList = this.leagues.myLeagueList;
   protected readonly joining = signal(false);
+  protected readonly joiningId = signal<string | null>(null);
   protected readonly skelRows = [0, 1, 2];
+
+  /** All public leagues live-watched via Firestore. */
+  private readonly publicLeagues = signal<readonly League[]>([]);
+
+  /** Public leagues the user isn't already a member of — what we surface
+   *  in the Discover card. Computed so it auto-updates when either the
+   *  user's own memberships or the public list changes. */
+  protected readonly discoverable = computed<readonly League[]>(() => {
+    const all = this.publicLeagues();
+    if (all.length === 0) return [];
+    const myIds = new Set(this.myList().map((m) => m.league.id));
+    return all.filter((l) => !myIds.has(l.id));
+  });
 
   protected readonly joinForm = this.fb.nonNullable.group({
     code: ['', [Validators.required, Validators.minLength(8)]],
   });
+
+  constructor() {
+    const unsub = this.leagues.listenToPublicLeagues((list) => {
+      this.publicLeagues.set(list);
+    });
+    this.destroyRef.onDestroy(() => unsub());
+  }
+
+  protected leagueIcon(type: League['type'], role: 'owner' | 'member'): string {
+    if (type === 'global') return 'public';
+    if (type === 'public') return 'public';
+    return role === 'owner' ? 'workspace_premium' : 'groups';
+  }
+
+  protected leagueRoleLabel(item: { league: League; role: 'owner' | 'member' }): string {
+    if (item.league.type === 'global') return 'auto-enrolled';
+    if (item.league.type === 'public') return item.role === 'owner' ? 'owner · public' : 'public';
+    return item.role;
+  }
+
+  protected async joinPublic(league: League): Promise<void> {
+    this.joiningId.set(league.id);
+    try {
+      await this.leagues.joinPublicLeague(league.id);
+      this.snackBar.open(`Joined ${league.name}`, undefined, { duration: 1800 });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not join league';
+      this.snackBar.open(msg, 'Dismiss', { duration: 4000 });
+    } finally {
+      this.joiningId.set(null);
+    }
+  }
 
   protected async openCreate(): Promise<void> {
     const ref = this.dialog.open<CreateLeagueDialogComponent, void, string>(

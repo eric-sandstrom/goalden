@@ -1,13 +1,18 @@
 export type LeagueRole = 'owner' | 'member';
 
 /**
- * Two flavours of league:
- *  - `private` (default): user-created via createLeague(), invite-only via
- *    capability URL. Has an owner with mod powers.
+ * Three flavours of league:
+ *  - `private` (default): user-created, invite-only via capability URL.
+ *    Has an owner with mod powers.
+ *  - `public`: user-created, **discoverable** by any signed-in user. Same
+ *    owner powers as private. Joinable without an invite code from the
+ *    browse list (the invite code still exists if the owner wants to share
+ *    one). The differentiator vs private is solely discoverability +
+ *    code-less join.
  *  - `global`: admin-created via createGlobalLeague(). No invite code, no
  *    owner. Users are auto-enrolled based on `globalConfig.autoEnroll`.
  */
-export type LeagueType = 'private' | 'global';
+export type LeagueType = 'private' | 'public' | 'global';
 
 /**
  * Configuration that drives auto-enrollment for `global` leagues. Evaluated
