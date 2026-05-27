@@ -17,6 +17,7 @@ export { devSetKickoffTime } from './dev-set-kickoff';
 export { devResetMyState } from './dev-reset-my-state';
 export { devClearMyPersonality } from './dev-clear-personality';
 export { devSignInAsAdmin } from './dev-sign-in-admin';
+export { grantAdminRole, revokeAdminRole } from './admin-roles';
 export { devPollTeamsNow } from './dev-poll-teams';
 export { devPollFixturesNow } from './dev-poll-fixtures';
 export {

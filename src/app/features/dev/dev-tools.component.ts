@@ -14,6 +14,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { FUNCTIONS } from '../../core/firebase/firebase.providers';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { PredictionsService } from '../../core/services/predictions.service';
+import { UserService } from '../../core/services/user.service';
 
 type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
 
@@ -261,6 +262,52 @@ type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
         </mat-card-content>
       </mat-card>
 
+      @if (isOwner()) {
+        <!-- ===================================================================
+             Role management (owner-only)
+             Owners can promote any user to admin, or demote them back.
+             Server-side requireOwnerOrEmulator re-checks the role on
+             every call — the UI gate here is just for trimming.
+        ==================================================================== -->
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-icon matCardAvatar>shield_person</mat-icon>
+            <mat-card-title>Role management</mat-card-title>
+            <mat-card-subtitle>
+              Grant or revoke the admin role. Owners can't be demoted here.
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <form [formGroup]="roleForm" class="form">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Target user uid</mat-label>
+                <input matInput formControlName="uid" placeholder="abc123..." />
+                <mat-hint>Copy from the user's profile URL (/users/:uid).</mat-hint>
+              </mat-form-field>
+              <div class="presets">
+                <button
+                  type="button"
+                  mat-flat-button
+                  color="primary"
+                  [disabled]="running() || roleForm.invalid"
+                  (click)="grantAdmin()"
+                >
+                  <mat-icon>shield</mat-icon> Grant admin
+                </button>
+                <button
+                  type="button"
+                  mat-stroked-button
+                  [disabled]="running() || roleForm.invalid"
+                  (click)="revokeAdmin()"
+                >
+                  <mat-icon>person_remove</mat-icon> Revoke admin
+                </button>
+              </div>
+            </form>
+          </mat-card-content>
+        </mat-card>
+      }
+
       <!-- ===================================================================
            Reset state
       ==================================================================== -->
@@ -395,11 +442,16 @@ type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
 export class DevToolsComponent {
   private readonly fixtures = inject(FixturesService);
   private readonly predictions = inject(PredictionsService);
+  private readonly userService = inject(UserService);
   private readonly functions = inject(FUNCTIONS);
   private readonly snackBar = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
 
   protected readonly running = signal(false);
+
+  /** Owners see the role-management card; everyone else doesn't. The
+   *  callables behind the buttons re-check the role server-side. */
+  protected readonly isOwner = this.userService.isOwner;
 
   /** Every fixture, labelled with its current status — used by the state and
    *  kickoff cards (which need to operate on any fixture, not just ones the
@@ -444,6 +496,13 @@ export class DevToolsComponent {
 
   protected readonly scenarioForm = this.fb.nonNullable.group({
     matchId: ['', Validators.required],
+  });
+
+  /** Target uid for the grant/revoke admin actions. Validated as a
+   *  non-empty string; format checks happen server-side (so we don't
+   *  duplicate Firebase Auth's uid rules). */
+  protected readonly roleForm = this.fb.nonNullable.group({
+    uid: ['', [Validators.required, Validators.minLength(1)]],
   });
 
   // --------------------------------------------------------------------------
@@ -613,6 +672,26 @@ export class DevToolsComponent {
    */
   protected async clearPersonality(): Promise<void> {
     await this.runCallable('devClearMyPersonality', {}, 'Personality cleared');
+  }
+
+  /**
+   * Promote a user to admin. Calls the owner-gated grantAdminRole
+   * callable; the server re-checks the role so a non-owner clicking
+   * this (e.g. an admin who somehow opened devtools) gets a clean
+   * permission-denied snackbar.
+   */
+  protected async grantAdmin(): Promise<void> {
+    const { uid } = this.roleForm.getRawValue();
+    if (!uid) return;
+    await this.runCallable('grantAdminRole', { uid }, `Granted admin to ${uid}`);
+  }
+
+  /** Demote a user — server refuses if target is an owner or is the
+   *  caller themselves, so no client-side guards needed here. */
+  protected async revokeAdmin(): Promise<void> {
+    const { uid } = this.roleForm.getRawValue();
+    if (!uid) return;
+    await this.runCallable('revokeAdminRole', { uid }, `Revoked admin from ${uid}`);
   }
 
   // --------------------------------------------------------------------------

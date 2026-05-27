@@ -22,14 +22,21 @@ export const EMPTY_TOTALS: UserTotals = {
 };
 
 /**
- * Roles granted to the user via the `users/{uid}.roles` array field.
- * Currently only `'admin'` is in use — it gates the /admin section and
- * the createGlobalLeague Cloud Functions.
+ * Roles granted via `users/{uid}.roles`. Two-tier hierarchy:
  *
- * Granted manually via the Firestore console for the first admin; that
- * admin can then grant others through the admin UI (planned).
+ *   - `'owner'` — top tier. Bootstrapped manually in the Firestore
+ *     console (one-time). Owners can grant/revoke `'admin'` via the
+ *     `grantAdminRole` / `revokeAdminRole` callables (surfaced in the
+ *     dev-tools UI). Owner implies admin.
+ *
+ *   - `'admin'` — granted by an owner. Unlocks the dev-tools surface
+ *     in production, the /admin section, and the global-leagues
+ *     callables. Cannot mutate any role assignments.
+ *
+ * The Firestore security rules deny client writes to the `roles`
+ * field, so escalation can only happen through owner-gated callables.
  */
-export type UserRole = 'admin';
+export type UserRole = 'admin' | 'owner';
 
 export interface UserDoc {
   readonly uid: string;
@@ -57,13 +64,21 @@ export class UserService {
     return u !== null && u.displayName.trim().length > 0;
   });
 
-  /** True when the current user has the 'admin' role on their user doc.
-   *  Used to gate the /admin section + admin-only UI affordances. The
-   *  server enforces the same check via firestore.rules + the
-   *  createGlobalLeague callable, so this is purely a UX guard. */
+  /** True when the current user has the 'admin' role OR the 'owner'
+   *  role (owner implies admin). Used to gate the /admin section +
+   *  admin-only UI affordances. The server enforces the same hierarchy
+   *  via requireAdminOrEmulator, so this is purely a UX guard. */
   readonly isAdmin = computed(() => {
     const u = this._userDoc();
-    return u !== null && u.roles.includes('admin');
+    if (!u) return false;
+    return u.roles.includes('admin') || u.roles.includes('owner');
+  });
+
+  /** True when the current user has the 'owner' role. Owners can
+   *  promote/demote other users to/from admin via the dev-tools UI. */
+  readonly isOwner = computed(() => {
+    const u = this._userDoc();
+    return u !== null && u.roles.includes('owner');
   });
 
   constructor() {
@@ -156,7 +171,7 @@ export function parseRoles(raw: unknown): readonly UserRole[] {
   if (!Array.isArray(raw)) return [];
   const valid: UserRole[] = [];
   for (const entry of raw) {
-    if (entry === 'admin') valid.push(entry);
+    if (entry === 'admin' || entry === 'owner') valid.push(entry);
   }
   return valid;
 }
