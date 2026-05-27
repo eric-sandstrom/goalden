@@ -21,12 +21,23 @@ export const EMPTY_TOTALS: UserTotals = {
   correctOutcomeHits: 0,
 };
 
+/**
+ * Roles granted to the user via the `users/{uid}.roles` array field.
+ * Currently only `'admin'` is in use — it gates the /admin section and
+ * the createGlobalLeague Cloud Functions.
+ *
+ * Granted manually via the Firestore console for the first admin; that
+ * admin can then grant others through the admin UI (planned).
+ */
+export type UserRole = 'admin';
+
 export interface UserDoc {
   readonly uid: string;
   readonly displayName: string;
   readonly photoURL: string | null;
   readonly createdAt: Date | null;
   readonly totals: UserTotals;
+  readonly roles: readonly UserRole[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -44,6 +55,15 @@ export class UserService {
   readonly hasDisplayName = computed(() => {
     const u = this._userDoc();
     return u !== null && u.displayName.trim().length > 0;
+  });
+
+  /** True when the current user has the 'admin' role on their user doc.
+   *  Used to gate the /admin section + admin-only UI affordances. The
+   *  server enforces the same check via firestore.rules + the
+   *  createGlobalLeague callable, so this is purely a UX guard. */
+  readonly isAdmin = computed(() => {
+    const u = this._userDoc();
+    return u !== null && u.roles.includes('admin');
   });
 
   constructor() {
@@ -67,6 +87,7 @@ export class UserService {
             photoURL: data['photoURL'] ?? null,
             createdAt: created instanceof Timestamp ? created.toDate() : null,
             totals: parseTotals(data['totals']),
+            roles: parseRoles(data['roles']),
           });
         } else {
           this._userDoc.set(null);
@@ -109,4 +130,15 @@ export function parseTotals(t: unknown): UserTotals {
     correctOutcomeHits:
       typeof d['correctOutcomeHits'] === 'number' ? d['correctOutcomeHits'] : 0,
   };
+}
+
+/** Defensive parse of `users/{uid}.roles`. Validates each entry against
+ *  the known UserRole union; unknown strings are dropped silently. */
+export function parseRoles(raw: unknown): readonly UserRole[] {
+  if (!Array.isArray(raw)) return [];
+  const valid: UserRole[] = [];
+  for (const entry of raw) {
+    if (entry === 'admin') valid.push(entry);
+  }
+  return valid;
 }

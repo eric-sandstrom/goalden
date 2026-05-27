@@ -130,6 +130,26 @@ export const leaveLeague = onCall({ region: 'europe-west1' }, async (request) =>
       throw new HttpsError('not-found', 'League does not exist');
     }
     const data = leagueSnap.data()!;
+
+    // Global leagues: respect globalConfig.allowLeave. Owners don't exist
+    // for global leagues so the ownership check below is skipped for them.
+    if (data['type'] === 'global') {
+      const allowLeave = data['globalConfig']?.allowLeave === true;
+      if (!allowLeave) {
+        throw new HttpsError(
+          'failed-precondition',
+          'This league is mandatory — you cannot leave.',
+        );
+      }
+      const memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) return; // already not a member
+      tx.delete(memberRef);
+      tx.update(leagueRef, { memberCount: FieldValue.increment(-1) });
+      // Global leagues have no leagues_public mirror — no second update.
+      return;
+    }
+
+    // Private league: existing owner-cannot-leave + mirror update logic.
     if (data['ownerId'] === uid) {
       throw new HttpsError(
         'failed-precondition',
@@ -137,7 +157,7 @@ export const leaveLeague = onCall({ region: 'europe-west1' }, async (request) =>
       );
     }
     const memberSnap = await tx.get(memberRef);
-    if (!memberSnap.exists) return; // already not a member
+    if (!memberSnap.exists) return;
 
     tx.delete(memberRef);
     tx.update(leagueRef, { memberCount: FieldValue.increment(-1) });
@@ -166,6 +186,15 @@ export const deleteLeague = onCall({ region: 'europe-west1' }, async (request) =
     throw new HttpsError('not-found', 'League does not exist');
   }
   const data = leagueSnap.data()!;
+  // Global leagues route through deleteGlobalLeague (admin-only). Refuse
+  // here so a private-league owner can't trip into a global-league code
+  // path with the wrong assumptions.
+  if (data['type'] === 'global') {
+    throw new HttpsError(
+      'failed-precondition',
+      'Global leagues can only be removed via deleteGlobalLeague (admin only).',
+    );
+  }
   if (data['ownerId'] !== uid) {
     throw new HttpsError('permission-denied', 'Only the owner can delete a league.');
   }

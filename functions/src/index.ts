@@ -26,3 +26,9 @@ export {
   transferOwnership,
   kickMember,
 } from './leagues';
+export {
+  createGlobalLeague,
+  syncGlobalLeague,
+  deleteGlobalLeague,
+  autoEnrollOnUserCreate,
+} from './global-leagues';

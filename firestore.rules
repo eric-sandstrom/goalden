@@ -38,6 +38,22 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/leagues/$(leagueId)/members/$(request.auth.uid));
     }
 
+    /**
+     * Reads the caller's user doc and checks whether their `roles` array
+     * includes 'admin'. Admins can create/manage global leagues via Cloud
+     * Functions; this helper is also a defence-in-depth check in case
+     * client-side admin gating is bypassed.
+     *
+     * `roles` is set via the Firestore console initially. Once an admin
+     * exists, they grant other admins via the planned admin UI (which
+     * calls a Cloud Function that bypasses these rules using Admin SDK).
+     */
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && 'admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roles', []);
+    }
+
     function fixture(matchId) {
       return get(/databases/$(database)/documents/fixtures/$(matchId)).data;
     }

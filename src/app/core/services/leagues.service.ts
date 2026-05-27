@@ -15,6 +15,7 @@ import { httpsCallable } from 'firebase/functions';
 import { FIRESTORE, FUNCTIONS } from '../firebase/firebase.providers';
 import {
   League,
+  LeagueGlobalConfig,
   LeagueMember,
   LeaguePublic,
   MyLeagueMembership,
@@ -194,9 +195,14 @@ export class LeaguesService {
   }
 
   private parseLeague(id: string, data: Record<string, unknown>): League {
+    const rawType = data['type'];
+    const type = rawType === 'global' ? 'global' : 'private';
+    const globalConfig = type === 'global' ? parseGlobalConfig(data['globalConfig']) : null;
     return {
       id,
       name: (data['name'] as string) ?? '',
+      type,
+      globalConfig,
       ownerId: (data['ownerId'] as string) ?? '',
       inviteCode: (data['inviteCode'] as string) ?? '',
       memberCount: (data['memberCount'] as number) ?? 0,
@@ -329,4 +335,35 @@ export class LeaguesService {
     );
     await call({ leagueId, memberUid });
   }
+}
+
+/** Defensive parse — global leagues from the server should always have a
+ *  well-formed config, but bad data shouldn't crash the UI. Returns null
+ *  if the shape doesn't validate. */
+function parseGlobalConfig(raw: unknown): LeagueGlobalConfig | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const autoEnroll = data['autoEnroll'];
+  if (autoEnroll !== 'all' && autoEnroll !== 'filter') return null;
+  const allowLeave = data['allowLeave'] === true;
+  const config: LeagueGlobalConfig = autoEnroll === 'filter' && data['filter']
+    ? {
+        autoEnroll: 'filter',
+        filter: parseFilter(data['filter']),
+        allowLeave,
+      }
+    : { autoEnroll: 'all', allowLeave };
+  return config;
+}
+
+function parseFilter(raw: unknown): { field: string; equals: string | number | boolean } {
+  if (!raw || typeof raw !== 'object') return { field: '', equals: '' };
+  const f = raw as Record<string, unknown>;
+  const field = typeof f['field'] === 'string' ? f['field'] : '';
+  const equals = f['equals'];
+  const safe =
+    typeof equals === 'string' || typeof equals === 'number' || typeof equals === 'boolean'
+      ? equals
+      : '';
+  return { field, equals: safe };
 }
