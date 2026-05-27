@@ -299,7 +299,13 @@ async function maybeRunGemini(
   const prompt = buildPrompt(stats, hint);
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    // Model selection notes (Goalden's experience, 2026):
+    //   - gemini-1.5-flash: retired, returns 404 on v1beta.
+    //   - gemini-2.0-flash: exists, but new projects start with
+    //     free_tier_requests=0 quota until manually provisioned.
+    //   - gemini-2.5-flash: free tier covers fresh AI Studio
+    //     projects out of the box. This is the safest default.
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: {
       // Structured output — locks the response shape so we don't have
@@ -322,30 +328,58 @@ async function maybeRunGemini(
         required: ['archetype', 'reasoning'],
         propertyOrdering: ['archetype', 'reasoning'],
       },
+      // Disable Gemini 2.5's built-in "thinking" tokens. Without this,
+      // the model spends most of the maxOutputTokens budget on private
+      // chain-of-thought reasoning and only emits a fragment of the
+      // actual JSON. We don't need CoT for a one-label classification.
+      thinkingConfig: { thinkingBudget: 0 },
       temperature: 0.7,
-      maxOutputTokens: 250,
+      // Generous ceiling so a long reasoning sentence + JSON envelope
+      // always fits. Bumped from 250 (which truncated mid-response).
+      maxOutputTokens: 1024,
     },
   });
 
   const raw = response.text;
+  // Always log the raw response so we can see what Gemini actually
+  // returned — invaluable for debugging structured-output mismatches.
+  logger.info('Gemini raw response', {
+    text: raw ?? null,
+    textLength: raw?.length ?? 0,
+    hasCandidates: !!response.candidates,
+    candidateCount: response.candidates?.length ?? 0,
+  });
+
   if (!raw) {
-    logger.warn('Gemini returned empty response');
+    logger.warn('Gemini returned empty response.text');
     return null;
   }
+
+  // Gemini sometimes wraps JSON in markdown fences (```json ... ```)
+  // even when responseMimeType is set. Strip them defensively before parsing.
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim();
+
   let parsed: { archetype?: unknown; reasoning?: unknown };
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(cleaned);
   } catch (e) {
-    logger.warn('Gemini response not valid JSON', { raw: raw.slice(0, 200) });
+    logger.warn('Gemini response not valid JSON', { raw: cleaned.slice(0, 500) });
     return null;
   }
   if (!isArchetype(parsed.archetype)) {
-    logger.warn('Gemini archetype not in enum', { archetype: parsed.archetype });
+    logger.warn('Gemini archetype not in enum', {
+      archetype: parsed.archetype,
+      raw: cleaned.slice(0, 200),
+    });
     return null;
   }
   const reasoning = typeof parsed.reasoning === 'string' ? parsed.reasoning.slice(0, 240) : '';
   if (!reasoning) {
-    logger.warn('Gemini returned empty reasoning');
+    logger.warn('Gemini returned empty reasoning', { raw: cleaned.slice(0, 200) });
     return null;
   }
   return { archetype: parsed.archetype, reasoning };
