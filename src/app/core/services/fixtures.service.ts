@@ -5,7 +5,9 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
+  orderBy,
   query,
   where,
 } from 'firebase/firestore';
@@ -207,18 +209,37 @@ export class FixturesService {
   // Network
   // ---------------------------------------------------------------------------
 
-  /** Reads the rollup at cache/fixtures (1 Firestore read) and populates the
-   *  signal + cache. */
+  /**
+   * Reads the rollup at `cache/fixtures` (1 Firestore read) and populates
+   * the signal + localStorage cache.
+   *
+   * Fallback: if the rollup doc doesn't exist (fresh deploy, manual delete,
+   * pollFootballData hasn't run yet), we read the `fixtures` collection
+   * directly. That's the expensive path (~100 reads) but it self-heals —
+   * the user still sees data, their localStorage caches it, and the next
+   * pollFootballData cycle regenerates the rollup for everyone.
+   */
   private async fetchFixtures(): Promise<void> {
     const snap = await getDoc(doc(this.db, 'cache', 'fixtures'));
-    if (!snap.exists()) {
-      // Rollup hasn't been generated yet — keep whatever cache holds (signal
-      // stays empty if cold). pollFootballData runs every 10 min so this
-      // edge only fires on a brand-new deploy.
-      this._loaded.set(true);
+    if (snap.exists()) {
+      this.populateFromRollup(snap.data());
       return;
     }
-    const data = snap.data();
+
+    // Rollup missing — try the canonical collection as a fallback.
+    console.warn(
+      '[FixturesService] cache/fixtures missing, falling back to fixtures collection',
+    );
+    try {
+      await this.fetchFixturesFromCollection();
+    } catch (err) {
+      console.error('[FixturesService] fallback collection read failed', err);
+      this._loaded.set(true);
+    }
+  }
+
+  /** Decodes an embedded rollup payload into Fixture[] and updates state. */
+  private populateFromRollup(data: DocumentData): void {
     const rawFixtures = Array.isArray(data['fixtures']) ? data['fixtures'] : [];
     const fixtures: Fixture[] = rawFixtures
       .map((entry: DocumentData) => {
@@ -227,9 +248,19 @@ export class FixturesService {
         return this.parse(id, entry);
       })
       .filter((f: Fixture | null): f is Fixture => f !== null)
-      // Bulk fetch doesn't guarantee chronological order; sort once here so
-      // every consumer can rely on ordered iteration.
       .sort((a: Fixture, b: Fixture) => a.utcKickoff.getTime() - b.utcKickoff.getTime());
+    this._fixtures.set(fixtures);
+    this._loaded.set(true);
+    this.writeCache(fixtures);
+  }
+
+  /** Per-doc read of the entire fixtures collection. Used only when the
+   *  rollup doc is missing — costs ~100 reads but self-heals the UX. */
+  private async fetchFixturesFromCollection(): Promise<void> {
+    const q = query(collection(this.db, 'fixtures'), orderBy('utcKickoff'));
+    const snap = await getDocs(q);
+    const fixtures: Fixture[] = [];
+    snap.forEach((d) => fixtures.push(this.parse(d.id, d.data())));
     this._fixtures.set(fixtures);
     this._loaded.set(true);
     this.writeCache(fixtures);

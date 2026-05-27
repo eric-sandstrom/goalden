@@ -1,5 +1,14 @@
 import { Injectable, Signal, computed, effect, inject, signal } from '@angular/core';
-import { DocumentData, Timestamp, doc, getDoc } from 'firebase/firestore';
+import {
+  DocumentData,
+  Timestamp,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+} from 'firebase/firestore';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import {
   Coach,
@@ -179,13 +188,25 @@ export class TeamsService {
    */
   private async fetchTeams(): Promise<void> {
     const snap = await getDoc(doc(this.db, 'cache', 'teams'));
-    if (!snap.exists()) {
-      // Rollup hasn't been generated yet (e.g. pollTeams hasn't run). Stay
-      // on whatever the cache holds; signal stays empty if cold.
-      this._loaded.set(true);
+    if (snap.exists()) {
+      this.populateFromRollup(snap.data());
       return;
     }
-    const data = snap.data();
+    // Rollup missing — fall back to reading the canonical teams collection.
+    // ~50 reads instead of 1, but the user sees data and their localStorage
+    // caches it. Next pollTeams cycle regenerates the rollup globally.
+    console.warn(
+      '[TeamsService] cache/teams missing, falling back to teams collection',
+    );
+    try {
+      await this.fetchTeamsFromCollection();
+    } catch (err) {
+      console.error('[TeamsService] fallback collection read failed', err);
+      this._loaded.set(true);
+    }
+  }
+
+  private populateFromRollup(data: DocumentData): void {
     const rawTeams = Array.isArray(data['teams']) ? data['teams'] : [];
     const teams = rawTeams
       .map((entry: DocumentData) => {
@@ -195,6 +216,18 @@ export class TeamsService {
       })
       .filter((t: Team | null): t is Team => t !== null)
       .sort((a: Team, b: Team) => a.name.localeCompare(b.name));
+    this._teams.set(teams);
+    this._loaded.set(true);
+    this.writeCache(teams);
+  }
+
+  /** Per-doc read of the entire teams collection — fallback when the
+   *  rollup is missing. ~50 reads vs 1 from the rollup. */
+  private async fetchTeamsFromCollection(): Promise<void> {
+    const q = query(collection(this.db, 'teams'), orderBy('name'));
+    const snap = await getDocs(q);
+    const teams: Team[] = [];
+    snap.forEach((d) => teams.push(this.parse(d.id, d.data())));
     this._teams.set(teams);
     this._loaded.set(true);
     this.writeCache(teams);
