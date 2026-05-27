@@ -77,23 +77,41 @@ export class UserService {
 
       this._loaded.set(false);
       const ref = doc(this.db, 'users', uid);
-      const unsub = onSnapshot(ref, (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          const created = data['createdAt'];
-          this._userDoc.set({
-            uid,
-            displayName: data['displayName'] ?? '',
-            photoURL: data['photoURL'] ?? null,
-            createdAt: created instanceof Timestamp ? created.toDate() : null,
-            totals: parseTotals(data['totals']),
-            roles: parseRoles(data['roles']),
-          });
-        } else {
-          this._userDoc.set(null);
-        }
-        this._loaded.set(true);
-      });
+      const unsub = onSnapshot(
+        ref,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            const created = data['createdAt'];
+            this._userDoc.set({
+              uid,
+              displayName: data['displayName'] ?? '',
+              photoURL: data['photoURL'] ?? null,
+              createdAt: created instanceof Timestamp ? created.toDate() : null,
+              totals: parseTotals(data['totals']),
+              roles: parseRoles(data['roles']),
+            });
+          } else {
+            this._userDoc.set(null);
+          }
+          this._loaded.set(true);
+        },
+        (err) => {
+          // Auth-stale detection. The rule on users/{uid} says any
+          // signed-in user can read; a permission-denied here while we
+          // still hold a uid means the server doesn't recognize our
+          // auth anymore (emulator restart wiped the user store, token
+          // got revoked, etc.). Force a sign-out so the AuthService
+          // redirect-on-null fires and the user lands on /login.
+          if (err.code === 'permission-denied' || err.code === 'unauthenticated') {
+            console.warn('[UserService] auth-stale signal — forcing sign-out');
+            void this.auth.signOut();
+          } else {
+            console.error('[UserService] user-doc listener error:', err);
+          }
+          this._loaded.set(true);
+        },
+      );
 
       onCleanup(() => unsub());
     });

@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -90,6 +91,24 @@ import { AuthService } from '../../core/services/auth.service';
           @if (error()) {
             <div class="error" role="alert">{{ error() }}</div>
           }
+
+          @if (showDevLogin) {
+            <!-- Dev-only fast path: skips email/password entirely. Uses
+                 a custom auth token minted by the devSignInAsAdmin
+                 callable. Only visible when running against the
+                 Functions emulator. -->
+            <div class="divider dev-divider"><span>dev</span></div>
+            <button
+              type="button"
+              mat-stroked-button
+              class="dev-btn"
+              (click)="signInAsDevAdmin()"
+              [disabled]="loading()"
+            >
+              <mat-icon>code</mat-icon>
+              Sign in as Admin (dev)
+            </button>
+          }
         </mat-card-content>
       </mat-card>
     </div>
@@ -113,9 +132,18 @@ import { AuthService } from '../../core/services/auth.service';
       width: 100%;
       max-width: 420px;
     }
-    .google-btn {
+    .google-btn,
+    .dev-btn {
       width: 100%;
       margin-top: 1rem;
+    }
+    .dev-divider {
+      /* Soft hint that the button below is for local dev only; the
+         dashed border separates it visually from the real sign-in
+         affordances above. */
+      border-top: 1px dashed var(--mat-sys-outline-variant);
+      padding-top: 1rem;
+      margin-top: 1.5rem;
     }
     .divider {
       text-align: center;
@@ -160,6 +188,12 @@ export class LoginComponent {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** Show the "Sign in as Admin (dev)" button only when running
+   *  against the local Functions emulator. The callable behind it
+   *  refuses to run anywhere else, so this is purely UX trimming —
+   *  no security boundary lives here. */
+  protected readonly showDevLogin = environment.useEmulators;
+
   protected readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
@@ -175,6 +209,21 @@ export class LoginComponent {
     this.loading.set(true);
     try {
       await this.auth.signInWithGoogle();
+      await this.router.navigateByUrl(this.returnUrl);
+    } catch (e: unknown) {
+      this.error.set(toMessage(e));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  /** Emulator-only one-click admin sign-in. Behind a server-side
+   *  emulator gate, so calling this in prod fails cleanly. */
+  protected async signInAsDevAdmin(): Promise<void> {
+    this.error.set(null);
+    this.loading.set(true);
+    try {
+      await this.auth.signInAsDevAdmin();
       await this.router.navigateByUrl(this.returnUrl);
     } catch (e: unknown) {
       this.error.set(toMessage(e));
