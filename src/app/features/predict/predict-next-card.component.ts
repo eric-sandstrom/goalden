@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -11,14 +11,21 @@ import {
 import { FixtureRowComponent } from './fixture-row.component';
 
 /**
- * A bite-sized "predict your next match" surface, suitable for embedding in
- * places where match prediction isn't the primary scope (e.g. the league
- * detail page). Shows exactly one fixture at a time — the next one the user
- * hasn't predicted yet — and offers a Next button to skip to the one after.
+ * A bite-sized "predict your next match" surface for embedding in places
+ * where match prediction isn't the primary scope (e.g. the league detail
+ * page). Shows exactly one fixture at a time and offers a Next button to
+ * skip to a different unpredicted fixture.
  *
- * Competition scope: currently the whole fixtures collection, which is just
- * the World Cup. When leagues gain a `competitionId` field in the future,
- * we'll filter the fixtures source here by it.
+ * Stay-on-current behaviour: the displayed fixture is tracked by **id**,
+ * not by position in the unpredicted list. So after the user submits a
+ * prediction in the embedded FixtureRow, the just-predicted fixture
+ * remains visible (now with its prediction filled in) until the user
+ * explicitly taps Next. The Next button then advances to the next
+ * unpredicted fixture.
+ *
+ * Competition scope: today the entire fixtures collection is just the
+ * World Cup. When leagues gain a `competitionId` field, the source
+ * `upcomingFixtures` will filter by that id.
  */
 @Component({
   selector: 'app-predict-next-card',
@@ -36,7 +43,7 @@ import { FixtureRowComponent } from './fixture-row.component';
         <div class="fixture-slot">
           <app-fixture-row [fixture]="f" [prediction]="predictionFor(f.id)" />
         </div>
-        @if (unpredicted().length > 1) {
+        @if (hasOtherUnpredicted()) {
           <mat-card-actions align="end">
             <button mat-button (click)="next()">
               Next
@@ -66,8 +73,6 @@ import { FixtureRowComponent } from './fixture-row.component';
     .predict-next-card mat-card-header {
       padding: 1rem 1rem 0;
     }
-    /* Fixture row has its own padding and border-bottom; box it cleanly
-       so the card edges look intentional. */
     .fixture-slot {
       padding: 0.5rem 0 0;
     }
@@ -101,34 +106,44 @@ export class PredictNextCardComponent {
   private readonly fixtures = inject(FixturesService);
   private readonly predictions = inject(PredictionsService);
 
-  /** 0-based index into `unpredicted()`. Clamped via an effect when the
-   *  list shrinks (e.g. after the user predicts the currently shown one). */
-  private readonly index = signal(0);
+  /** ID of the fixture currently shown. Stays put across predict
+   *  submissions so the user only sees a new fixture when they ask for
+   *  one via the Next button. */
+  private readonly currentFixtureId = signal<string | null>(null);
 
-  /** Upcoming TIMED fixtures the caller hasn't predicted yet, in kickoff
-   *  order. The "to do" list. */
-  protected readonly unpredicted = computed<readonly Fixture[]>(() => {
+  /** Every upcoming TIMED fixture in kickoff order. Used to seed the
+   *  initial card and as the source list the Next button walks. */
+  protected readonly upcomingFixtures = computed<readonly Fixture[]>(() => {
     const now = Date.now();
-    const preds = this.predictions.matchPredictions();
     return this.fixtures
       .fixtures()
-      .filter(
-        (f) =>
-          f.status === 'TIMED' &&
-          f.utcKickoff.getTime() > now &&
-          !preds.has(f.id),
-      )
+      .filter((f) => f.status === 'TIMED' && f.utcKickoff.getTime() > now)
       .sort((a, b) => a.utcKickoff.getTime() - b.utcKickoff.getTime());
   });
 
-  protected readonly currentFixture = computed<Fixture | null>(() => {
-    const list = this.unpredicted();
-    if (list.length === 0) return null;
-    return list[this.index() % list.length] ?? list[0];
+  /** Subset of upcomingFixtures the user hasn't predicted yet. */
+  protected readonly unpredicted = computed<readonly Fixture[]>(() => {
+    const preds = this.predictions.matchPredictions();
+    return this.upcomingFixtures().filter((f) => !preds.has(f.id));
   });
 
-  /** Earliest upcoming locked / non-TIMED fixture so the empty state can
-   *  hint at "next match starts at …" rather than feeling like a dead end. */
+  /** The fixture currently rendered in the card — looked up by id from
+   *  the fixtures cache. Returns null only when there's literally nothing
+   *  upcoming. */
+  protected readonly currentFixture = computed<Fixture | null>(() => {
+    const id = this.currentFixtureId();
+    if (id) {
+      const found = this.fixtures.fixturesById().get(id);
+      if (found) return found;
+    }
+    // Initial state OR the previously-shown fixture vanished — pick the
+    // first unpredicted, falling back to the first upcoming if everything
+    // has been predicted (so the user still sees something useful).
+    return this.unpredicted()[0] ?? this.upcomingFixtures()[0] ?? null;
+  });
+
+  /** Earliest upcoming fixture so the empty state can hint at "next match
+   *  starts at …" rather than feeling like a dead end. */
   protected readonly nextLockedFixture = computed<Fixture | null>(() => {
     const now = Date.now();
     return (
@@ -136,6 +151,16 @@ export class PredictNextCardComponent {
         .fixtures()
         .find((f) => f.utcKickoff.getTime() > now) ?? null
     );
+  });
+
+  /** Whether there's another unpredicted fixture *besides* the one currently
+   *  shown. Drives whether to display the Next button. */
+  protected readonly hasOtherUnpredicted = computed(() => {
+    const current = this.currentFixture();
+    const unpredicted = this.unpredicted();
+    if (unpredicted.length === 0) return false;
+    if (unpredicted.length === 1) return unpredicted[0].id !== current?.id;
+    return true;
   });
 
   protected readonly subtitle = computed(() => {
@@ -146,14 +171,15 @@ export class PredictNextCardComponent {
   });
 
   constructor() {
-    // Whenever the unpredicted list shrinks past the current index, snap
-    // back to 0. Without this, a user who clicked Next then submitted a
-    // prediction could end up with the card showing nothing while the
-    // list still has entries.
+    // Seed the current fixture once data arrives. Don't overwrite an
+    // existing selection — that would defeat the "stay until Next is
+    // pressed" behaviour.
     effect(() => {
       const list = this.unpredicted();
-      if (list.length > 0 && this.index() >= list.length) {
-        this.index.set(0);
+      const already = untracked(() => this.currentFixtureId());
+      if (already) return;
+      if (list.length > 0) {
+        this.currentFixtureId.set(list[0].id);
       }
     });
   }
@@ -162,10 +188,32 @@ export class PredictNextCardComponent {
     return this.predictions.matchPredictions().get(matchId) ?? null;
   }
 
+  /**
+   * Advances to the next unpredicted fixture.
+   *  - If the current fixture is still in the unpredicted list (user
+   *    hasn't predicted yet, just browsing), step to the one after it.
+   *  - If the current fixture has been predicted (not in the unpredicted
+   *    list anymore), pick the first unpredicted.
+   *  - Wraps around at the end of the list.
+   */
   protected next(): void {
-    const list = this.unpredicted();
-    if (list.length === 0) return;
-    this.index.update((i) => (i + 1) % list.length);
+    const unpredicted = this.unpredicted();
+    if (unpredicted.length === 0) {
+      this.currentFixtureId.set(null);
+      return;
+    }
+    const currentId = this.currentFixtureId();
+    const idxInList = currentId
+      ? unpredicted.findIndex((f) => f.id === currentId)
+      : -1;
+    if (idxInList < 0) {
+      // Current fixture is predicted (or null) — start at the top of the
+      // unpredicted queue.
+      this.currentFixtureId.set(unpredicted[0].id);
+      return;
+    }
+    const nextIdx = (idxInList + 1) % unpredicted.length;
+    this.currentFixtureId.set(unpredicted[nextIdx].id);
   }
 
   protected kickoffLabel(fixture: Fixture): string {

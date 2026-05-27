@@ -638,6 +638,13 @@ export class FixtureRowComponent {
 
   constructor() {
     effect(() => {
+      // Track the fixture identity explicitly. Otherwise, when the parent
+      // component swaps the [fixture] input to a different fixture whose
+      // prediction is also null (or has the same numeric shape), neither
+      // `prediction()` nor `locked()` change identity, the effect doesn't
+      // re-run, and the form keeps showing the previous fixture's values.
+      void this.fixture().id;
+
       const p = this.prediction();
       const locked = this.locked();
       this.form.patchValue(
@@ -666,9 +673,15 @@ export class FixtureRowComponent {
   protected step(field: 'home' | 'away', delta: number): void {
     if (this.locked()) return;
     const control = this.form.controls[field];
-    const current = typeof control.value === 'number' ? control.value : 0;
-    const next = Math.max(0, Math.min(99, current + delta));
-    if (next === current) return;
+    const raw = control.value;
+    // First +/- press from an empty input just establishes 0 — don't apply
+    // the delta yet. Lets the user see the field initialize before stepping.
+    if (typeof raw !== 'number') {
+      control.setValue(0);
+      return;
+    }
+    const next = Math.max(0, Math.min(99, raw + delta));
+    if (next === raw) return;
     control.setValue(next);
   }
 
