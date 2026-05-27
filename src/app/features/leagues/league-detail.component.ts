@@ -82,7 +82,7 @@ interface LeagueRow {
           </div>
         </mat-card>
       } @else {
-        <mat-card appearance="outlined">
+        <mat-card appearance="outlined" class="header-card">
           <mat-card-header>
             <mat-icon matCardAvatar [class.type-global]="league()!.type === 'global'">
               {{ headerIcon() }}
@@ -106,70 +106,59 @@ interface LeagueRow {
               </span>
             </mat-card-title>
             <mat-card-subtitle>{{ headerSubtitle() }}</mat-card-subtitle>
-            <span class="grow"></span>
-            @if (hasMenuItems()) {
-              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="League actions">
-                <mat-icon>more_vert</mat-icon>
-              </button>
-              <mat-menu #menu="matMenu">
-                @if (canShareInvite()) {
-                  <button mat-menu-item (click)="copyLink()">
-                    <mat-icon>link</mat-icon>
-                    Copy invite link
-                  </button>
-                  <button mat-menu-item (click)="copyCode()">
-                    <mat-icon>content_copy</mat-icon>
-                    Copy code
-                  </button>
-                }
-                @if (amOwner() && canModerate()) {
-                  <button mat-menu-item (click)="regenerateCode()">
-                    <mat-icon>autorenew</mat-icon>
-                    Regenerate invite code
-                  </button>
-                  <button mat-menu-item (click)="confirmDelete()">
-                    <mat-icon>delete</mat-icon>
-                    Delete league
-                  </button>
-                }
-                @if (canLeave()) {
-                  <button mat-menu-item (click)="leave()">
-                    <mat-icon>logout</mat-icon>
-                    Leave league
-                  </button>
-                }
-              </mat-menu>
-            }
-          </mat-card-header>
 
-          <!-- Compact share strip — merged in from the old standalone
-               invite card. Right-aligned mini QR + code chip + copy
-               button. Only renders for leagues that have an invite code
-               (private + public). Global leagues skip this entirely. -->
-          @if (canShareInvite()) {
-            <mat-card-content class="share-strip">
-              <qrcode
-                [qrdata]="inviteUrl()"
-                [width]="72"
-                [errorCorrectionLevel]="'L'"
-                [margin]="1"
-                [colorDark]="'#000000'"
-                [colorLight]="'#ffffff'"
-                [allowEmptyString]="false"
-              ></qrcode>
-              <div class="share-meta">
-                <code class="invite-code-mini">{{ league()!.inviteCode }}</code>
-                <button
-                  mat-icon-button
-                  (click)="copyLink()"
-                  aria-label="Copy invite link"
-                  matTooltip="Copy invite link"
-                >
-                  <mat-icon>link</mat-icon>
+            <!-- Top-right: QR (when there's an invite code to share) +
+                 settings button. The settings dropdown contains
+                 Copy link / Copy code / mod actions / Leave, so we don't
+                 need standalone copy buttons next to the QR. -->
+            <div class="header-actions">
+              @if (canShareInvite()) {
+                <qrcode
+                  class="header-qr"
+                  [qrdata]="inviteUrl()"
+                  [width]="56"
+                  [errorCorrectionLevel]="'L'"
+                  [margin]="1"
+                  [colorDark]="'#000000'"
+                  [colorLight]="'#ffffff'"
+                  [allowEmptyString]="false"
+                ></qrcode>
+              }
+              @if (hasMenuItems()) {
+                <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="League settings">
+                  <mat-icon>settings</mat-icon>
                 </button>
-              </div>
-            </mat-card-content>
-          }
+                <mat-menu #menu="matMenu">
+                  @if (canShareInvite()) {
+                    <button mat-menu-item (click)="copyLink()">
+                      <mat-icon>link</mat-icon>
+                      Copy invite link
+                    </button>
+                    <button mat-menu-item (click)="copyCode()">
+                      <mat-icon>content_copy</mat-icon>
+                      Copy code
+                    </button>
+                  }
+                  @if (amOwner() && canModerate()) {
+                    <button mat-menu-item (click)="regenerateCode()">
+                      <mat-icon>autorenew</mat-icon>
+                      Regenerate invite code
+                    </button>
+                    <button mat-menu-item (click)="confirmDelete()">
+                      <mat-icon>delete</mat-icon>
+                      Delete league
+                    </button>
+                  }
+                  @if (canLeave()) {
+                    <button mat-menu-item (click)="leave()">
+                      <mat-icon>logout</mat-icon>
+                      Leave league
+                    </button>
+                  }
+                </mat-menu>
+              }
+            </div>
+          </mat-card-header>
         </mat-card>
 
         <!-- Predict-next card: drop in one outstanding fixture for the
@@ -302,32 +291,21 @@ interface LeagueRow {
     }
     .hdr-text { flex: 1; min-width: 0; }
 
-    /* Compact share strip inside the header card. Right-aligned mini QR +
-       code + copy-link icon button. Sits below the header row so it
-       doesn't fight mat-card-header's grid for space. */
-    .share-strip {
+    /* Pin the QR + settings button to the top-right of the header,
+       inline with the title row. mat-card-header places anything after
+       mat-card-subtitle in a trailing column. */
+    .header-card mat-card-header {
+      align-items: flex-start;
+    }
+    .header-actions {
       display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 0.625rem;
-      padding-top: 0.5rem;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin-left: auto;
     }
-    .share-strip qrcode {
+    .header-qr {
       display: inline-flex;
-    }
-    .share-meta {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-    .invite-code-mini {
-      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-      font-size: 0.78rem;
-      letter-spacing: 0.04em;
-      color: var(--mat-sys-on-surface-variant);
-      padding: 2px 6px;
-      border-radius: 6px;
-      background: var(--mat-sys-surface-container-low);
+      align-items: flex-start;
     }
     .table-wrap { padding: 0; overflow: hidden; }
     .skel-list { padding: 0; }
