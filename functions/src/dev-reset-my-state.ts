@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { requireAdminOrEmulator } from './lib/admin-check';
 
 /**
  * Dev-only callable: wipe the caller's predictions and/or totals so we can
@@ -17,9 +18,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 export const devResetMyState = onCall(
   { region: 'europe-west1' },
   async (request) => {
-    if (process.env['FUNCTIONS_EMULATOR'] !== 'true') {
-      throw new HttpsError('failed-precondition', 'Dev tools are emulator-only.');
-    }
+    await requireAdminOrEmulator(request);
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in first.');
     }

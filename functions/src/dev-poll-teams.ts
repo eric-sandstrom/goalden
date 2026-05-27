@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { FOOTBALL_DATA_TOKEN } from './poll-football-data';
 import { runPollTeams } from './poll-teams';
+import { requireAdminOrEmulator } from './lib/admin-check';
 
 /**
  * Dev-only callable: forces a teams poll immediately, instead of waiting up
@@ -14,12 +15,7 @@ import { runPollTeams } from './poll-teams';
 export const devPollTeamsNow = onCall(
   { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN] },
   async (request) => {
-    if (process.env['FUNCTIONS_EMULATOR'] !== 'true') {
-      throw new HttpsError('failed-precondition', 'Dev tools are emulator-only.');
-    }
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Sign in first.');
-    }
+    await requireAdminOrEmulator(request);
 
     const token = FOOTBALL_DATA_TOKEN.value();
     if (!token) {

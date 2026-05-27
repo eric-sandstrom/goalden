@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { requireAdminOrEmulator } from './lib/admin-check';
 
 /**
  * Dev-only callable: override a fixture's `utcKickoff`. Accepts either an
@@ -16,12 +17,7 @@ import { Timestamp, getFirestore } from 'firebase-admin/firestore';
 export const devSetKickoffTime = onCall(
   { region: 'europe-west1' },
   async (request) => {
-    if (process.env['FUNCTIONS_EMULATOR'] !== 'true') {
-      throw new HttpsError('failed-precondition', 'Dev tools are emulator-only.');
-    }
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Sign in first.');
-    }
+    await requireAdminOrEmulator(request);
 
     const { matchId, isoDateTime, offsetMinutes } = request.data ?? {};
     if (typeof matchId !== 'string' || matchId.length === 0) {

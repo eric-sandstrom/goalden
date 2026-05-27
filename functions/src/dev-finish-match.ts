@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { getFirestore } from 'firebase-admin/firestore';
+import { requireAdminOrEmulator } from './lib/admin-check';
 
 /**
  * Dev-only callable: forces a fixture into FINISHED with a given score so the
@@ -12,12 +13,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 export const devFinishMatch = onCall(
   { region: 'europe-west1' },
   async (request) => {
-    if (process.env['FUNCTIONS_EMULATOR'] !== 'true') {
-      throw new HttpsError('failed-precondition', 'Dev tools are emulator-only.');
-    }
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Sign in first.');
-    }
+    await requireAdminOrEmulator(request);
 
     const { matchId, homeScore, awayScore } = request.data ?? {};
     if (typeof matchId !== 'string' || matchId.length === 0) {

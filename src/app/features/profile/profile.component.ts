@@ -7,6 +7,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { PersonalityService } from '../../core/services/personality.service';
@@ -32,6 +34,7 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
     MatIconModule,
     MatSelectModule,
     MatSliderModule,
+    MatTooltipModule,
     PredictorPersonalityCardComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,11 +91,25 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
       <!-- ===================================================================
            Theme picker
       ==================================================================== -->
-      <mat-card appearance="outlined">
+      <mat-card appearance="outlined" class="theme-card">
         <mat-card-header>
           <mat-icon matCardAvatar>palette</mat-icon>
           <mat-card-title>Theme</mat-card-title>
           <mat-card-subtitle>Paint the app in your team's colors</mat-card-subtitle>
+
+          <!-- Theme randomizer — top-right of the header. Picks a random
+               team preset (excluding default and the currently-applied
+               one) and applies it instantly. -->
+          <button
+            type="button"
+            mat-icon-button
+            class="theme-shuffle"
+            (click)="randomizeTheme()"
+            matTooltip="Random theme"
+            aria-label="Randomize theme"
+          >
+            <mat-icon>casino</mat-icon>
+          </button>
         </mat-card-header>
 
         <mat-card-content>
@@ -340,7 +357,7 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
         </mat-card-content>
       </mat-card>
 
-      @if (showDev) {
+      @if (showDev()) {
         <mat-card appearance="outlined">
           <mat-card-header>
             <mat-icon matCardAvatar class="dev">science</mat-icon>
@@ -365,6 +382,17 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
       min-height: 0;
       overflow: hidden;
       width: 100%;
+    }
+    /* Theme card: pin the randomize button to the top-right by giving
+       mat-card-header flex-start alignment + auto left-margin on the
+       button. mat-card-header is already a flex container; this is the
+       same trick we use in the league header for the QR/settings row. */
+    .theme-card mat-card-header {
+      align-items: flex-start;
+    }
+    .theme-card .theme-shuffle {
+      margin-left: auto;
+      align-self: flex-start;
     }
     .profile {
       padding: 1.5rem 1rem;
@@ -670,6 +698,7 @@ export class ProfileComponent {
   private readonly userService = inject(UserService);
   private readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);
+  private readonly snackBar = inject(MatSnackBar);
   /** Exposed as `protected` because the template binds the personality
    *  card's inputs directly off the service signals. */
   protected readonly personality = inject(PersonalityService);
@@ -686,8 +715,11 @@ export class ProfileComponent {
     () => this.userService.userDoc()?.displayName ?? '',
   );
   protected readonly email = computed(() => this.auth.user()?.email ?? '');
-  protected readonly showDev = !environment.production;
   protected readonly isAdmin = this.userService.isAdmin;
+  /** Show the "Dev tools" link when we're in a non-production build OR
+   *  the user has the admin role. Matches the `devOrAdminGuard` on the
+   *  `/dev` route so the link doesn't promise access we won't grant. */
+  protected readonly showDev = computed(() => !environment.production || this.isAdmin());
 
   protected readonly variantOptions = this.themeService.variantOptions;
   protected readonly defaultPresetValue = PRESET_DEFAULT;
@@ -725,6 +757,42 @@ export class ProfileComponent {
 
   protected applyPreset(code: PresetCode): void {
     this.themeService.applyPreset(code);
+  }
+
+  /**
+   * Full theme randomizer — rolls the dice on every knob the picker
+   * exposes: colors (primary / secondary / tertiary), Material variant
+   * (style), contrast slider, and color mode (system/light/dark).
+   *
+   * Material 3's HCT palette generator takes raw seed colors and
+   * derives the full tonal scale, so even un-vetted random hex values
+   * produce a usable theme. The picker dropdown drops into PRESET_CUSTOM
+   * since the resulting palette won't match any known preset.
+   */
+  protected randomizeTheme(): void {
+    // Colors
+    this.themeService.setColors({
+      primary: randomHex(),
+      secondary: randomHex(),
+      tertiary: randomHex(),
+    });
+
+    // Variant (style) — uniform pick from the available HCT schemes.
+    const variants = this.variantOptions;
+    const variant = variants[Math.floor(Math.random() * variants.length)].value;
+    this.themeService.setVariant(variant);
+
+    // Contrast — full range [-1, 1]. Service clamps if we drift.
+    this.themeService.setContrast(Math.random() * 2 - 1);
+
+    // Color mode — system / light / dark with equal weight. 'system'
+    // means "follow OS", which can produce a less visible change if the
+    // OS preference already matches the most-recent mode — but the
+    // user explicitly asked to include it.
+    const modes: ColorMode[] = ['system', 'light', 'dark'];
+    this.themeService.setColorMode(modes[Math.floor(Math.random() * modes.length)]);
+
+    this.snackBar.open('Theme randomized', undefined, { duration: 1500 });
   }
 
   protected setPrimaryFromEvent(event: Event): void {
@@ -780,4 +848,15 @@ export class ProfileComponent {
     await this.auth.signOut();
     await this.router.navigate(['/login']);
   }
+}
+
+/**
+ * Produce a random 6-digit hex color (e.g. '#a3f72c'). Pure random
+ * across the full RGB space — Material's HCT palette generator
+ * tolerates any seed and derives a coherent tonal scale from it, so
+ * we don't constrain saturation or lightness here.
+ */
+function randomHex(): string {
+  const n = Math.floor(Math.random() * 0x1_00_00_00);
+  return '#' + n.toString(16).padStart(6, '0');
 }

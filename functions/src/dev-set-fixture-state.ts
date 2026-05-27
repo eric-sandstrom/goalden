@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { requireAdminOrEmulator } from './lib/admin-check';
 
 type Status = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
 
@@ -20,12 +21,7 @@ const VALID_STATUS = new Set<Status>(['TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED'])
 export const devSetFixtureState = onCall(
   { region: 'europe-west1' },
   async (request) => {
-    if (process.env['FUNCTIONS_EMULATOR'] !== 'true') {
-      throw new HttpsError('failed-precondition', 'Dev tools are emulator-only.');
-    }
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Sign in first.');
-    }
+    await requireAdminOrEmulator(request);
 
     const { matchId, status, homeScore, awayScore } = request.data ?? {};
     if (typeof matchId !== 'string' || matchId.length === 0) {
