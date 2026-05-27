@@ -27,6 +27,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { LeaguesService } from '../../core/services/leagues.service';
 import { parseTotals } from '../../core/services/user.service';
 import { League, LeagueMember } from '../../core/models/league.model';
+import { PredictNextCardComponent } from '../predict/predict-next-card.component';
 
 interface LeagueRow {
   readonly uid: string;
@@ -52,6 +53,7 @@ interface LeagueRow {
     MatTableModule,
     MatTooltipModule,
     SkelComponent,
+    PredictNextCardComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -140,6 +142,12 @@ interface LeagueRow {
             }
           </mat-card-header>
         </mat-card>
+
+        <!-- Predict-next card: drop in one outstanding fixture for the
+             league's competition. Today every league shares the same
+             World Cup fixture pool; once leagues become multi-competition
+             this card will read a leagueId-scoped fixture source. -->
+        <app-predict-next-card />
 
         <!-- Invite card: private + public leagues both have invite codes
              so this renders for both. Global leagues have no invite code
