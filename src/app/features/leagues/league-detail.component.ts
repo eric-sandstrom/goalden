@@ -120,36 +120,41 @@ interface LeagueRow {
           </mat-card-header>
         </mat-card>
 
-        <mat-card appearance="outlined" class="invite">
-          <mat-card-header>
-            <mat-icon matCardAvatar>qr_code_2</mat-icon>
-            <mat-card-title>Invite friends</mat-card-title>
-            <mat-card-subtitle>Scan or share the link</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="invite-content">
-            <qrcode
-              [qrdata]="inviteUrl()"
-              [width]="180"
-              [errorCorrectionLevel]="'M'"
-              [margin]="2"
-              [colorDark]="'#000000'"
-              [colorLight]="'#ffffff'"
-              [allowEmptyString]="false"
-            ></qrcode>
-            <div class="invite-meta">
-              <mat-chip-set>
-                <mat-chip [disableRipple]="true">
-                  <mat-icon matChipAvatar>vpn_key</mat-icon>
-                  {{ league()!.inviteCode }}
-                </mat-chip>
-              </mat-chip-set>
-              <button mat-stroked-button (click)="copyLink()">
-                <mat-icon>link</mat-icon>
-                Copy link
-              </button>
-            </div>
-          </mat-card-content>
-        </mat-card>
+        <!-- Invite card: private + public leagues both have invite codes
+             so this renders for both. Global leagues have no invite code
+             (auto-enrolled only) — guard hides the card for them. -->
+        @if (league()!.inviteCode) {
+          <mat-card appearance="outlined" class="invite">
+            <mat-card-header>
+              <mat-icon matCardAvatar>qr_code_2</mat-icon>
+              <mat-card-title>{{ inviteCardTitle() }}</mat-card-title>
+              <mat-card-subtitle>{{ inviteCardSubtitle() }}</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content class="invite-content">
+              <qrcode
+                [qrdata]="inviteUrl()"
+                [width]="180"
+                [errorCorrectionLevel]="'M'"
+                [margin]="2"
+                [colorDark]="'#000000'"
+                [colorLight]="'#ffffff'"
+                [allowEmptyString]="false"
+              ></qrcode>
+              <div class="invite-meta">
+                <mat-chip-set>
+                  <mat-chip [disableRipple]="true">
+                    <mat-icon matChipAvatar>vpn_key</mat-icon>
+                    {{ league()!.inviteCode }}
+                  </mat-chip>
+                </mat-chip-set>
+                <button mat-stroked-button (click)="copyLink()">
+                  <mat-icon>link</mat-icon>
+                  Copy link
+                </button>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        }
 
         <mat-card appearance="outlined" class="table-wrap card-grow">
           <div class="card-scroll">
@@ -336,6 +341,19 @@ export class LeagueDetailComponent {
     const code = this.league()?.inviteCode;
     if (!code) return '';
     return `${window.location.origin}/j/${code}`;
+  });
+
+  /** Header copy for the invite card. Public leagues get a different
+   *  phrasing since they're already discoverable — the QR/code is for
+   *  convenience, not access control. */
+  protected readonly inviteCardTitle = computed(() => {
+    return this.league()?.type === 'public' ? 'Share this league' : 'Invite friends';
+  });
+
+  protected readonly inviteCardSubtitle = computed(() => {
+    return this.league()?.type === 'public'
+      ? 'Scan, share the link, or anyone can find it in Discover'
+      : 'Scan or share the link';
   });
 
   protected readonly rows = computed<readonly LeagueRow[]>(() => {
