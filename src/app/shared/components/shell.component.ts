@@ -1,15 +1,17 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { BackButtonComponent } from './back-button.component';
 import { BottomNavComponent } from './bottom-nav.component';
 import { InstallBannerComponent } from './install-banner.component';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, BottomNavComponent, InstallBannerComponent],
+  imports: [RouterOutlet, BackButtonComponent, BottomNavComponent, InstallBannerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="content">
       <app-install-banner />
+      <app-back-button />
       <router-outlet />
     </main>
     <app-bottom-nav />

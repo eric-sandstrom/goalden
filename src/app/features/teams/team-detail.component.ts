@@ -1,6 +1,5 @@
 import { NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,7 +24,6 @@ interface SquadSection {
   selector: 'app-team-detail',
   imports: [
     NgOptimizedImage,
-    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -35,11 +33,6 @@ interface SquadSection {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="page">
-      <a mat-button routerLink="/teams" class="back-link">
-        <mat-icon>arrow_back</mat-icon>
-        All teams
-      </a>
-
       @if (!loaded()) {
         <mat-card appearance="outlined" class="hero-card">
           <mat-card-header>
@@ -166,10 +159,6 @@ interface SquadSection {
       min-height: 0;
       overflow: hidden;
       width: 100%;
-    }
-    .back-link {
-      align-self: flex-start;
-      margin-bottom: -0.25rem;
     }
     .hero-card {
       min-height: 120px;

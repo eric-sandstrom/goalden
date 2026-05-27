@@ -174,7 +174,9 @@ import { KnownTeam, PODIUM_LOCK } from '../../core/models/podium.model';
     }
     .container {
       padding: 1rem;
-      max-width: 560px;
+      /* Match the .page utility's max-width so every routed view inside
+         the shell shares the same content column. */
+      max-width: 720px;
       width: 100%;
       margin: 0 auto;
       overflow-y: auto;

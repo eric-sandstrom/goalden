@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -17,7 +16,6 @@ import { LeaguesService } from '../../core/services/leagues.service';
   selector: 'app-admin',
   imports: [
     ReactiveFormsModule,
-    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatCheckboxModule,
@@ -31,10 +29,6 @@ import { LeaguesService } from '../../core/services/leagues.service';
   template: `
     <section class="page">
       <header class="hero">
-        <a mat-button routerLink="/profile" class="back-link">
-          <mat-icon>arrow_back</mat-icon>
-          Profile
-        </a>
         <h1>Admin</h1>
         <p class="hint">Manage global leagues — visible to all matching users.</p>
       </header>
@@ -174,9 +168,6 @@ import { LeaguesService } from '../../core/services/leagues.service';
       flex-direction: column;
       gap: 0.25rem;
       align-items: flex-start;
-    }
-    .back-link {
-      margin-bottom: 0.25rem;
     }
     h1 {
       margin: 0;
