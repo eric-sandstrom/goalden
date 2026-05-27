@@ -159,14 +159,14 @@ service cloud.firestore {
 
     // ----- predictions: podium picks ---------------------------------------
     //
-    // Read: owner anytime; any signed-in user after the podium lock
-    //   (tournament opening UTC 2026-06-11). Pre-lock the picks stay
-    //   secret so users can't copy each other's bracket strategy.
+    // Read: owner anytime; any other signed-in user always (pre- or
+    //   post-lock). League members compare picks during the build-up
+    //   to the tournament — the strategy-copying risk is minimal in
+    //   practice for a friends app, and the feature value outweighs it.
     // Write: owner only, with strict field whitelist + lock-time check.
 
     match /predictions/{uid}/podium/picks {
-      allow read: if isSelf(uid)
-        || (isSignedIn() && request.time >= timestamp.date(2026, 6, 11));
+      allow read: if isSelf(uid) || isSignedIn();
 
       allow create, update: if isSelf(uid)
         && request.resource.data.keys().hasOnly([

@@ -21,7 +21,7 @@ import {
   PredictionsService,
 } from '../../core/services/predictions.service';
 import { Fixture, isLocked } from '../../core/models/fixture.model';
-import { PODIUM_LOCK, PodiumPick } from '../../core/models/podium.model';
+import { PodiumPick } from '../../core/models/podium.model';
 import { UserTotals, parseTotals } from '../../core/services/user.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { FixtureRowComponent } from '../predict/fixture-row.component';
@@ -326,7 +326,7 @@ export class UserProfileComponent {
       const [userOk] = await Promise.all([
         this.loadUserDoc(uid),
         this.loadLockedPredictions(uid),
-        this.loadPodiumIfUnlocked(uid),
+        this.loadPodium(uid),
       ]);
       if (!userOk) {
         this.otherUser.set(null);
@@ -385,10 +385,10 @@ export class UserProfileComponent {
     this.otherPredictions.set(map);
   }
 
-  /** Podium picks are public after the lock date. Skip the fetch entirely
-   *  before then to avoid a noisy permission-denied error in the console. */
-  private async loadPodiumIfUnlocked(uid: string): Promise<void> {
-    if (Date.now() < PODIUM_LOCK.getTime()) return;
+  /** Loads the target user's podium picks if they've submitted any.
+   *  Any signed-in user can read them via the relaxed rules, regardless
+   *  of whether the podium lock date has passed. */
+  private async loadPodium(uid: string): Promise<void> {
     try {
       const snap = await getDoc(doc(this.db, `predictions/${uid}/podium/picks`));
       if (!snap.exists()) return;
@@ -402,7 +402,7 @@ export class UserProfileComponent {
         points: data['points'] ?? null,
       });
     } catch {
-      // Quietly ignore — podium might just not be set.
+      // Quietly ignore — podium might just not be set, or rules denied.
     }
   }
 }
