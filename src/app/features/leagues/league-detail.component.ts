@@ -35,6 +35,8 @@ interface LeagueRow {
   readonly displayName: string;
   readonly photoURL: string | null;
   readonly totalPoints: number;
+  readonly exactHits: number;
+  readonly outcomeHits: number;
   readonly role: 'owner' | 'member';
 }
 
@@ -202,6 +204,24 @@ interface LeagueRow {
                 </td>
               </ng-container>
 
+              <ng-container matColumnDef="exact">
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  matTooltip="Exact full-time score predictions (3 pts each)"
+                >Exact</th>
+                <td mat-cell *matCellDef="let row">{{ row.exactHits }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="outcome">
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  matTooltip="Correct outcome predictions — W/D/L (1 pt each)"
+                >Outcome</th>
+                <td mat-cell *matCellDef="let row">{{ row.outcomeHits }}</td>
+              </ng-container>
+
               <ng-container matColumnDef="points">
                 <th mat-header-cell *matHeaderCellDef>Pts</th>
                 <td mat-cell *matCellDef="let row"><strong>{{ row.totalPoints }}</strong></td>
@@ -237,8 +257,12 @@ interface LeagueRow {
                 mat-row
                 *matRowDef="let row; columns: columns"
                 [class.me]="row.uid === myUid()"
-                [class.clickable]="row.uid !== myUid()"
+                class="clickable"
+                role="link"
+                tabindex="0"
                 (click)="openUser(row)"
+                (keydown.enter)="openUser(row)"
+                (keydown.space)="openUser(row); $event.preventDefault()"
               ></tr>
             </table>
           </div>
@@ -321,10 +345,32 @@ interface LeagueRow {
     }
     .skel-row:last-child { border-bottom: none; }
     table { width: 100%; }
+
+    /* Column widths: only the player column is fluid; everything else gets
+       a fixed width so the layout doesn't reflow when names get long or
+       point counts change in length. The player column has no explicit
+       width — it absorbs all remaining horizontal space. */
+    th.cdk-column-rank,    td.cdk-column-rank    { width: 36px; }
+    th.cdk-column-exact,   td.cdk-column-exact   { width: 64px; text-align: center; }
+    th.cdk-column-outcome, td.cdk-column-outcome { width: 80px; text-align: center; }
+    th.cdk-column-points,  td.cdk-column-points  { width: 56px; text-align: right; }
+    th.cdk-column-actions, td.cdk-column-actions { width: 48px; }
+    /* Stop a long display name from pushing the fixed columns off-screen.
+       The cell is still inline-flex inside so the avatar + name + crown
+       stay aligned; min-width: 0 lets the inner span ellipsize cleanly. */
+    td.cdk-column-player { min-width: 0; }
+    td.cdk-column-player .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
     .player {
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      max-width: 100%;
     }
     .avatar {
       border-radius: 50%;
@@ -347,13 +393,16 @@ interface LeagueRow {
       background: var(--mat-sys-secondary-container);
     }
     tr.me td { color: var(--mat-sys-on-secondary-container); }
-    /* Make other-user rows feel tappable — hover tint + pointer cursor. */
-    tr.clickable {
-      cursor: pointer;
-      transition: background-color 120ms ease;
+    /* Clickable rows (every member except yourself). Hover + focus-visible
+       give a visible affordance; role=link + tabindex=0 in the template
+       make it keyboard-reachable and screen-reader-discoverable. */
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover td {
+      background: color-mix(in srgb, var(--mat-sys-on-surface) 6%, transparent);
     }
-    tr.clickable:hover {
-      background: var(--mat-sys-surface-container-low);
+    tr.clickable:focus-visible {
+      outline: 2px solid var(--mat-sys-primary);
+      outline-offset: -2px;
     }
     .state {
       display: flex;
@@ -453,7 +502,7 @@ export class LeagueDetailComponent {
     return this.canShareInvite() || (this.amOwner() && this.canModerate()) || this.canLeave();
   });
 
-  protected readonly columns = ['rank', 'player', 'points', 'actions'];
+  protected readonly columns = ['rank', 'player', 'exact', 'outcome', 'points', 'actions'];
   protected readonly skelRows = [0, 1, 2, 3, 4];
 
   protected readonly inviteUrl = computed(() => {
@@ -473,10 +522,21 @@ export class LeagueDetailComponent {
         displayName: (u['displayName'] as string) ?? 'Unknown',
         photoURL: (u['photoURL'] as string | null) ?? null,
         totalPoints: totals.total,
+        exactHits: totals.exactScoreHits,
+        outcomeHits: totals.correctOutcomeHits,
         role: m.role,
       };
     });
-    list.sort((a, b) => b.totalPoints - a.totalPoints);
+    // Tiebreaker cascade per CLAUDE.md: totalPoints, then exact-score hits,
+    // then correct-outcome hits, then displayName. Bracket points aren't
+    // exposed in this row shape yet — fine for v1, the first three keys
+    // already split nearly every realistic tie.
+    list.sort((a, b) => {
+      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      if (b.exactHits !== a.exactHits) return b.exactHits - a.exactHits;
+      if (b.outcomeHits !== a.outcomeHits) return b.outcomeHits - a.outcomeHits;
+      return a.displayName.localeCompare(b.displayName);
+    });
     return list.map((r, i) => ({ ...r, rank: i + 1 }));
   });
 
@@ -569,6 +629,19 @@ export class LeagueDetailComponent {
     return this.amOwner() && row.uid !== this.myUid();
   }
 
+  /**
+   * Navigate to the chosen player's profile. Bound to the row's (click) +
+   * keyboard handlers. Every row is clickable — including your own; the
+   * UserProfileComponent self-redirect will bounce /users/<myUid> to
+   * /profile so the user still lands on a sensible page.
+   *
+   * The actions column has its own (click)="$event.stopPropagation()" so
+   * the per-member menu trigger doesn't double-fire this navigation.
+   */
+  protected openUser(row: LeagueRow): void {
+    void this.router.navigate(['/users', row.uid]);
+  }
+
   protected async confirmTransfer(row: LeagueRow): Promise<void> {
     if (
       !confirm(
@@ -587,14 +660,6 @@ export class LeagueDetailComponent {
         duration: 4000,
       });
     }
-  }
-
-  /** Navigate to another user's profile. Tapping your own row is a no-op
-   *  since seeing your own stats from the league context isn't useful —
-   *  you'd just use the /profile tab. */
-  protected openUser(row: LeagueRow): void {
-    if (row.uid === this.myUid()) return;
-    void this.router.navigate(['/users', row.uid]);
   }
 
   protected async confirmKick(row: LeagueRow): Promise<void> {
