@@ -39,7 +39,8 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="profile">
+    <section class="profile-scroll">
+      <div class="profile-content">
       <mat-card appearance="outlined">
         <mat-card-header>
           <mat-card-title>{{ displayName() }}</mat-card-title>
@@ -69,24 +70,6 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
         [ownerMode]="true"
         [eligibility]="personality.eligibility()"
       />
-
-      <!-- ===================================================================
-           Browse links
-      ==================================================================== -->
-      <mat-card appearance="outlined">
-        <mat-card-actions>
-          <a mat-button routerLink="/teams">
-            <mat-icon>groups</mat-icon>
-            Browse teams
-          </a>
-          @if (isAdmin()) {
-            <a mat-button routerLink="/admin">
-              <mat-icon class="admin-icon">admin_panel_settings</mat-icon>
-              Admin
-            </a>
-          }
-        </mat-card-actions>
-      </mat-card>
 
       <!-- ===================================================================
            Theme picker
@@ -360,18 +343,25 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
       @if (showDev()) {
         <mat-card appearance="outlined">
           <mat-card-header>
-            <mat-icon matCardAvatar class="dev">science</mat-icon>
-            <mat-card-title>Developer</mat-card-title>
-            <mat-card-subtitle>Local-only tools</mat-card-subtitle>
+            <mat-icon matCardAvatar class="dev">build</mat-icon>
+            <mat-card-title>Tools</mat-card-title>
+            <mat-card-subtitle>Match state, role management, and other admin / developer surfaces</mat-card-subtitle>
           </mat-card-header>
           <mat-card-actions>
+            @if (isAdmin()) {
+              <a mat-button routerLink="/admin">
+                <mat-icon class="admin-icon">admin_panel_settings</mat-icon>
+                Admin
+              </a>
+            }
             <a mat-button routerLink="/dev">
-              <mat-icon>build</mat-icon>
+              <mat-icon>handyman</mat-icon>
               Dev tools
             </a>
           </mat-card-actions>
         </mat-card>
       }
+      </div>
     </section>
   `,
   styles: `
@@ -394,7 +384,17 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
       margin-left: auto;
       align-self: flex-start;
     }
-    .profile {
+    /* Outer scroll container is full-width so the scrollbar sits at
+       the viewport edge instead of inset by the centered max-width.
+       .profile-content (below) handles the centering + padding. */
+    .profile-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      width: 100%;
+    }
+    .profile-content {
       padding: 1.5rem 1rem;
       /* Match the .page utility's max-width so every routed view inside
          the shell shares the same content column. */
@@ -404,8 +404,6 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      overflow-y: auto;
-      overscroll-behavior: contain;
       box-sizing: border-box;
     }
     mat-card-actions {

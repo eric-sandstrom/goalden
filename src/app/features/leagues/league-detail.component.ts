@@ -126,39 +126,43 @@ interface LeagueRow {
                   [allowEmptyString]="false"
                 ></qrcode>
               }
-              @if (hasMenuItems()) {
-                <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="League settings">
-                  <mat-icon>settings</mat-icon>
+              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="League settings">
+                <mat-icon>settings</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu">
+                <!-- Browse teams lives here (rather than on Profile) so it's
+                     contextually reachable from any league view. -->
+                <button mat-menu-item (click)="browseTeams()">
+                  <mat-icon>groups</mat-icon>
+                  Browse teams
                 </button>
-                <mat-menu #menu="matMenu">
-                  @if (canShareInvite()) {
-                    <button mat-menu-item (click)="copyLink()">
-                      <mat-icon>link</mat-icon>
-                      Copy invite link
-                    </button>
-                    <button mat-menu-item (click)="copyCode()">
-                      <mat-icon>content_copy</mat-icon>
-                      Copy code
-                    </button>
-                  }
-                  @if (amOwner() && canModerate()) {
-                    <button mat-menu-item (click)="regenerateCode()">
-                      <mat-icon>autorenew</mat-icon>
-                      Regenerate invite code
-                    </button>
-                    <button mat-menu-item (click)="confirmDelete()">
-                      <mat-icon>delete</mat-icon>
-                      Delete league
-                    </button>
-                  }
-                  @if (canLeave()) {
-                    <button mat-menu-item (click)="leave()">
-                      <mat-icon>logout</mat-icon>
-                      Leave league
-                    </button>
-                  }
-                </mat-menu>
-              }
+                @if (canShareInvite()) {
+                  <button mat-menu-item (click)="copyLink()">
+                    <mat-icon>link</mat-icon>
+                    Copy invite link
+                  </button>
+                  <button mat-menu-item (click)="copyCode()">
+                    <mat-icon>content_copy</mat-icon>
+                    Copy code
+                  </button>
+                }
+                @if (amOwner() && canModerate()) {
+                  <button mat-menu-item (click)="regenerateCode()">
+                    <mat-icon>autorenew</mat-icon>
+                    Regenerate invite code
+                  </button>
+                  <button mat-menu-item (click)="confirmDelete()">
+                    <mat-icon>delete</mat-icon>
+                    Delete league
+                  </button>
+                }
+                @if (canLeave()) {
+                  <button mat-menu-item (click)="leave()">
+                    <mat-icon>logout</mat-icon>
+                    Leave league
+                  </button>
+                }
+              </mat-menu>
             </div>
           </mat-card-header>
         </mat-card>
@@ -496,12 +500,6 @@ export class LeagueDetailComponent {
     return !this.amOwner();
   });
 
-  /** Hide the menu trigger entirely when there's nothing in the menu —
-   *  e.g. a non-leavable global league shown to a non-admin member. */
-  protected readonly hasMenuItems = computed(() => {
-    return this.canShareInvite() || (this.amOwner() && this.canModerate()) || this.canLeave();
-  });
-
   protected readonly columns = ['rank', 'player', 'exact', 'outcome', 'points', 'actions'];
   protected readonly skelRows = [0, 1, 2, 3, 4];
 
@@ -575,6 +573,13 @@ export class LeagueDetailComponent {
 
       onCleanup(() => unsubMembers());
     });
+  }
+
+  /** Jumps to the global teams browser. Lives in this component's menu
+   *  rather than the profile page because the league detail is the
+   *  natural surface for "tell me about the competing teams". */
+  protected browseTeams(): void {
+    void this.router.navigate(['/teams']);
   }
 
   protected async copyLink(): Promise<void> {

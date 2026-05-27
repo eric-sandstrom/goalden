@@ -37,8 +37,8 @@ const RECENT_LIMIT = 3;
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="page">
-      <div class="page-scroll">
+    <section class="home-scroll">
+      <div class="home-content">
         <!-- =================================================================
              Hero / welcome
         ================================================================== -->
@@ -219,6 +219,28 @@ const RECENT_LIMIT = 3;
       min-height: 0;
       overflow: hidden;
       width: 100%;
+    }
+    /* The outer scroll container is full-width so the scrollbar sits
+       at the viewport edge instead of inset by the .page utility's
+       max-width centering. .home-content (inside) does the centering
+       + padding. Means a single scrollbar, at the edge, on every
+       screen width. */
+    .home-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      width: 100%;
+    }
+    .home-content {
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-sizing: border-box;
     }
 
     /* ----- Hero ----- */
