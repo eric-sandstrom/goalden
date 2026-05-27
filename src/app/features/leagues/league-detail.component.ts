@@ -82,41 +82,62 @@ interface LeagueRow {
       } @else {
         <mat-card appearance="outlined">
           <mat-card-header>
-            <mat-icon matCardAvatar>{{ amOwner() ? 'workspace_premium' : 'groups' }}</mat-icon>
-            <mat-card-title>{{ league()!.name }}</mat-card-title>
-            <mat-card-subtitle>
-              {{ league()!.memberCount }} members
-              @if (amOwner()) { · You're the owner }
-            </mat-card-subtitle>
+            <mat-icon matCardAvatar [class.type-global]="league()!.type === 'global'">
+              {{ headerIcon() }}
+            </mat-icon>
+            <mat-card-title>
+              <span class="title-row">
+                <span class="title-text">{{ league()!.name }}</span>
+                @if (league()!.type !== 'private') {
+                  <mat-chip
+                    class="type-chip"
+                    [class.type-chip-global]="league()!.type === 'global'"
+                    [class.type-chip-public]="league()!.type === 'public'"
+                    [disableRipple]="true"
+                  >
+                    <mat-icon matChipAvatar>
+                      {{ league()!.type === 'global' ? 'public' : 'visibility' }}
+                    </mat-icon>
+                    {{ league()!.type === 'global' ? 'Global' : 'Public' }}
+                  </mat-chip>
+                }
+              </span>
+            </mat-card-title>
+            <mat-card-subtitle>{{ headerSubtitle() }}</mat-card-subtitle>
             <span class="grow"></span>
-            <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="League actions">
-              <mat-icon>more_vert</mat-icon>
-            </button>
-            <mat-menu #menu="matMenu">
-              <button mat-menu-item (click)="copyLink()">
-                <mat-icon>link</mat-icon>
-                Copy invite link
+            @if (hasMenuItems()) {
+              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="League actions">
+                <mat-icon>more_vert</mat-icon>
               </button>
-              <button mat-menu-item (click)="copyCode()">
-                <mat-icon>content_copy</mat-icon>
-                Copy code
-              </button>
-              @if (amOwner()) {
-                <button mat-menu-item (click)="regenerateCode()">
-                  <mat-icon>autorenew</mat-icon>
-                  Regenerate invite code
-                </button>
-                <button mat-menu-item (click)="confirmDelete()">
-                  <mat-icon>delete</mat-icon>
-                  Delete league
-                </button>
-              } @else {
-                <button mat-menu-item (click)="leave()">
-                  <mat-icon>logout</mat-icon>
-                  Leave league
-                </button>
-              }
-            </mat-menu>
+              <mat-menu #menu="matMenu">
+                @if (canShareInvite()) {
+                  <button mat-menu-item (click)="copyLink()">
+                    <mat-icon>link</mat-icon>
+                    Copy invite link
+                  </button>
+                  <button mat-menu-item (click)="copyCode()">
+                    <mat-icon>content_copy</mat-icon>
+                    Copy code
+                  </button>
+                }
+                @if (amOwner() && canModerate()) {
+                  <button mat-menu-item (click)="regenerateCode()">
+                    <mat-icon>autorenew</mat-icon>
+                    Regenerate invite code
+                  </button>
+                  <button mat-menu-item (click)="confirmDelete()">
+                    <mat-icon>delete</mat-icon>
+                    Delete league
+                  </button>
+                }
+                @if (canLeave()) {
+                  <button mat-menu-item (click)="leave()">
+                    <mat-icon>logout</mat-icon>
+                    Leave league
+                  </button>
+                }
+              </mat-menu>
+            }
           </mat-card-header>
         </mat-card>
 
@@ -244,6 +265,38 @@ interface LeagueRow {
     }
     .grow { flex: 1; }
     mat-card-header { align-items: center; }
+
+    /* Header title with optional type chip alongside the league name. */
+    .title-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    .title-text {
+      min-width: 0;
+      overflow-wrap: break-word;
+    }
+    /* Type chip — small, low-key. Uses Material's tertiary for public and
+       primary for global so they're visually distinct without shouting. */
+    .type-chip {
+      transform: scale(0.85);
+      transform-origin: left center;
+    }
+    .type-chip-public {
+      background-color: color-mix(in srgb, var(--mat-sys-tertiary) 18%, transparent) !important;
+      color: var(--mat-sys-on-tertiary-container) !important;
+    }
+    .type-chip-global {
+      background-color: color-mix(in srgb, var(--mat-sys-primary) 18%, transparent) !important;
+      color: var(--mat-sys-on-primary-container) !important;
+    }
+    /* Tint the header avatar icon for global leagues so the page feels
+       distinct top-to-bottom, not just a chip in the corner. */
+    .type-global {
+      color: var(--mat-sys-primary);
+    }
     .hdr-text { flex: 1; min-width: 0; }
     .invite-content {
       display: flex;
@@ -332,6 +385,68 @@ export class LeagueDetailComponent {
     const l = this.league();
     const uid = this.auth.uid();
     return !!l && !!uid && l.ownerId === uid;
+  });
+
+  // ---------------------------------------------------------------------------
+  // Header presentation derived from league type
+  // ---------------------------------------------------------------------------
+
+  protected readonly headerIcon = computed(() => {
+    const l = this.league();
+    if (!l) return 'groups';
+    if (l.type === 'global') return 'public';
+    if (l.type === 'public') return 'visibility';
+    return this.amOwner() ? 'workspace_premium' : 'groups';
+  });
+
+  protected readonly headerSubtitle = computed(() => {
+    const l = this.league();
+    if (!l) return '';
+    const memberLine = `${l.memberCount} members`;
+    if (l.type === 'global') {
+      return l.globalConfig?.allowLeave
+        ? `${memberLine} · auto-enrolled · you can leave`
+        : `${memberLine} · auto-enrolled`;
+    }
+    if (l.type === 'public') {
+      return this.amOwner()
+        ? `${memberLine} · public · you're the owner`
+        : `${memberLine} · public`;
+    }
+    // private
+    return this.amOwner() ? `${memberLine} · you're the owner` : memberLine;
+  });
+
+  /** Private + public leagues both have an invite code that's worth sharing.
+   *  Global leagues have no code. */
+  protected readonly canShareInvite = computed(() => {
+    const l = this.league();
+    return !!l && l.type !== 'global' && !!l.inviteCode;
+  });
+
+  /** Only private and public leagues have owners with mod powers. */
+  protected readonly canModerate = computed(() => {
+    const l = this.league();
+    return !!l && l.type !== 'global';
+  });
+
+  /** Leave button visibility:
+   *   - private/public: any non-owner can leave; owner can't.
+   *   - global + allowLeave: anyone can leave.
+   *   - global + !allowLeave: nobody can leave. */
+  protected readonly canLeave = computed(() => {
+    const l = this.league();
+    if (!l) return false;
+    if (l.type === 'global') {
+      return l.globalConfig?.allowLeave === true;
+    }
+    return !this.amOwner();
+  });
+
+  /** Hide the menu trigger entirely when there's nothing in the menu —
+   *  e.g. a non-leavable global league shown to a non-admin member. */
+  protected readonly hasMenuItems = computed(() => {
+    return this.canShareInvite() || (this.amOwner() && this.canModerate()) || this.canLeave();
   });
 
   protected readonly columns = ['rank', 'player', 'points', 'actions'];

@@ -404,6 +404,38 @@ export class LeaguesService {
       cb(list);
     });
   }
+
+  /**
+   * Computes the caller's rank inside a single league. Fetches the league's
+   * members + their `users/{uid}.totals.total` and sorts desc. One-shot,
+   * not reactive — meant to be called on mount and refreshed on demand.
+   * Tiebreakers are intentionally skipped here; this is the summary view's
+   * approximation, not the full per-league leaderboard.
+   */
+  async getLeagueStanding(
+    leagueId: string,
+    uid: string,
+  ): Promise<{ rank: number; total: number; points: number }> {
+    const membersRef = collection(this.db, `leagues/${leagueId}/members`);
+    const membersSnap = await getDocs(membersRef);
+    const memberUids = membersSnap.docs.map((d) => d.id);
+    if (memberUids.length === 0) {
+      return { rank: 0, total: 0, points: 0 };
+    }
+    const userDocs = await this.getMemberUserDocs(memberUids);
+    const scored = memberUids.map((memberUid) => {
+      const data = userDocs.get(memberUid);
+      const totals = (data?.['totals'] ?? {}) as Record<string, unknown>;
+      const points = typeof totals['total'] === 'number' ? totals['total'] : 0;
+      return { uid: memberUid, points };
+    });
+    scored.sort((a, b) => b.points - a.points);
+    const idx = scored.findIndex((s) => s.uid === uid);
+    if (idx < 0) {
+      return { rank: 0, total: scored.length, points: 0 };
+    }
+    return { rank: idx + 1, total: scored.length, points: scored[idx].points };
+  }
 }
 
 /** Defensive parse — global leagues from the server should always have a

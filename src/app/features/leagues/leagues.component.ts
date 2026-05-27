@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -20,9 +21,16 @@ import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { League } from '../../core/models/league.model';
+import { AuthService } from '../../core/services/auth.service';
 import { LeaguesService } from '../../core/services/leagues.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { CreateLeagueDialogComponent } from './create-league-dialog.component';
+
+interface LeagueStanding {
+  rank: number;
+  total: number;
+  points: number;
+}
 
 @Component({
   selector: 'app-leagues',
@@ -122,8 +130,14 @@ import { CreateLeagueDialogComponent } from './create-league-dialog.component';
               <a mat-list-item [routerLink]="['/leagues', item.league.id]">
                 <mat-icon matListItemIcon>{{ leagueIcon(item.league.type, item.role) }}</mat-icon>
                 <span matListItemTitle>{{ item.league.name }}</span>
-                <span matListItemLine>
-                  {{ item.league.memberCount }} members · {{ leagueRoleLabel(item) }}
+                <span matListItemLine>{{ leagueRoleLabel(item) }}</span>
+                <span matListItemMeta class="standing">
+                  @if (standingFor(item.league.id); as s) {
+                    <span class="rank">#{{ s.rank }} <span class="rank-of">of {{ s.total }}</span></span>
+                    <span class="pts">{{ s.points }} pts</span>
+                  } @else {
+                    <span class="rank-skel">—</span>
+                  }
                 </span>
               </a>
             }
@@ -221,10 +235,40 @@ import { CreateLeagueDialogComponent } from './create-league-dialog.component';
     .skel-text {
       flex: 1;
     }
+
+    /* Trailing rank/points block on each league row. The rank is the big
+       number to draw the eye; points are secondary muted text below. */
+    .standing {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.1rem;
+      min-width: 64px;
+    }
+    .rank {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--mat-sys-on-surface);
+    }
+    .rank-of {
+      font-weight: 400;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.85em;
+    }
+    .pts {
+      font-size: 0.78rem;
+      color: var(--mat-sys-on-surface-variant);
+      font-variant-numeric: tabular-nums;
+    }
+    .rank-skel {
+      color: var(--mat-sys-on-surface-variant);
+      font-weight: 700;
+    }
   `,
 })
 export class LeaguesComponent {
   private readonly leagues = inject(LeaguesService);
+  private readonly auth = inject(AuthService);
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
@@ -254,11 +298,56 @@ export class LeaguesComponent {
     code: ['', [Validators.required, Validators.minLength(8)]],
   });
 
+  /** Caller's rank + points per league, keyed by leagueId. Populated
+   *  lazily as standings come in. */
+  private readonly _standings = signal<ReadonlyMap<string, LeagueStanding>>(new Map());
+
   constructor() {
     const unsub = this.leagues.listenToPublicLeagues((list) => {
       this.publicLeagues.set(list);
     });
     this.destroyRef.onDestroy(() => unsub());
+
+    // Whenever the user's set of leagues changes, fan out a one-shot
+    // getLeagueStanding per league and merge results into the signal.
+    // Each league becomes ~1-2 Firestore reads (members + batched user
+    // docs); fine for the typical 1-5 leagues per user.
+    effect(() => {
+      const uid = this.auth.uid();
+      const list = this.myList();
+      if (!uid || list.length === 0) {
+        this._standings.set(new Map());
+        return;
+      }
+      void this.refetchStandings(list, uid);
+    });
+  }
+
+  protected standingFor(leagueId: string): LeagueStanding | null {
+    return this._standings().get(leagueId) ?? null;
+  }
+
+  private async refetchStandings(
+    items: readonly { league: League }[],
+    uid: string,
+  ): Promise<void> {
+    // Parallelise — N small reads in parallel rather than sequential.
+    const results = await Promise.all(
+      items.map(async (item) => {
+        try {
+          const standing = await this.leagues.getLeagueStanding(item.league.id, uid);
+          return [item.league.id, standing] as const;
+        } catch (err) {
+          console.error(`[Leagues] standing for ${item.league.id} failed`, err);
+          return null;
+        }
+      }),
+    );
+    const next = new Map<string, LeagueStanding>();
+    for (const r of results) {
+      if (r) next.set(r[0], r[1]);
+    }
+    this._standings.set(next);
   }
 
   protected leagueIcon(type: League['type'], role: 'owner' | 'member'): string {

@@ -45,13 +45,9 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/predict/predict.component').then((m) => m.PredictComponent),
       },
-      {
-        path: 'leaderboard',
-        loadComponent: () =>
-          import('./features/leaderboard/leaderboard.component').then(
-            (m) => m.LeaderboardComponent,
-          ),
-      },
+      // /leaderboard merged into /leagues. Keep the path as a redirect so
+      // existing bookmarks / shared links still land on the right page.
+      { path: 'leaderboard', redirectTo: 'leagues', pathMatch: 'full' },
       {
         path: 'leagues',
         loadComponent: () =>
