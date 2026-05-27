@@ -141,6 +141,35 @@ interface LeagueRow {
               </mat-menu>
             }
           </mat-card-header>
+
+          <!-- Compact share strip — merged in from the old standalone
+               invite card. Right-aligned mini QR + code chip + copy
+               button. Only renders for leagues that have an invite code
+               (private + public). Global leagues skip this entirely. -->
+          @if (canShareInvite()) {
+            <mat-card-content class="share-strip">
+              <qrcode
+                [qrdata]="inviteUrl()"
+                [width]="72"
+                [errorCorrectionLevel]="'L'"
+                [margin]="1"
+                [colorDark]="'#000000'"
+                [colorLight]="'#ffffff'"
+                [allowEmptyString]="false"
+              ></qrcode>
+              <div class="share-meta">
+                <code class="invite-code-mini">{{ league()!.inviteCode }}</code>
+                <button
+                  mat-icon-button
+                  (click)="copyLink()"
+                  aria-label="Copy invite link"
+                  matTooltip="Copy invite link"
+                >
+                  <mat-icon>link</mat-icon>
+                </button>
+              </div>
+            </mat-card-content>
+          }
         </mat-card>
 
         <!-- Predict-next card: drop in one outstanding fixture for the
@@ -148,42 +177,6 @@ interface LeagueRow {
              World Cup fixture pool; once leagues become multi-competition
              this card will read a leagueId-scoped fixture source. -->
         <app-predict-next-card />
-
-        <!-- Invite card: private + public leagues both have invite codes
-             so this renders for both. Global leagues have no invite code
-             (auto-enrolled only) — guard hides the card for them. -->
-        @if (league()!.inviteCode) {
-          <mat-card appearance="outlined" class="invite">
-            <mat-card-header>
-              <mat-icon matCardAvatar>qr_code_2</mat-icon>
-              <mat-card-title>{{ inviteCardTitle() }}</mat-card-title>
-              <mat-card-subtitle>{{ inviteCardSubtitle() }}</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content class="invite-content">
-              <qrcode
-                [qrdata]="inviteUrl()"
-                [width]="180"
-                [errorCorrectionLevel]="'M'"
-                [margin]="2"
-                [colorDark]="'#000000'"
-                [colorLight]="'#ffffff'"
-                [allowEmptyString]="false"
-              ></qrcode>
-              <div class="invite-meta">
-                <mat-chip-set>
-                  <mat-chip [disableRipple]="true">
-                    <mat-icon matChipAvatar>vpn_key</mat-icon>
-                    {{ league()!.inviteCode }}
-                  </mat-chip>
-                </mat-chip-set>
-                <button mat-stroked-button (click)="copyLink()">
-                  <mat-icon>link</mat-icon>
-                  Copy link
-                </button>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        }
 
         <mat-card appearance="outlined" class="table-wrap card-grow">
           <div class="card-scroll">
@@ -308,18 +301,33 @@ interface LeagueRow {
       color: var(--mat-sys-primary);
     }
     .hdr-text { flex: 1; min-width: 0; }
-    .invite-content {
+
+    /* Compact share strip inside the header card. Right-aligned mini QR +
+       code + copy-link icon button. Sits below the header row so it
+       doesn't fight mat-card-header's grid for space. */
+    .share-strip {
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
-      gap: 1rem;
+      justify-content: flex-end;
+      gap: 0.625rem;
+      padding-top: 0.5rem;
     }
-    .invite-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      flex: 1;
-      min-width: 0;
+    .share-strip qrcode {
+      display: inline-flex;
+    }
+    .share-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .invite-code-mini {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      color: var(--mat-sys-on-surface-variant);
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--mat-sys-surface-container-low);
     }
     .table-wrap { padding: 0; overflow: hidden; }
     .skel-list { padding: 0; }
@@ -474,19 +482,6 @@ export class LeagueDetailComponent {
     const code = this.league()?.inviteCode;
     if (!code) return '';
     return `${window.location.origin}/j/${code}`;
-  });
-
-  /** Header copy for the invite card. Public leagues get a different
-   *  phrasing since they're already discoverable — the QR/code is for
-   *  convenience, not access control. */
-  protected readonly inviteCardTitle = computed(() => {
-    return this.league()?.type === 'public' ? 'Share this league' : 'Invite friends';
-  });
-
-  protected readonly inviteCardSubtitle = computed(() => {
-    return this.league()?.type === 'public'
-      ? 'Scan, share the link, or anyone can find it in Discover'
-      : 'Scan or share the link';
   });
 
   protected readonly rows = computed<readonly LeagueRow[]>(() => {
