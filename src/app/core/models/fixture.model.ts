@@ -37,6 +37,16 @@ export function isLocked(fixture: Fixture, now: Date = new Date()): boolean {
   return fixture.utcKickoff.getTime() <= now.getTime();
 }
 
+/**
+ * True when either team isn't decided yet — typical of knockout fixtures
+ * before the preceding round resolves. We can't usefully predict a TBD
+ * fixture (no team to bet on), so the UI hides it from the
+ * predict-next-card and disables the score inputs on a regular row.
+ */
+export function isTbd(fixture: Fixture): boolean {
+  return fixture.homeTeam.id === null || fixture.awayTeam.id === null;
+}
+
 export function isKnockout(stage: FixtureStage): boolean {
   return stage !== 'GROUP';
 }

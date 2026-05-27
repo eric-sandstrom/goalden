@@ -13,7 +13,7 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
-import { Fixture, isLocked } from '../../core/models/fixture.model';
+import { Fixture, isLocked, isTbd } from '../../core/models/fixture.model';
 import {
   MatchPrediction,
   PredictionsService,
@@ -69,13 +69,13 @@ import {
           </div>
         } @else {
           <form [formGroup]="form" class="scores">
-            <div class="score-box home" [class.locked]="locked()">
+            <div class="score-box home" [class.locked]="editDisabled()">
               <div class="step-stack">
                 <button
                   type="button"
                   class="step-btn"
                   (click)="step('home', 1)"
-                  [disabled]="locked()"
+                  [disabled]="editDisabled()"
                   aria-label="Increase home score"
                 >
                   <mat-icon>add</mat-icon>
@@ -84,7 +84,7 @@ import {
                   type="button"
                   class="step-btn"
                   (click)="step('home', -1)"
-                  [disabled]="locked()"
+                  [disabled]="editDisabled()"
                   aria-label="Decrease home score"
                 >
                   <mat-icon>remove</mat-icon>
@@ -97,12 +97,12 @@ import {
                 min="0"
                 max="99"
                 formControlName="home"
-                [readonly]="locked()"
+                [readonly]="editDisabled()"
                 aria-label="Home score"
               />
             </div>
             <span class="sep">-</span>
-            <div class="score-box away" [class.locked]="locked()">
+            <div class="score-box away" [class.locked]="editDisabled()">
               <input
                 class="score-input"
                 type="number"
@@ -110,7 +110,7 @@ import {
                 min="0"
                 max="99"
                 formControlName="away"
-                [readonly]="locked()"
+                [readonly]="editDisabled()"
                 aria-label="Away score"
               />
               <div class="step-stack">
@@ -118,7 +118,7 @@ import {
                   type="button"
                   class="step-btn"
                   (click)="step('away', 1)"
-                  [disabled]="locked()"
+                  [disabled]="editDisabled()"
                   aria-label="Increase away score"
                 >
                   <mat-icon>add</mat-icon>
@@ -127,7 +127,7 @@ import {
                   type="button"
                   class="step-btn"
                   (click)="step('away', -1)"
-                  [disabled]="locked()"
+                  [disabled]="editDisabled()"
                   aria-label="Decrease away score"
                 >
                   <mat-icon>remove</mat-icon>
@@ -176,7 +176,12 @@ import {
       }
 
       <div class="meta">
-        @if (liveStatus(); as live) {
+        @if (tbd()) {
+          <span class="status tbd">
+            <mat-icon class="status-icon" aria-hidden="true">hourglass_empty</mat-icon>
+            Teams TBD · {{ kickoffLabel() }}
+          </span>
+        } @else if (liveStatus(); as live) {
           <span class="status" [class.live]="live.tone === 'live'" [class.final]="live.tone === 'final'">
             @if (live.tone === 'live') {
               <span class="live-dot" aria-hidden="true"></span>
@@ -428,6 +433,11 @@ import {
       color: var(--mat-sys-tertiary);
       font-weight: 600;
     }
+    .status.tbd {
+      /* Muted neutral — convey "not actionable yet" without yelling. */
+      color: var(--mat-sys-on-surface-variant);
+      font-style: italic;
+    }
     .status.live {
       color: var(--mat-sys-error);
       font-weight: 700;
@@ -553,6 +563,16 @@ export class FixtureRowComponent {
 
   protected readonly locked = computed(() => isLocked(this.fixture(), new Date(this.nowTick())));
 
+  /** True when either team is undecided (knockout match before bracket
+   *  resolves). Drives input disabling + the dedicated status label. */
+  protected readonly tbd = computed(() => isTbd(this.fixture()));
+
+  /** Score inputs and step buttons are non-editable when the fixture is
+   *  either locked (past kickoff / in play / finished) or TBD (no teams
+   *  yet to bet on). The two states show different status copy but share
+   *  the same widget styling. */
+  protected readonly editDisabled = computed(() => this.locked() || this.tbd());
+
   protected readonly kickoffLabel = computed(() =>
     this.fixture().utcKickoff.toLocaleString(undefined, {
       weekday: 'short',
@@ -654,7 +674,10 @@ export class FixtureRowComponent {
         },
         { emitEvent: false },
       );
-      if (locked) {
+      // Disable the form when the fixture is locked OR has TBD teams.
+      // Read tbd() here so the effect re-runs if the fixture flips from
+      // TBD → resolved (e.g. bracket fills in).
+      if (locked || this.tbd()) {
         this.form.disable({ emitEvent: false });
       } else {
         this.form.enable({ emitEvent: false });
@@ -671,7 +694,7 @@ export class FixtureRowComponent {
   }
 
   protected step(field: 'home' | 'away', delta: number): void {
-    if (this.locked()) return;
+    if (this.editDisabled()) return;
     const control = this.form.controls[field];
     const raw = control.value;
     // First +/- press from an empty input just establishes 0 — don't apply
@@ -686,7 +709,7 @@ export class FixtureRowComponent {
   }
 
   private async tryAutoSave(): Promise<void> {
-    if (this.locked()) return;
+    if (this.editDisabled()) return;
     const { home, away } = this.form.getRawValue();
     if (home === null || away === null) return;
     if (!Number.isInteger(home) || !Number.isInteger(away)) return;

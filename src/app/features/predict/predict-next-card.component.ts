@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, u
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { Fixture } from '../../core/models/fixture.model';
+import { Fixture, isTbd } from '../../core/models/fixture.model';
 import { FixturesService } from '../../core/services/fixtures.service';
 import {
   MatchPrediction,
@@ -111,13 +111,20 @@ export class PredictNextCardComponent {
    *  one via the Next button. */
   private readonly currentFixtureId = signal<string | null>(null);
 
-  /** Every upcoming TIMED fixture in kickoff order. Used to seed the
-   *  initial card and as the source list the Next button walks. */
+  /** Every upcoming TIMED fixture in kickoff order, excluding fixtures
+   *  whose teams aren't decided yet (knockout rounds before the
+   *  preceding round finishes). TBD matches reappear in the candidate
+   *  list automatically once pollFootballData fills in the team ids. */
   protected readonly upcomingFixtures = computed<readonly Fixture[]>(() => {
     const now = Date.now();
     return this.fixtures
       .fixtures()
-      .filter((f) => f.status === 'TIMED' && f.utcKickoff.getTime() > now)
+      .filter(
+        (f) =>
+          f.status === 'TIMED' &&
+          f.utcKickoff.getTime() > now &&
+          !isTbd(f),
+      )
       .sort((a, b) => a.utcKickoff.getTime() - b.utcKickoff.getTime());
   });
 
