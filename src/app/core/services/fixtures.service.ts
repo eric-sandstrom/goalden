@@ -173,6 +173,9 @@ export class FixturesService {
     try {
       const env = JSON.parse(raw) as CacheEnvelope;
       if (typeof env.cachedAt !== 'number') return false;
+      // An empty cache should never count as fresh — see TeamsService for
+      // rationale. Without this, a single empty fetch poisons the cache.
+      if (!Array.isArray(env.fixtures) || env.fixtures.length === 0) return false;
       return Date.now() - env.cachedAt < CACHE_TTL_MS;
     } catch {
       return false;
@@ -194,6 +197,9 @@ export class FixturesService {
 
   private writeCache(fixtures: readonly Fixture[]): void {
     if (typeof localStorage === 'undefined') return;
+    // Don't persist an empty result — would poison the cache and suppress
+    // re-fetches until TTL expires.
+    if (fixtures.length === 0) return;
     try {
       const envelope: CacheEnvelope = {
         fixtures: fixtures.map(fixtureToCache),

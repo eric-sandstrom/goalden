@@ -142,6 +142,10 @@ export class TeamsService {
     try {
       const env = JSON.parse(raw) as CacheEnvelope;
       if (typeof env.cachedAt !== 'number') return false;
+      // An empty cache should never count as fresh — otherwise a single
+      // failed fetch (or one happening before pollTeams populates the
+      // rollup) would lock the user out of teams data for 24h.
+      if (!Array.isArray(env.teams) || env.teams.length === 0) return false;
       return Date.now() - env.cachedAt < CACHE_TTL_MS;
     } catch {
       return false;
@@ -163,6 +167,10 @@ export class TeamsService {
 
   private writeCache(teams: readonly Team[]): void {
     if (typeof localStorage === 'undefined') return;
+    // Don't persist an empty result — that would poison the cache and
+    // suppress re-fetches until the TTL expires, even though the underlying
+    // problem (no data yet) might resolve in minutes.
+    if (teams.length === 0) return;
     try {
       const envelope: CacheEnvelope = {
         teams: teams.map(teamToCache),
