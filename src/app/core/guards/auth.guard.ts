@@ -41,6 +41,28 @@ export const requiresAuthGuard: CanActivateFn = async () => {
   return true;
 };
 
+/** Gate for the /admin section. Requires both authenticated AND the
+ *  user-doc `roles` field to include `'admin'`. Sends non-admins back to
+ *  the home page. */
+export const adminGuard: CanActivateFn = async () => {
+  const auth = inject(AuthService);
+  const userService = inject(UserService);
+  const router = inject(Router);
+
+  const authInit$ = toObservable(auth.initialized);
+  const userLoaded$ = toObservable(userService.loaded);
+
+  await firstValueFrom(authInit$.pipe(filter((v) => v)));
+  if (!auth.isAuthenticated()) {
+    return router.parseUrl('/login');
+  }
+  await firstValueFrom(userLoaded$.pipe(filter((v) => v)));
+  if (!userService.isAdmin()) {
+    return router.parseUrl('/');
+  }
+  return true;
+};
+
 export const redirectIfAuthenticatedGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);

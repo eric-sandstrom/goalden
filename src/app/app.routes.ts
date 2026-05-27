@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { environment } from '../environments/environment';
 import {
+  adminGuard,
   authGuard,
   redirectIfAuthenticatedGuard,
   requiresAuthGuard,
@@ -92,6 +93,12 @@ export const routes: Routes = [
         canActivate: [devOnlyGuard],
         loadComponent: () =>
           import('./features/dev/dev-tools.component').then((m) => m.DevToolsComponent),
+      },
+      {
+        path: 'admin',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./features/admin/admin.component').then((m) => m.AdminComponent),
       },
     ],
   },

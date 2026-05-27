@@ -60,6 +60,12 @@ import { UserService } from '../../core/services/user.service';
             <mat-icon>groups</mat-icon>
             Browse teams
           </a>
+          @if (isAdmin()) {
+            <a mat-button routerLink="/admin">
+              <mat-icon class="admin-icon">admin_panel_settings</mat-icon>
+              Admin
+            </a>
+          }
         </mat-card-actions>
       </mat-card>
 
@@ -368,6 +374,7 @@ import { UserService } from '../../core/services/user.service';
       justify-content: flex-start;
     }
     .dev { color: var(--mat-sys-tertiary); }
+    .admin-icon { color: var(--mat-sys-tertiary); }
 
     /* ---- Theme card layout ---- */
     .full-field { width: 100%; }
@@ -659,6 +666,7 @@ export class ProfileComponent {
   );
   protected readonly email = computed(() => this.auth.user()?.email ?? '');
   protected readonly showDev = !environment.production;
+  protected readonly isAdmin = this.userService.isAdmin;
 
   protected readonly variantOptions = this.themeService.variantOptions;
   protected readonly defaultPresetValue = PRESET_DEFAULT;

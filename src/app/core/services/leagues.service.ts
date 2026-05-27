@@ -335,6 +335,51 @@ export class LeaguesService {
     );
     await call({ leagueId, memberUid });
   }
+
+  // ---------------------------------------------------------------------------
+  // Admin-only callables for global leagues
+  // ---------------------------------------------------------------------------
+
+  async createGlobalLeague(args: {
+    name: string;
+    description: string;
+    globalConfig: LeagueGlobalConfig;
+  }): Promise<{ leagueId: string; enrolled: number }> {
+    const call = httpsCallable<typeof args, { leagueId: string; enrolled: number }>(
+      this.functions,
+      'createGlobalLeague',
+    );
+    const res = await call(args);
+    return res.data;
+  }
+
+  async syncGlobalLeague(leagueId: string): Promise<{ added: number; total: number }> {
+    const call = httpsCallable<{ leagueId: string }, { added: number; total: number }>(
+      this.functions,
+      'syncGlobalLeague',
+    );
+    const res = await call({ leagueId });
+    return res.data;
+  }
+
+  async deleteGlobalLeague(leagueId: string): Promise<void> {
+    const call = httpsCallable<{ leagueId: string }, { ok: boolean }>(
+      this.functions,
+      'deleteGlobalLeague',
+    );
+    await call({ leagueId });
+  }
+
+  /** Snapshot listener over every global league. Used by the admin UI to
+   *  show all globals, not just the ones the caller is a member of. */
+  listenToGlobalLeagues(cb: (leagues: readonly League[]) => void): () => void {
+    const q = query(collection(this.db, 'leagues'), where('type', '==', 'global'));
+    return onSnapshot(q, (snap) => {
+      const list: League[] = [];
+      snap.forEach((d) => list.push(this.parseLeague(d.id, d.data())));
+      cb(list);
+    });
+  }
 }
 
 /** Defensive parse — global leagues from the server should always have a
