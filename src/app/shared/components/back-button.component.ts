@@ -22,41 +22,8 @@ import { NavigationHistoryService } from '../../core/services/navigation-history
   selector: 'app-back-button',
   imports: [MatButtonModule, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (visible()) {
-      <button
-        type="button"
-        mat-button
-        class="back-btn"
-        (click)="goBack()"
-        [attr.aria-label]="ariaLabel()"
-      >
-        <mat-icon>chevron_left</mat-icon>
-        Back to {{ previousLabel() }}
-      </button>
-    }
-  `,
-  styles: `
-    :host {
-      /* Mirror .page's centered column so the back button sits in the
-         same horizontal band as the content cards below it: max 720px
-         wide, centered, with 1rem horizontal padding. */
-      display: block;
-      flex: 0 0 auto;
-      width: 100%;
-      max-width: 720px;
-      margin: 0 auto;
-      box-sizing: border-box;
-      padding: 0.5rem 1rem 0;
-    }
-    .back-btn {
-      /* Cancel mat-button's default leading padding so the chevron lines
-         up with the content's left edge, not 8px inside it. */
-      padding-left: 0;
-      padding-right: 0.75rem;
-      min-width: 0;
-    }
-  `,
+  templateUrl: './back-button.component.html',
+  styleUrl: './back-button.component.scss',
 })
 export class BackButtonComponent {
   private readonly history = inject(NavigationHistoryService);

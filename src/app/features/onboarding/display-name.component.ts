@@ -18,82 +18,8 @@ import { UserService } from '../../core/services/user.service';
     MatInputModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="container">
-      <mat-card appearance="outlined">
-        <mat-card-header>
-          <mat-card-title>What should we call you?</mat-card-title>
-          <mat-card-subtitle>This shows up on leaderboards.</mat-card-subtitle>
-        </mat-card-header>
-
-        <mat-card-content>
-          <form [formGroup]="form" (ngSubmit)="submit()">
-            <mat-form-field appearance="outline">
-              <mat-label>Display name</mat-label>
-              <input
-                matInput
-                formControlName="name"
-                autocomplete="nickname"
-                maxlength="30"
-                #nameInput
-              />
-              <mat-hint align="end">{{ length() }}/30</mat-hint>
-              @if (form.controls.name.touched && form.controls.name.hasError('minlength')) {
-                <mat-error>Minimum 2 characters</mat-error>
-              }
-            </mat-form-field>
-
-            <button
-              type="submit"
-              mat-flat-button
-              color="primary"
-              [disabled]="form.invalid || loading()"
-            >
-              Continue
-            </button>
-          </form>
-
-          @if (error()) {
-            <div class="error" role="alert">{{ error() }}</div>
-          }
-        </mat-card-content>
-      </mat-card>
-    </div>
-  `,
-  styles: `
-    :host {
-      display: block;
-      height: 100%;
-    }
-    .container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100%;
-      padding: 1rem;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      box-sizing: border-box;
-    }
-    mat-card {
-      width: 100%;
-      max-width: 420px;
-    }
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    mat-form-field {
-      width: 100%;
-    }
-    .error {
-      color: var(--mat-sys-error);
-      margin-top: 1rem;
-      text-align: center;
-      font-size: 0.9rem;
-    }
-  `,
+  templateUrl: './display-name.component.html',
+  styleUrl: './display-name.component.scss',
 })
 export class DisplayNameComponent {
   private readonly userService = inject(UserService);

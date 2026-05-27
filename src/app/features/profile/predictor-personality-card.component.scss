@@ -1,0 +1,54 @@
+    .personality-card {
+      padding: 0;
+    }
+    mat-card-header {
+      padding: 1rem 1rem 0;
+      align-items: center;
+    }
+    mat-card-content {
+      padding: 0.75rem 1rem 0;
+    }
+    .hdr-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .emoji {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      font-size: 28px;
+      line-height: 1;
+    }
+    .empty-icon {
+      color: var(--mat-sys-primary);
+    }
+    .reasoning {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      color: var(--mat-sys-on-surface);
+    }
+    .hint {
+      font-size: 0.8rem;
+      color: var(--mat-sys-on-surface-variant);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .hint-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+    .actions {
+      padding: 0.5rem 0.75rem 0.75rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .busy-label {
+      font-size: 0.85rem;
+      color: var(--mat-sys-on-surface-variant);
+    }

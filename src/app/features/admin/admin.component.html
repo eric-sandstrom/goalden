@@ -1,0 +1,123 @@
+    <section class="page">
+      <header class="hero">
+        <h1>Admin</h1>
+        <p class="hint">Manage global leagues — visible to all matching users.</p>
+      </header>
+
+      <!-- ===================================================================
+           Create global league
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>add_circle</mat-icon>
+          <mat-card-title>Create global league</mat-card-title>
+          <mat-card-subtitle>All matching users are auto-enrolled immediately</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <form [formGroup]="createForm" class="form" (ngSubmit)="submit()">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Name</mat-label>
+              <input matInput formControlName="name" maxlength="60" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Description (optional)</mat-label>
+              <input matInput formControlName="description" maxlength="200" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Auto-enroll</mat-label>
+              <mat-select formControlName="autoEnroll">
+                <mat-option value="all">All users</mat-option>
+                <mat-option value="filter">Users matching a filter</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            @if (createForm.controls.autoEnroll.value === 'filter') {
+              <div class="filter-row">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>Field name</mat-label>
+                  <input matInput formControlName="filterField" placeholder="e.g. country" />
+                </mat-form-field>
+                <span class="filter-equals" aria-hidden="true">=</span>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>Equals</mat-label>
+                  <input matInput formControlName="filterEquals" />
+                </mat-form-field>
+              </div>
+              <p class="hint small">
+                Tip: any field on the user doc. Strings, numbers, or booleans
+                ("true"/"false"). Comparison is strict equality.
+              </p>
+            }
+
+            <mat-checkbox formControlName="allowLeave">
+              Allow members to leave this league
+            </mat-checkbox>
+
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="createForm.invalid || creating()"
+            >
+              @if (creating()) {
+                <mat-progress-spinner mode="indeterminate" diameter="20" />
+              } @else {
+                Create league
+              }
+            </button>
+          </form>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- ===================================================================
+           Existing global leagues
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>public</mat-icon>
+          <mat-card-title>Global leagues</mat-card-title>
+          <mat-card-subtitle>{{ leagueListSubtitle() }}</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @if (leagues().length === 0) {
+            <p class="hint">None yet — create one above.</p>
+          } @else {
+            <div class="leagues">
+              @for (league of leagues(); track league.id) {
+                <div class="league-row">
+                  <div class="league-meta">
+                    <span class="league-name">{{ league.name }}</span>
+                    <span class="league-sub">
+                      {{ league.memberCount }} members ·
+                      {{ leagueConditionLabel(league) }} ·
+                      {{ league.globalConfig?.allowLeave ? 'leavable' : 'mandatory' }}
+                    </span>
+                  </div>
+                  <div class="league-actions">
+                    <button
+                      type="button"
+                      mat-stroked-button
+                      [disabled]="busyLeagueId() === league.id"
+                      (click)="sync(league)"
+                    >
+                      <mat-icon>sync</mat-icon> Sync
+                    </button>
+                    <button
+                      type="button"
+                      mat-stroked-button
+                      class="danger"
+                      [disabled]="busyLeagueId() === league.id"
+                      (click)="remove(league)"
+                    >
+                      <mat-icon>delete</mat-icon> Delete
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+    </section>

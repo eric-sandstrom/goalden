@@ -1,0 +1,118 @@
+    <section class="page">
+      @if (!loaded()) {
+        <mat-card appearance="outlined" class="hero-card">
+          <mat-card-header>
+            <app-skel width="80px" height="80px" rounded />
+            <div class="skel-hdr">
+              <app-skel width="60%" height="1.5rem" block />
+              <div style="height: 6px;"></div>
+              <app-skel width="40%" height="1rem" block />
+            </div>
+          </mat-card-header>
+        </mat-card>
+      } @else if (team(); as t) {
+        <!-- ===== Hero ===== -->
+        <mat-card appearance="outlined" class="hero-card">
+          <mat-card-header>
+            @if (t.crest) {
+              <img
+                matCardAvatar
+                [ngSrc]="t.crest"
+                width="56"
+                height="56"
+                [alt]="t.name + ' crest'"
+              />
+            } @else {
+              <mat-icon matCardAvatar aria-hidden="true">shield</mat-icon>
+            }
+            <mat-card-title>{{ t.name }}</mat-card-title>
+            <mat-card-subtitle>{{ subtitle(t) }}</mat-card-subtitle>
+          </mat-card-header>
+          @if (t.clubColors || t.venue || t.founded) {
+            <mat-card-content class="hero-meta">
+              @if (t.founded) {
+                <div class="meta-row">
+                  <mat-icon class="meta-icon" aria-hidden="true">history</mat-icon>
+                  <span class="meta-text">Founded {{ t.founded }}</span>
+                </div>
+              }
+              @if (t.venue) {
+                <div class="meta-row">
+                  <mat-icon class="meta-icon" aria-hidden="true">stadium</mat-icon>
+                  <span class="meta-text">{{ t.venue }}</span>
+                </div>
+              }
+              @if (t.clubColors) {
+                <div class="meta-row">
+                  <mat-icon class="meta-icon" aria-hidden="true">palette</mat-icon>
+                  <span class="meta-text">{{ t.clubColors }}</span>
+                </div>
+              }
+            </mat-card-content>
+          }
+        </mat-card>
+
+        <!-- ===== Coach =====
+             Skip the card entirely when there's no usable name. The
+             football-data free tier sometimes returns a coach stub with only
+             an id and no name fields, which would render as an empty title
+             above a subtitle and look broken. -->
+        @if (t.coach && t.coach.name.trim().length > 0) {
+          <mat-card appearance="outlined">
+            <mat-card-header>
+              <mat-icon matCardAvatar>sports</mat-icon>
+              <mat-card-title>{{ t.coach.name }}</mat-card-title>
+              <mat-card-subtitle>Head coach{{
+                t.coach.nationality ? ' · ' + t.coach.nationality : ''
+              }}</mat-card-subtitle>
+            </mat-card-header>
+          </mat-card>
+        }
+
+        <!-- ===== Squad ===== -->
+        @if (squadSections().length > 0) {
+          <mat-card appearance="outlined" class="card-grow squad-card">
+            <mat-card-header>
+              <mat-icon matCardAvatar>group</mat-icon>
+              <mat-card-title>Squad</mat-card-title>
+              <mat-card-subtitle>{{ t.squad.length }} players</mat-card-subtitle>
+            </mat-card-header>
+            <div class="card-scroll">
+              @for (section of squadSections(); track section.position) {
+                <section class="squad-section">
+                  <h2 class="squad-section-title">{{ section.label }}</h2>
+                  <mat-list>
+                    @for (player of section.players; track player.id) {
+                      <mat-list-item>
+                        @if (player.shirtNumber !== null) {
+                          <span matListItemAvatar class="shirt-number">{{
+                            player.shirtNumber
+                          }}</span>
+                        } @else {
+                          <span matListItemAvatar class="shirt-number shirt-blank"
+                            aria-hidden="true">—</span>
+                        }
+                        <span matListItemTitle>{{ player.name }}</span>
+                        @if (player.nationality) {
+                          <span matListItemLine>{{ player.nationality }}</span>
+                        }
+                      </mat-list-item>
+                    }
+                  </mat-list>
+                </section>
+              }
+            </div>
+          </mat-card>
+        } @else {
+          <mat-card appearance="outlined" class="empty">
+            <mat-icon aria-hidden="true">person_off</mat-icon>
+            <p>No squad data yet — try again after the next sync.</p>
+          </mat-card>
+        }
+      } @else {
+        <mat-card appearance="outlined" class="empty">
+          <mat-icon aria-hidden="true">help</mat-icon>
+          <p>Team not found.</p>
+        </mat-card>
+      }
+    </section>

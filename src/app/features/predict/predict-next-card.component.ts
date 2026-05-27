@@ -31,76 +31,8 @@ import { FixtureRowComponent } from './fixture-row.component';
   selector: 'app-predict-next-card',
   imports: [MatButtonModule, MatCardModule, MatIconModule, FixtureRowComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <mat-card appearance="outlined" class="predict-next-card">
-      <mat-card-header>
-        <mat-icon matCardAvatar>sports_soccer</mat-icon>
-        <mat-card-title>Predict next match</mat-card-title>
-        <mat-card-subtitle>{{ subtitle() }}</mat-card-subtitle>
-      </mat-card-header>
-
-      @if (currentFixture(); as f) {
-        <div class="fixture-slot">
-          <app-fixture-row [fixture]="f" [prediction]="predictionFor(f.id)" />
-        </div>
-        @if (hasOtherUnpredicted()) {
-          <mat-card-actions align="end">
-            <button mat-button (click)="next()">
-              Next
-              <mat-icon iconPositionEnd>chevron_right</mat-icon>
-            </button>
-          </mat-card-actions>
-        }
-      } @else {
-        <mat-card-content class="empty">
-          <mat-icon class="empty-icon" aria-hidden="true">check_circle</mat-icon>
-          <p class="empty-text">All caught up — no upcoming matches left to predict.</p>
-          @if (nextLockedFixture(); as nf) {
-            <p class="empty-sub">
-              Next match: <strong>{{ nf.homeTeam.name }} vs {{ nf.awayTeam.name }}</strong>
-              · kicks off {{ kickoffLabel(nf) }}
-            </p>
-          }
-        </mat-card-content>
-      }
-    </mat-card>
-  `,
-  styles: `
-    .predict-next-card {
-      padding: 0;
-      overflow: hidden;
-    }
-    .predict-next-card mat-card-header {
-      padding: 1rem 1rem 0;
-    }
-    .fixture-slot {
-      padding: 0.5rem 0 0;
-    }
-    .empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 1.5rem 1rem;
-      text-align: center;
-      color: var(--mat-sys-on-surface-variant);
-    }
-    .empty-icon {
-      color: var(--mat-sys-primary);
-      font-size: 32px;
-      width: 32px;
-      height: 32px;
-    }
-    .empty-text {
-      margin: 0;
-      font-weight: 500;
-      color: var(--mat-sys-on-surface);
-    }
-    .empty-sub {
-      margin: 0;
-      font-size: 0.85rem;
-    }
-  `,
+  templateUrl: './predict-next-card.component.html',
+  styleUrl: './predict-next-card.component.scss',
 })
 export class PredictNextCardComponent {
   private readonly fixtures = inject(FixturesService);

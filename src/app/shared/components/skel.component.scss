@@ -1,0 +1,22 @@
+:host {
+  background: linear-gradient(
+    100deg,
+    var(--mat-sys-surface-container) 30%,
+    var(--mat-sys-surface-container-high) 50%,
+    var(--mat-sys-surface-container) 70%
+  );
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s linear infinite;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+@keyframes skel-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :host {
+    animation: none;
+    background: var(--mat-sys-surface-container-high);
+  }
+}

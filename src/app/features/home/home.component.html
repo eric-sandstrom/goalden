@@ -1,0 +1,173 @@
+    <section class="home-scroll">
+      <div class="home-content">
+        <!-- =================================================================
+             Hero / welcome
+        ================================================================== -->
+        @if (!userLoaded()) {
+          <mat-card appearance="outlined" class="hero-card">
+            <mat-card-header>
+              <app-skel width="60%" height="1.8rem" block />
+              <div style="height: 8px;"></div>
+              <app-skel width="40%" height="1rem" block />
+            </mat-card-header>
+          </mat-card>
+        } @else {
+          <mat-card appearance="outlined" class="hero-card">
+            <mat-card-header>
+              <mat-card-title>Welcome, {{ displayName() }}</mat-card-title>
+              <mat-card-subtitle>{{ heroSubtitle() }}</mat-card-subtitle>
+            </mat-card-header>
+          </mat-card>
+        }
+
+        <!-- =================================================================
+             Podium pick banner (only when action needed)
+        ================================================================== -->
+        @if (showPodiumBanner()) {
+          <mat-card appearance="outlined" class="banner action-card">
+            <mat-card-header>
+              <mat-icon matCardAvatar class="trophy">emoji_events</mat-icon>
+              <mat-card-title>Pick your podium</mat-card-title>
+              <mat-card-subtitle>+50 pts available · Locks June 11</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-actions align="end">
+              <a mat-flat-button color="primary" routerLink="/podium">Make picks</a>
+            </mat-card-actions>
+          </mat-card>
+        } @else if (podiumLoaded() && podiumPickSubmitted() && !podiumLocked()) {
+          <mat-card appearance="outlined" class="action-card">
+            <mat-card-header>
+              <mat-icon matCardAvatar class="trophy">emoji_events</mat-icon>
+              <mat-card-title>Your podium picks are in</mat-card-title>
+              <mat-card-subtitle>Locks June 11 — you can still change them</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-actions align="end">
+              <a mat-button routerLink="/podium">Edit picks</a>
+            </mat-card-actions>
+          </mat-card>
+        }
+
+        <!-- =================================================================
+             Matches (merged: Live / Up next / Recent)
+        ================================================================== -->
+        @if (!fixturesLoaded()) {
+          <mat-card appearance="outlined" class="fixtures-card matches-card">
+            <div class="matches-tabs">
+              <app-skel width="100%" height="40px" block />
+              <app-skel width="40%" height="0.9rem" block />
+            </div>
+            <div class="rows">
+              @for (i of skelRows; track i) {
+                <div class="skel-row">
+                  <div class="skel-grid">
+                    <app-skel width="56px" height="1.2rem" />
+                    <div class="skel-scores">
+                      <app-skel width="56px" height="56px" />
+                      <app-skel width="56px" height="56px" />
+                    </div>
+                    <app-skel width="56px" height="1.2rem" />
+                  </div>
+                  <app-skel width="45%" height="0.9rem" block />
+                </div>
+              }
+            </div>
+          </mat-card>
+        } @else if (availableViews().length > 0) {
+          <mat-card appearance="outlined" class="fixtures-card matches-card">
+            <div class="matches-tabs">
+              <mat-button-toggle-group
+                [value]="currentView()"
+                (change)="setView($event.value)"
+                hideSingleSelectionIndicator
+                aria-label="Match list"
+              >
+                @for (v of availableViews(); track v) {
+                  <mat-button-toggle [value]="v">
+                    @if (v === 'live') {
+                      <span class="tab-live-dot" aria-hidden="true"></span>
+                    }
+                    {{ viewLabel(v) }}
+                  </mat-button-toggle>
+                }
+              </mat-button-toggle-group>
+              @if (paneSubtitle(); as subtitle) {
+                <p class="pane-subtitle">{{ subtitle }}</p>
+              }
+            </div>
+
+            <div class="rows">
+              @switch (currentView()) {
+                @case ('live') {
+                  @for (f of liveFixtures(); track f.id) {
+                    <app-fixture-row [fixture]="f" [prediction]="predictionFor(f.id)" />
+                  }
+                }
+                @case ('upcoming') {
+                  @for (f of upcomingFixtures(); track f.id) {
+                    <app-fixture-row [fixture]="f" [prediction]="predictionFor(f.id)" />
+                  }
+                }
+                @case ('recent') {
+                  @for (f of recentResults(); track f.id) {
+                    <app-fixture-row [fixture]="f" [prediction]="predictionFor(f.id)" />
+                  }
+                }
+              }
+            </div>
+
+            <mat-card-actions align="end">
+              <a mat-button routerLink="/predict">
+                All fixtures
+                <mat-icon iconPositionEnd>chevron_right</mat-icon>
+              </a>
+            </mat-card-actions>
+          </mat-card>
+        } @else {
+          <!-- Tournament hasn't started, no fixtures yet -->
+          <mat-card appearance="outlined" class="empty-card">
+            <mat-card-header>
+              <mat-icon matCardAvatar>event_busy</mat-icon>
+              <mat-card-title>No fixtures yet</mat-card-title>
+              <mat-card-subtitle>The schedule will populate before kickoff</mat-card-subtitle>
+            </mat-card-header>
+          </mat-card>
+        }
+
+        <!-- =================================================================
+             Your tally
+        ================================================================== -->
+        @if (showTally()) {
+          <mat-card appearance="outlined" class="tally-card">
+            <mat-card-header>
+              <mat-icon matCardAvatar>scoreboard</mat-icon>
+              <mat-card-title>Your tally</mat-card-title>
+              @if (rankSubtitle(); as sub) {
+                <mat-card-subtitle>{{ sub }}</mat-card-subtitle>
+              }
+            </mat-card-header>
+            <mat-card-content>
+              <div class="stats-grid">
+                <div class="stat">
+                  <span class="stat-value">{{ totals().total }}</span>
+                  <span class="stat-label">points</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value">{{ totals().exactScoreHits }}</span>
+                  <span class="stat-label">exact</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value">{{ totals().correctOutcomeHits }}</span>
+                  <span class="stat-label">outcome</span>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions align="end">
+              <a mat-button routerLink="/leaderboard">
+                Leaderboard
+                <mat-icon iconPositionEnd>chevron_right</mat-icon>
+              </a>
+            </mat-card-actions>
+          </mat-card>
+        }
+      </div>
+    </section>

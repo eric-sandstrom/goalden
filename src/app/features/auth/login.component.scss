@@ -1,0 +1,58 @@
+:host {
+  display: block;
+  height: 100%;
+}
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+.login-card {
+  width: 100%;
+  max-width: 420px;
+}
+.google-btn,
+.dev-btn {
+  width: 100%;
+  margin-top: 1rem;
+}
+.dev-divider {
+  /* Soft hint that the button below is for local dev only; the
+     dashed border separates it visually from the real sign-in
+     affordances above. */
+  border-top: 1px dashed var(--mat-sys-outline-variant);
+  padding-top: 1rem;
+  margin-top: 1.5rem;
+}
+.divider {
+  text-align: center;
+  margin: 1.25rem 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+mat-form-field {
+  width: 100%;
+}
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.error {
+  color: var(--mat-sys-error);
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+}

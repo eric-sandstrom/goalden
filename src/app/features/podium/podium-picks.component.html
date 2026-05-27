@@ -1,0 +1,125 @@
+<section class="container">
+  <mat-card appearance="outlined">
+    <mat-card-header>
+      <mat-icon matCardAvatar>emoji_events</mat-icon>
+      <mat-card-title>Pick your podium</mat-card-title>
+      <mat-card-subtitle>
+        @if (locked()) {
+          Locked — first match has kicked off
+        } @else {
+          Locks at first kickoff — June 11, 2026
+        }
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (!fixturesLoaded() || !podiumLoaded()) {
+        <div class="state">
+          <mat-progress-spinner mode="indeterminate" diameter="32" />
+        </div>
+      } @else {
+        <p class="hint">
+          +25 for the winner, +15 for runner-up, +10 for third place. Pick three different
+          teams.
+        </p>
+
+        <form [formGroup]="form" class="form">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Winner (+25)</mat-label>
+            <mat-icon matIconPrefix class="medal gold">workspace_premium</mat-icon>
+            <mat-select formControlName="winner">
+              @for (team of teams(); track team.id) {
+                <mat-option [value]="team.id" [disabled]="isDisabled(team.id, 'winner')">
+                  <span class="opt">
+                    @if (team.crest) {
+                      <img
+                        [ngSrc]="team.crest"
+                        width="20"
+                        height="20"
+                        [alt]="team.name + ' crest'"
+                      />
+                    }
+                    {{ team.name }}
+                  </span>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Runner-up (+15)</mat-label>
+            <mat-icon matIconPrefix class="medal silver">workspace_premium</mat-icon>
+            <mat-select formControlName="second">
+              @for (team of teams(); track team.id) {
+                <mat-option [value]="team.id" [disabled]="isDisabled(team.id, 'second')">
+                  <span class="opt">
+                    @if (team.crest) {
+                      <img
+                        [ngSrc]="team.crest"
+                        width="20"
+                        height="20"
+                        [alt]="team.name + ' crest'"
+                      />
+                    }
+                    {{ team.name }}
+                  </span>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Third (+10)</mat-label>
+            <mat-icon matIconPrefix class="medal bronze">workspace_premium</mat-icon>
+            <mat-select formControlName="third">
+              @for (team of teams(); track team.id) {
+                <mat-option [value]="team.id" [disabled]="isDisabled(team.id, 'third')">
+                  <span class="opt">
+                    @if (team.crest) {
+                      <img
+                        [ngSrc]="team.crest"
+                        width="20"
+                        height="20"
+                        [alt]="team.name + ' crest'"
+                      />
+                    }
+                    {{ team.name }}
+                  </span>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </form>
+
+        @if (existingPick(); as pick) {
+          <mat-chip-set class="status">
+            <mat-chip [disableRipple]="true">
+              <mat-icon matChipAvatar>check_circle</mat-icon>
+              Picks submitted
+            </mat-chip>
+          </mat-chip-set>
+        }
+      }
+    </mat-card-content>
+
+    @if (!locked()) {
+      <mat-card-actions align="end">
+        <a mat-button routerLink="/">Cancel</a>
+        <button
+          mat-flat-button
+          color="primary"
+          [disabled]="form.invalid || saving() || locked()"
+          (click)="save()"
+        >
+          @if (saving()) {
+            <mat-progress-spinner mode="indeterminate" diameter="20" />
+          } @else if (existingPick()) {
+            Update picks
+          } @else {
+            Save picks
+          }
+        </button>
+      </mat-card-actions>
+    }
+  </mat-card>
+</section>

@@ -1,0 +1,76 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+}
+mat-button-toggle-group {
+  align-self: stretch;
+  overflow-x: auto;
+  /* flex: 0 0 auto stops the fixtures card below from squeezing
+     the filter bar when content is long. Height comes from the
+     inner buttons (set below) rather than min-height here, so
+     the bar exactly matches its content. */
+  flex: 0 0 auto;
+}
+mat-button-toggle-group .mat-button-toggle,
+mat-button-toggle-group .mat-button-toggle .mat-button-toggle-button {
+  height: 40px;
+}
+.fixtures-card {
+  padding: 0;
+  overflow: hidden;
+}
+.group {
+  display: contents;
+}
+.day {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0.6rem 1rem;
+  font: var(--mat-sys-title-small);
+  color: var(--mat-sys-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background-color: var(--mat-sys-surface-container-highest);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.skel-list { display: block; }
+.skel-row {
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 124px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.skel-row:nth-child(even) { background: var(--mat-sys-surface-container-low); }
+.skel-row:last-child { border-bottom: none; }
+.skel-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+.skel-grid > app-skel:last-of-type {
+  justify-self: end;
+}
+.skel-scores {
+  display: flex;
+  gap: 8px;
+}

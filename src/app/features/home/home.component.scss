@@ -1,0 +1,170 @@
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+    }
+    /* The outer scroll container is full-width so the scrollbar sits
+       at the viewport edge instead of inset by the .page utility's
+       max-width centering. .home-content (inside) does the centering
+       + padding. Means a single scrollbar, at the edge, on every
+       screen width. */
+    .home-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      width: 100%;
+    }
+    .home-content {
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-sizing: border-box;
+    }
+
+    /* ----- Hero ----- */
+    .hero-card {
+      min-height: 96px;
+    }
+    .hero-card mat-card-header {
+      padding: 1rem 1rem 1.25rem;
+    }
+    .hero-card mat-card-title {
+      font: var(--mat-sys-headline-small);
+      margin-bottom: 0.25rem;
+    }
+
+    /* ----- Action cards (podium banner, podium submitted) ----- */
+    .action-card {
+      min-height: 132px;
+      display: flex;
+      flex-direction: column;
+    }
+    .action-card mat-card-header {
+      padding-top: 1rem;
+      padding-bottom: 0.5rem;
+      flex: 1 1 auto;
+    }
+    .banner { border-color: var(--mat-sys-tertiary); }
+    .trophy { color: var(--mat-sys-tertiary); }
+
+    /* ----- Matches card (merged Live / Up next / Recent) ----- */
+    .fixtures-card {
+      padding: 0;
+      overflow: hidden;
+    }
+    .matches-card {
+      min-height: 380px;
+      display: flex;
+      flex-direction: column;
+    }
+    .matches-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 1rem 1rem 0.75rem;
+      border-bottom: 1px solid var(--mat-sys-outline-variant);
+    }
+    .matches-tabs mat-button-toggle-group {
+      align-self: stretch;
+      overflow-x: auto;
+    }
+    .pane-subtitle {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .tab-live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--mat-sys-error);
+      margin-right: 6px;
+      vertical-align: middle;
+      animation: home-live-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes home-live-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.35); }
+    }
+    .rows {
+      display: block;
+      flex: 1 1 auto;
+    }
+
+    /* ----- Tally ----- */
+    .tally-card {
+      min-height: 240px;
+      display: flex;
+      flex-direction: column;
+    }
+    .tally-card mat-card-content {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.625rem;
+      width: 100%;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+      padding: 1.25rem 0.5rem;
+      min-height: 104px;
+      border-radius: 14px;
+      background: var(--mat-sys-surface-container-low);
+      box-sizing: border-box;
+    }
+    .stat-value {
+      font: var(--mat-sys-headline-large);
+      font-variant-numeric: tabular-nums;
+      color: var(--mat-sys-on-surface);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--mat-sys-on-surface-variant);
+    }
+
+    /* ----- Empty state ----- */
+    .empty-card {
+      min-height: 140px;
+    }
+
+    /* ----- Skeleton mirroring fixture-row layout ----- */
+    .skel-row {
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.5rem;
+      min-height: 124px;
+      box-sizing: border-box;
+      border-bottom: 1px solid var(--mat-sys-outline-variant);
+    }
+    .skel-row:last-child { border-bottom: none; }
+    .skel-row:nth-child(even) { background: var(--mat-sys-surface-container-low); }
+    .skel-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .skel-grid > app-skel:last-of-type { justify-self: end; }
+    .skel-scores { display: flex; gap: 8px; }

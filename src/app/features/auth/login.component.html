@@ -1,0 +1,89 @@
+<div class="login-container">
+  <mat-card class="login-card" appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>Goalden</mat-card-title>
+      <mat-card-subtitle>Sign in to play</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <button
+        type="button"
+        mat-stroked-button
+        class="google-btn"
+        (click)="signInGoogle()"
+        [disabled]="loading()"
+      >
+        <mat-icon>login</mat-icon>
+        Continue with Google
+      </button>
+
+      <div class="divider"><span>or</span></div>
+
+      <form [formGroup]="form" (ngSubmit)="submitEmail()" autocomplete="on">
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email" autocomplete="email" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            type="password"
+            formControlName="password"
+            [autocomplete]="mode() === 'signin' ? 'current-password' : 'new-password'"
+          />
+          @if (form.controls.password.touched && form.controls.password.hasError('minlength')) {
+            <mat-error>Minimum 6 characters</mat-error>
+          }
+        </mat-form-field>
+
+        <div class="actions">
+          <button
+            type="submit"
+            mat-flat-button
+            color="primary"
+            [disabled]="form.invalid || loading()"
+          >
+            @if (loading()) {
+              <mat-progress-spinner mode="indeterminate" diameter="20" />
+            } @else if (mode() === 'signin') {
+              Sign in
+            } @else {
+              Create account
+            }
+          </button>
+          <button type="button" mat-button (click)="toggleMode()">
+            @if (mode() === 'signin') {
+              Create account
+            } @else {
+              Have an account? Sign in
+            }
+          </button>
+        </div>
+      </form>
+
+      @if (error()) {
+        <div class="error" role="alert">{{ error() }}</div>
+      }
+
+      @if (showDevLogin) {
+        <!-- Dev-only fast path: skips email/password entirely. Uses
+             a custom auth token minted by the devSignInAsAdmin
+             callable. Only visible when running against the
+             Functions emulator. -->
+        <div class="divider dev-divider"><span>dev</span></div>
+        <button
+          type="button"
+          mat-stroked-button
+          class="dev-btn"
+          (click)="signInAsDevAdmin()"
+          [disabled]="loading()"
+        >
+          <mat-icon>code</mat-icon>
+          Sign in as Admin (dev)
+        </button>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

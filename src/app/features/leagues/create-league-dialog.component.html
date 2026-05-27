@@ -1,0 +1,58 @@
+    <h2 mat-dialog-title>
+      <mat-icon class="title-icon">groups</mat-icon>
+      Create a league
+    </h2>
+    <mat-dialog-content>
+      <form [formGroup]="form">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>League name</mat-label>
+          <input
+            matInput
+            formControlName="name"
+            maxlength="40"
+            cdkFocusInitial
+            autocomplete="off"
+          />
+          <mat-hint align="end">{{ form.controls.name.value.length }}/40</mat-hint>
+          @if (form.controls.name.touched && form.controls.name.hasError('minlength')) {
+            <mat-error>At least 2 characters</mat-error>
+          }
+        </mat-form-field>
+
+        <div class="type-row">
+          <span class="type-label">Visibility</span>
+          <mat-button-toggle-group formControlName="type" hideSingleSelectionIndicator>
+            <mat-button-toggle value="private">
+              <mat-icon>lock</mat-icon>
+              Private
+            </mat-button-toggle>
+            <mat-button-toggle value="public">
+              <mat-icon>public</mat-icon>
+              Public
+            </mat-button-toggle>
+          </mat-button-toggle-group>
+          <p class="type-hint">
+            @if (form.controls.type.value === 'private') {
+              Invite-only — share the code or link.
+            } @else {
+              Anyone can find and join — no invite needed.
+            }
+          </p>
+        </div>
+      </form>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button (click)="cancel()" [disabled]="creating()">Cancel</button>
+      <button
+        mat-flat-button
+        color="primary"
+        (click)="submit()"
+        [disabled]="form.invalid || creating()"
+      >
+        @if (creating()) {
+          <mat-progress-spinner mode="indeterminate" diameter="20" />
+        } @else {
+          Create
+        }
+      </button>
+    </mat-dialog-actions>

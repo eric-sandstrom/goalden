@@ -1,0 +1,45 @@
+    <section class="container">
+      <mat-card appearance="outlined" class="card">
+        <mat-card-header>
+          <mat-icon matCardAvatar class="trophy">emoji_events</mat-icon>
+          <mat-card-title>Join a Goalden league</mat-card-title>
+          <mat-card-subtitle>Invite code: <strong>{{ code() }}</strong></mat-card-subtitle>
+        </mat-card-header>
+
+        <mat-card-content>
+          @if (loading()) {
+            <div class="state">
+              <mat-progress-spinner mode="indeterminate" diameter="32" />
+            </div>
+          } @else if (errorMessage()) {
+            <p class="error" role="alert">{{ errorMessage() }}</p>
+          } @else if (publicLeague(); as l) {
+            <div class="league-info">
+              <p class="name">{{ l.name }}</p>
+              <p class="meta">{{ l.memberCount }} members</p>
+            </div>
+          }
+        </mat-card-content>
+
+        <mat-card-actions align="end">
+          @if (!isAuthed()) {
+            <button mat-flat-button color="primary" (click)="signIn()">
+              Sign in to join
+            </button>
+          } @else if (publicLeague()) {
+            <button
+              mat-flat-button
+              color="primary"
+              (click)="join()"
+              [disabled]="joining()"
+            >
+              @if (joining()) {
+                <mat-progress-spinner mode="indeterminate" diameter="20" />
+              } @else {
+                Join league
+              }
+            </button>
+          }
+        </mat-card-actions>
+      </mat-card>
+    </section>

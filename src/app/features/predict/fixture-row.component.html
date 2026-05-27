@@ -1,0 +1,182 @@
+<div class="row">
+  @if (fixture().homeTeam.crest) {
+    <div
+      class="crest-bg home"
+      [style.background-image]="'url(' + fixture().homeTeam.crest + ')'"
+      aria-hidden="true"
+    ></div>
+  }
+  @if (fixture().awayTeam.crest) {
+    <div
+      class="crest-bg away"
+      [style.background-image]="'url(' + fixture().awayTeam.crest + ')'"
+      aria-hidden="true"
+    ></div>
+  }
+  <div class="match">
+    @if (fixture().homeTeam.id !== null) {
+      <a
+        class="team home team-link"
+        [routerLink]="['/teams', 'fd-' + fixture().homeTeam.id]"
+      >
+        <span class="name">{{ fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'TBD' }}</span>
+      </a>
+    } @else {
+      <div class="team home">
+        <span class="name">{{ fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'TBD' }}</span>
+      </div>
+    }
+
+    @if (actualScore(); as actual) {
+      <div
+        class="result-board"
+        [class.live]="liveStatus()?.tone === 'live'"
+        [class.final]="liveStatus()?.tone === 'final'"
+      >
+        <span class="result-num">{{ actual.home }}</span>
+        <span class="result-sep">–</span>
+        <span class="result-num">{{ actual.away }}</span>
+      </div>
+    } @else {
+      <form [formGroup]="form" class="scores">
+        <div class="score-box home" [class.locked]="editDisabled()">
+          <div class="step-stack">
+            <button
+              type="button"
+              class="step-btn"
+              (click)="step('home', 1)"
+              [disabled]="editDisabled()"
+              aria-label="Increase home score"
+            >
+              <mat-icon>add</mat-icon>
+            </button>
+            <button
+              type="button"
+              class="step-btn"
+              (click)="step('home', -1)"
+              [disabled]="editDisabled()"
+              aria-label="Decrease home score"
+            >
+              <mat-icon>remove</mat-icon>
+            </button>
+          </div>
+          <input
+            class="score-input"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            max="99"
+            formControlName="home"
+            [readonly]="editDisabled()"
+            aria-label="Home score"
+          />
+        </div>
+        <span class="sep">-</span>
+        <div class="score-box away" [class.locked]="editDisabled()">
+          <input
+            class="score-input"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            max="99"
+            formControlName="away"
+            [readonly]="editDisabled()"
+            aria-label="Away score"
+          />
+          <div class="step-stack">
+            <button
+              type="button"
+              class="step-btn"
+              (click)="step('away', 1)"
+              [disabled]="editDisabled()"
+              aria-label="Increase away score"
+            >
+              <mat-icon>add</mat-icon>
+            </button>
+            <button
+              type="button"
+              class="step-btn"
+              (click)="step('away', -1)"
+              [disabled]="editDisabled()"
+              aria-label="Decrease away score"
+            >
+              <mat-icon>remove</mat-icon>
+            </button>
+          </div>
+        </div>
+      </form>
+    }
+
+    @if (fixture().awayTeam.id !== null) {
+      <a
+        class="team away team-link"
+        [routerLink]="['/teams', 'fd-' + fixture().awayTeam.id]"
+      >
+        <span class="name">{{ fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'TBD' }}</span>
+      </a>
+    } @else {
+      <div class="team away">
+        <span class="name">{{ fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'TBD' }}</span>
+      </div>
+    }
+  </div>
+
+  @if (hasActualScore()) {
+    <div class="result-strip">
+      @if (prediction(); as p) {
+        <span class="pick">
+          Your pick: <strong>{{ p.homeScore }}–{{ p.awayScore }}</strong>
+        </span>
+        @if (predictionResult(); as r) {
+          <span class="result-chip" [attr.data-category]="r.category">
+            <mat-icon class="result-chip-icon" aria-hidden="true">{{ r.icon }}</mat-icon>
+            {{ r.label }}
+            @if (liveStatus()?.tone === 'final') {
+              · +{{ r.points }} pt{{ r.points === 1 ? '' : 's' }}
+            }
+          </span>
+        }
+      } @else {
+        <span class="no-pick">
+          <mat-icon class="result-chip-icon" aria-hidden="true">do_not_disturb</mat-icon>
+          No prediction
+        </span>
+      }
+    </div>
+  }
+
+  <div class="meta">
+    @if (tbd()) {
+      <span class="status tbd">
+        <mat-icon class="status-icon" aria-hidden="true">hourglass_empty</mat-icon>
+        Teams TBD · {{ kickoffLabel() }}
+      </span>
+    } @else if (liveStatus(); as live) {
+      <span class="status" [class.live]="live.tone === 'live'" [class.final]="live.tone === 'final'">
+        @if (live.tone === 'live') {
+          <span class="live-dot" aria-hidden="true"></span>
+        } @else {
+          <mat-icon class="status-icon" aria-hidden="true">{{ live.icon }}</mat-icon>
+        }
+        {{ live.label }} · {{ kickoffLabel() }}
+      </span>
+    } @else if (lockChip(); as chip) {
+      @if (chip.tone === 'warn') {
+        <span class="status warn">
+          <mat-icon class="status-icon" aria-hidden="true">{{ chip.icon }}</mat-icon>
+          {{ chip.label }}
+        </span>
+      } @else {
+        <span class="status locked">
+          <mat-icon class="status-icon" aria-hidden="true">{{ chip.icon }}</mat-icon>
+          {{ kickoffLabel() }}
+        </span>
+      }
+    } @else {
+      <span class="status">
+        <mat-icon class="status-icon" aria-hidden="true">schedule</mat-icon>
+        {{ kickoffLabel() }}
+      </span>
+    }
+  </div>
+</div>

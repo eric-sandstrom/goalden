@@ -1,0 +1,34 @@
+.predict-next-card {
+  padding: 0;
+  overflow: hidden;
+}
+.predict-next-card mat-card-header {
+  padding: 1rem 1rem 0;
+}
+.fixture-slot {
+  padding: 0.5rem 0 0;
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+.empty-icon {
+  color: var(--mat-sys-primary);
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+}
+.empty-text {
+  margin: 0;
+  font-weight: 500;
+  color: var(--mat-sys-on-surface);
+}
+.empty-sub {
+  margin: 0;
+  font-size: 0.85rem;
+}

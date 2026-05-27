@@ -14,87 +14,8 @@ import { LeaguePublic } from '../../core/models/league.model';
   selector: 'app-join-league',
   imports: [MatButtonModule, MatCardModule, MatIconModule, MatProgressSpinnerModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <section class="container">
-      <mat-card appearance="outlined" class="card">
-        <mat-card-header>
-          <mat-icon matCardAvatar class="trophy">emoji_events</mat-icon>
-          <mat-card-title>Join a Goalden league</mat-card-title>
-          <mat-card-subtitle>Invite code: <strong>{{ code() }}</strong></mat-card-subtitle>
-        </mat-card-header>
-
-        <mat-card-content>
-          @if (loading()) {
-            <div class="state">
-              <mat-progress-spinner mode="indeterminate" diameter="32" />
-            </div>
-          } @else if (errorMessage()) {
-            <p class="error" role="alert">{{ errorMessage() }}</p>
-          } @else if (publicLeague(); as l) {
-            <div class="league-info">
-              <p class="name">{{ l.name }}</p>
-              <p class="meta">{{ l.memberCount }} members</p>
-            </div>
-          }
-        </mat-card-content>
-
-        <mat-card-actions align="end">
-          @if (!isAuthed()) {
-            <button mat-flat-button color="primary" (click)="signIn()">
-              Sign in to join
-            </button>
-          } @else if (publicLeague()) {
-            <button
-              mat-flat-button
-              color="primary"
-              (click)="join()"
-              [disabled]="joining()"
-            >
-              @if (joining()) {
-                <mat-progress-spinner mode="indeterminate" diameter="20" />
-              } @else {
-                Join league
-              }
-            </button>
-          }
-        </mat-card-actions>
-      </mat-card>
-    </section>
-  `,
-  styles: `
-    :host {
-      display: block;
-      height: 100%;
-    }
-    .container {
-      padding: 1rem;
-      max-width: 480px;
-      margin: 0 auto;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      box-sizing: border-box;
-    }
-    .card { width: 100%; }
-    .trophy { color: var(--mat-sys-tertiary); }
-    .state {
-      display: flex;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .league-info {
-      text-align: center;
-      padding: 1rem 0;
-    }
-    .name {
-      font: var(--mat-sys-headline-small);
-      margin: 0 0 0.25rem;
-    }
-    .meta { color: var(--mat-sys-on-surface-variant); margin: 0; }
-    .error { color: var(--mat-sys-error); }
-  `,
+  templateUrl: './join-league.component.html',
+  styleUrl: './join-league.component.scss',
 })
 export class JoinLeagueComponent {
   readonly code = input.required<string>();

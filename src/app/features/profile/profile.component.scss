@@ -1,0 +1,324 @@
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+    }
+    /* Theme card: pin the randomize button to the top-right by giving
+       mat-card-header flex-start alignment + auto left-margin on the
+       button. mat-card-header is already a flex container; this is the
+       same trick we use in the league header for the QR/settings row. */
+    .theme-card mat-card-header {
+      align-items: flex-start;
+    }
+    .theme-card .theme-shuffle {
+      margin-left: auto;
+      align-self: flex-start;
+    }
+    /* Outer scroll container is full-width so the scrollbar sits at
+       the viewport edge instead of inset by the centered max-width.
+       .profile-content (below) handles the centering + padding. */
+    .profile-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      width: 100%;
+    }
+    .profile-content {
+      padding: 1.5rem 1rem;
+      /* Match the .page utility's max-width so every routed view inside
+         the shell shares the same content column. */
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-sizing: border-box;
+    }
+    mat-card-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 0.5rem 1rem 1rem;
+      gap: 0.25rem;
+    }
+    mat-card-actions button,
+    mat-card-actions a[mat-button] {
+      justify-content: flex-start;
+    }
+    .dev { color: var(--mat-sys-tertiary); }
+    .admin-icon { color: var(--mat-sys-tertiary); }
+
+    /* ---- Theme card layout ---- */
+    .full-field { width: 100%; }
+    mat-card-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      /* mat-card-header sits flush; without breathing room the first form
+         field collides with the subtitle. */
+      padding-top: 0.75rem;
+    }
+
+    .mode-trigger,
+    .palette-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .mode-trigger-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+      line-height: 18px;
+    }
+    mat-option mat-icon {
+      margin-right: 0.5rem;
+    }
+    /* Crest images + fallback icons inside the preset select. The select
+       options use Material's row layout (icon + label) so we mimic that
+       sizing for the crest <img>. */
+    .preset-crest {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      margin-right: 0.5rem;
+      flex-shrink: 0;
+    }
+    .preset-icon {
+      width: 20px;
+      height: 20px;
+      font-size: 20px;
+      line-height: 20px;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    /* The trigger crest sits inside .palette-trigger flex, the option crest
+       needs to align with mat-option's grid — same dimensions either way. */
+    mat-option .preset-crest { margin-right: 0; }
+    mat-option .preset-icon { margin-right: 0.5rem; }
+
+    /* ---- Color pickers ---- */
+    .color-pickers {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: var(--mat-sys-surface-container-low);
+      border-radius: 12px;
+      border: 1px solid var(--mat-sys-outline-variant);
+    }
+    .color-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.5rem;
+    }
+    .color-meta {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+      cursor: pointer;
+    }
+    .color-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--mat-sys-on-surface);
+    }
+    .color-hint {
+      font-size: 0.78rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .color-input-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    /* Strip the native chrome off <input type="color"> and turn it into a
+       tappable swatch. Different browsers paint it differently; the rules
+       below cover Chromium, Firefox, and Safari. */
+    .color-input {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 40px;
+      height: 40px;
+      border: 2px solid var(--mat-sys-outline-variant);
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+      padding: 0;
+      overflow: hidden;
+      transition: border-color 120ms ease, transform 120ms ease;
+    }
+    .color-input:hover {
+      border-color: var(--mat-sys-outline);
+    }
+    .color-input:active { transform: scale(0.94); }
+    .color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-input::-webkit-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+    .color-input::-moz-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+    .color-hex {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.8rem;
+      color: var(--mat-sys-on-surface-variant);
+      letter-spacing: 0.02em;
+      min-width: 6ch;
+    }
+
+    /* ---- Contrast slider ---- */
+    .slider-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.25rem 0;
+    }
+    .slider-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .slider-label { font-size: 0.9rem; color: var(--mat-sys-on-surface); }
+    .slider-value {
+      font-size: 0.8rem;
+      color: var(--mat-sys-on-surface-variant);
+      font-variant-numeric: tabular-nums;
+    }
+    .slider-field mat-slider { width: 100%; }
+    .slider-scale {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--mat-sys-on-surface-variant);
+      padding: 0 0.25rem;
+    }
+
+    /* ---- Preview ---- */
+    .preview {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.875rem;
+      background: var(--mat-sys-surface-container-low);
+      border: 1px solid var(--mat-sys-outline-variant);
+      border-radius: 12px;
+    }
+    .preview-title {
+      margin: 0;
+      font: var(--mat-sys-title-small);
+      color: var(--mat-sys-on-surface);
+    }
+    .preview-blurb {
+      margin: 0 0 0.25rem;
+      font-size: 0.78rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .preview-block {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      border-top: 1px solid var(--mat-sys-outline-variant);
+    }
+    .preview-block:first-of-type { border-top: none; }
+    .preview-tag {
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--mat-sys-on-surface-variant);
+      font-weight: 600;
+    }
+    .preview-items {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .preview-btn {
+      min-width: 0;
+      padding: 0 0.875rem;
+      height: 32px;
+      font-size: 0.85rem;
+    }
+    /* Override mat-flat-button colours so we can show tertiary variants
+       without fighting Material's color input API in v20. */
+    .preview-btn.primary-btn {
+      background-color: var(--mat-sys-primary);
+      color: var(--mat-sys-on-primary);
+    }
+    .preview-btn.tertiary-btn {
+      background-color: var(--mat-sys-tertiary);
+      color: var(--mat-sys-on-tertiary);
+    }
+    .preview-swatch {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--mat-sys-outline-variant);
+    }
+    .preview-on {
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    /* Each swatch maps to a single system token. The on-X color of each
+       container variant is rendered as 'Aa' inside so the user can see
+       the text/background relationship at a glance. */
+    .primary-bg { background: var(--mat-sys-primary); }
+    .primary-container-bg {
+      background: var(--mat-sys-primary-container);
+    }
+    .primary-container-bg .preview-on { color: var(--mat-sys-on-primary-container); }
+    .secondary-bg { background: var(--mat-sys-secondary); }
+    .secondary-container-bg { background: var(--mat-sys-secondary-container); }
+    .secondary-container-bg .preview-on { color: var(--mat-sys-on-secondary-container); }
+    .tertiary-bg { background: var(--mat-sys-tertiary); }
+    .tertiary-container-bg { background: var(--mat-sys-tertiary-container); }
+    .tertiary-container-bg .preview-on { color: var(--mat-sys-on-tertiary-container); }
+    .surface-lowest { background: var(--mat-sys-surface-container-lowest); }
+    .surface-low { background: var(--mat-sys-surface-container-low); }
+    .surface { background: var(--mat-sys-surface-container); }
+    .surface-high { background: var(--mat-sys-surface-container-high); }
+    .surface-highest { background: var(--mat-sys-surface-container-highest); }
+    .outline-swatch {
+      background: transparent;
+      border-color: var(--mat-sys-outline);
+      border-width: 2px;
+    }
+    .outline-variant-swatch {
+      background: transparent;
+      border-color: var(--mat-sys-outline-variant);
+      border-width: 2px;
+    }
+    .preview-text {
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .preview-text.on-surface { color: var(--mat-sys-on-surface); }
+    .preview-text.on-surface-variant { color: var(--mat-sys-on-surface-variant); }
+    /* The secondary-themed chip is a simple way to surface secondary-container
+       in something that looks like a real app element. */
+    .preview-secondary-chip {
+      background-color: var(--mat-sys-secondary-container) !important;
+      color: var(--mat-sys-on-secondary-container) !important;
+    }
+
+    .reset-row {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 0.25rem;
+    }

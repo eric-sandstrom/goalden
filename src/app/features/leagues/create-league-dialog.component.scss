@@ -1,0 +1,31 @@
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+    .title-icon {
+      color: var(--mat-sys-primary);
+    }
+    mat-form-field {
+      width: 100%;
+      min-width: 320px;
+    }
+    .type-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+    .type-label {
+      font-size: 0.85rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .type-row mat-button-toggle-group {
+      align-self: stretch;
+    }
+    .type-hint {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--mat-sys-on-surface-variant);
+    }

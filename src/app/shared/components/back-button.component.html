@@ -1,0 +1,12 @@
+@if (visible()) {
+  <button
+    type="button"
+    mat-button
+    class="back-btn"
+    (click)="goBack()"
+    [attr.aria-label]="ariaLabel()"
+  >
+    <mat-icon>chevron_left</mat-icon>
+    Back to {{ previousLabel() }}
+  </button>
+}

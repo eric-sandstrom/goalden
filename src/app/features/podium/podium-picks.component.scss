@@ -1,0 +1,56 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+}
+.container {
+  padding: 1rem;
+  /* Match the .page utility's max-width so every routed view inside
+     the shell shares the same content column. */
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+.hint {
+  color: var(--mat-sys-on-surface-variant);
+  margin: 0 0 1rem;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.medal {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+  margin-right: 4px;
+}
+.medal.gold { color: var(--mat-sys-tertiary); }
+.medal.silver { color: var(--mat-sys-outline); }
+/* Bronze is the tertiary (typically warm) muted toward the error palette
+   (typically red) to land somewhere brown/coppery. Adapts to the active
+   theme so all three medals stay coherent with whichever country palette
+   is in play. */
+.medal.bronze {
+  color: color-mix(in srgb, var(--mat-sys-tertiary) 55%, var(--mat-sys-error) 45%);
+}
+.status {
+  margin-top: 1rem;
+}
+.state {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}

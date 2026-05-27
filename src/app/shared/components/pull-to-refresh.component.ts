@@ -32,72 +32,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
   selector: 'app-pull-to-refresh',
   imports: [MatIconModule, MatProgressSpinnerModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <!-- Indicator floats above the content. translateY is the only
-         thing that animates so we can keep it on the compositor. -->
-    <div
-      class="indicator"
-      [class.visible]="visible()"
-      [class.armed]="state() === 'armed'"
-      [style.transform]="indicatorTransform()"
-      aria-hidden="true"
-    >
-      @if (state() === 'refreshing') {
-        <mat-progress-spinner mode="indeterminate" [diameter]="22" />
-      } @else {
-        <!-- Rotate the refresh glyph proportionally to pull progress —
-             reaches ~360° at the threshold. Gives a visual sense of
-             "preloading the spin" before the actual refresh fires. -->
-        <mat-icon class="refresh-icon" [style.transform]="iconRotation()">
-          refresh
-        </mat-icon>
-      }
-    </div>
-    <ng-content />
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-height: 0;
-      position: relative;
-      overflow: hidden;
-    }
-    .indicator {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      width: 40px;
-      height: 40px;
-      margin-left: -20px;
-      border-radius: 50%;
-      background: var(--mat-sys-surface-container-high);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      opacity: 0;
-      z-index: 50;
-      transition: opacity 120ms ease, background-color 120ms ease;
-    }
-    .indicator.visible {
-      opacity: 1;
-    }
-    .indicator.armed {
-      /* Switch to primary tint at threshold — visual cue that releasing
-         will commit the refresh. Subtle but readable on both light and
-         dark themes. */
-      background: var(--mat-sys-primary-container);
-      color: var(--mat-sys-on-primary-container);
-    }
-    .refresh-icon {
-      /* Smoothed rotation. Without this the icon would jitter during a
-         fast pull because we only get touchmove every ~16ms. */
-      transition: transform 60ms linear;
-    }
-  `,
+  templateUrl: './pull-to-refresh.component.html',
+  styleUrl: './pull-to-refresh.component.scss',
   host: {
     '(touchstart)': 'onTouchStart($event)',
     '(touchmove)': 'onTouchMove($event)',

@@ -9,44 +9,8 @@ import { PredictionsService } from '../../core/services/predictions.service';
   selector: 'app-install-banner',
   imports: [MatButtonModule, MatCardModule, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (visible()) {
-      <mat-card appearance="outlined" class="banner" role="region" aria-label="Install Goalden">
-        <mat-card-header>
-          <mat-icon matCardAvatar class="icon">
-            {{ showIOSHint() ? 'ios_share' : 'install_mobile' }}
-          </mat-icon>
-          <mat-card-title>Install Goalden</mat-card-title>
-          <mat-card-subtitle>
-            @if (showIOSHint()) {
-              Tap <strong>Share</strong>, then <strong>Add to Home Screen</strong> to install.
-            } @else {
-              Quick launcher + match reminders. Two seconds, no app store.
-            }
-          </mat-card-subtitle>
-        </mat-card-header>
-
-        <mat-card-actions align="end">
-          <button mat-button (click)="dismiss()">Not now</button>
-          @if (canInstall()) {
-            <button mat-flat-button color="primary" (click)="install()">
-              <mat-icon>install_desktop</mat-icon>
-              Install
-            </button>
-          }
-        </mat-card-actions>
-      </mat-card>
-    }
-  `,
-  styles: `
-    .banner {
-      margin: 1rem 1rem 0;
-      border-color: var(--mat-sys-primary);
-    }
-    .icon {
-      color: var(--mat-sys-primary);
-    }
-  `,
+  templateUrl: './install-banner.component.html',
+  styleUrl: './install-banner.component.scss',
 })
 export class InstallBannerComponent {
   private readonly installPrompt = inject(InstallPromptService);

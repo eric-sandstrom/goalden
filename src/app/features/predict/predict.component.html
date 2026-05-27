@@ -1,0 +1,54 @@
+<section class="page">
+  <mat-button-toggle-group
+      [value]="filter()"
+      (change)="filter.set($event.value)"
+      hideSingleSelectionIndicator
+      aria-label="Filter fixtures"
+    >
+      <mat-button-toggle value="UPCOMING">Upcoming</mat-button-toggle>
+      <mat-button-toggle value="LIVE">Live</mat-button-toggle>
+      <mat-button-toggle value="FINISHED">Finished</mat-button-toggle>
+      <mat-button-toggle value="GROUP">Group</mat-button-toggle>
+      <mat-button-toggle value="KNOCKOUTS">Knockouts</mat-button-toggle>
+      <mat-button-toggle value="ALL">All</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  <mat-card appearance="outlined" class="card-grow fixtures-card">
+    <div class="card-scroll">
+      @if (!loaded()) {
+        <div class="skel-list">
+          @for (i of skelRows; track i) {
+            <div class="skel-row">
+              <div class="skel-grid">
+                <app-skel width="56px" height="1.2rem" />
+                <div class="skel-scores">
+                  <app-skel width="56px" height="56px" />
+                  <app-skel width="56px" height="56px" />
+                </div>
+                <app-skel width="56px" height="1.2rem" />
+              </div>
+              <app-skel width="45%" height="0.9rem" block />
+            </div>
+          }
+        </div>
+      } @else if (groups().length === 0) {
+        <div class="empty">
+          <mat-icon aria-hidden="true">event_busy</mat-icon>
+          <p>No fixtures match this filter.</p>
+        </div>
+      } @else {
+        @for (group of groups(); track group.key) {
+          <section class="group">
+            <h2 class="day">{{ group.label }}</h2>
+            @for (fixture of group.fixtures; track fixture.id) {
+              <app-fixture-row
+                [fixture]="fixture"
+                [prediction]="predictionFor(fixture.id)"
+              />
+            }
+          </section>
+        }
+      }
+    </div>
+  </mat-card>
+</section>

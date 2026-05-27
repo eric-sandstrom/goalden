@@ -1,0 +1,32 @@
+<mat-card appearance="outlined" class="predict-next-card">
+  <mat-card-header>
+    <mat-icon matCardAvatar>sports_soccer</mat-icon>
+    <mat-card-title>Predict next match</mat-card-title>
+    <mat-card-subtitle>{{ subtitle() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  @if (currentFixture(); as f) {
+    <div class="fixture-slot">
+      <app-fixture-row [fixture]="f" [prediction]="predictionFor(f.id)" />
+    </div>
+    @if (hasOtherUnpredicted()) {
+      <mat-card-actions align="end">
+        <button mat-button (click)="next()">
+          Next
+          <mat-icon iconPositionEnd>chevron_right</mat-icon>
+        </button>
+      </mat-card-actions>
+    }
+  } @else {
+    <mat-card-content class="empty">
+      <mat-icon class="empty-icon" aria-hidden="true">check_circle</mat-icon>
+      <p class="empty-text">All caught up — no upcoming matches left to predict.</p>
+      @if (nextLockedFixture(); as nf) {
+        <p class="empty-sub">
+          Next match: <strong>{{ nf.homeTeam.name }} vs {{ nf.awayTeam.name }}</strong>
+          · kicks off {{ kickoffLabel(nf) }}
+        </p>
+      }
+    </mat-card-content>
+  }
+</mat-card>

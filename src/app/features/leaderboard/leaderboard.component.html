@@ -1,0 +1,88 @@
+    <section class="page">
+      <header class="hero">
+        <h1>Global leaderboard</h1>
+        @if (myEntry(); as me) {
+          <mat-chip-set>
+            <mat-chip [disableRipple]="true" highlighted>
+              <mat-icon matChipAvatar>account_circle</mat-icon>
+              You're #{{ me.rank }} with {{ me.totals.total }} pts
+            </mat-chip>
+          </mat-chip-set>
+          <button mat-stroked-button (click)="scrollToMe()">
+            <mat-icon>my_location</mat-icon>
+            Find me
+          </button>
+        }
+      </header>
+
+      @if (!loaded()) {
+        <mat-card appearance="outlined" class="table-wrap card-grow">
+          <div class="card-scroll skel-list">
+            @for (i of skelRows; track i) {
+              <div class="skel-row">
+                <app-skel width="18px" height="1rem" />
+                <app-skel width="28px" height="28px" rounded />
+                <app-skel width="40%" height="1rem" />
+                <app-skel width="28px" height="1rem" />
+              </div>
+            }
+          </div>
+        </mat-card>
+      } @else if (entries().length === 0) {
+        <mat-card appearance="outlined" class="empty">
+          <mat-icon aria-hidden="true">leaderboard</mat-icon>
+          <p>No scores yet. Predictions get points once matches finish.</p>
+        </mat-card>
+      } @else {
+        <mat-card appearance="outlined" class="table-wrap card-grow">
+          <div class="card-scroll">
+            <table mat-table [dataSource]="entries()">
+              <ng-container matColumnDef="rank">
+                <th mat-header-cell *matHeaderCellDef>#</th>
+                <td mat-cell *matCellDef="let row">{{ row.rank }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="player">
+                <th mat-header-cell *matHeaderCellDef>Player</th>
+                <td mat-cell *matCellDef="let row">
+                  <span class="player">
+                    @if (row.photoURL) {
+                      <img
+                        [ngSrc]="row.photoURL"
+                        width="28"
+                        height="28"
+                        [alt]="row.displayName + ' avatar'"
+                        class="avatar"
+                      />
+                    } @else {
+                      <mat-icon class="avatar-fallback" aria-hidden="true">person</mat-icon>
+                    }
+                    <span class="name">{{ row.displayName }}</span>
+                  </span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="points">
+                <th mat-header-cell *matHeaderCellDef>Pts</th>
+                <td
+                  mat-cell
+                  *matCellDef="let row"
+                  [matTooltip]="breakdownTooltip(row)"
+                  matTooltipPosition="left"
+                >
+                  <strong>{{ row.totals.total }}</strong>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+              <tr
+                mat-row
+                *matRowDef="let row; columns: columns"
+                [class.me]="row.uid === myUid()"
+                [attr.data-uid]="row.uid"
+              ></tr>
+            </table>
+          </div>
+        </mat-card>
+      }
+    </section>

@@ -50,221 +50,8 @@ interface LeagueStanding {
     SkelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <section class="page">
-      <header class="hero">
-        <h1>Leagues</h1>
-        <button mat-flat-button color="primary" (click)="openCreate()">
-          <mat-icon>add</mat-icon>
-          Create league
-        </button>
-      </header>
-
-      <mat-card appearance="outlined">
-        <mat-card-header>
-          <mat-icon matCardAvatar>login</mat-icon>
-          <mat-card-title>Join with a code</mat-card-title>
-          <mat-card-subtitle>Paste an invite link or code</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <form [formGroup]="joinForm" (ngSubmit)="join()" class="join">
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="code-field">
-              <mat-label>Invite code</mat-label>
-              <input
-                matInput
-                formControlName="code"
-                placeholder="ABCD-1234"
-                autocomplete="off"
-                autocapitalize="characters"
-                spellcheck="false"
-              />
-            </mat-form-field>
-            <button
-              mat-flat-button
-              color="primary"
-              type="submit"
-              [disabled]="joinForm.invalid || joining()"
-            >
-              @if (joining()) {
-                <mat-progress-spinner mode="indeterminate" diameter="20" />
-              } @else {
-                Join
-              }
-            </button>
-          </form>
-        </mat-card-content>
-      </mat-card>
-
-      @if (!loaded()) {
-        <mat-card appearance="outlined" class="card-grow my-leagues-card">
-          <mat-card-header>
-            <mat-icon matCardAvatar>groups</mat-icon>
-            <mat-card-title>Your leagues</mat-card-title>
-          </mat-card-header>
-          <div class="card-scroll skel-list">
-            @for (i of skelRows; track i) {
-              <div class="skel-row">
-                <app-skel width="24px" height="24px" rounded />
-                <div class="skel-text">
-                  <app-skel width="50%" height="1rem" block />
-                  <div style="height: 4px;"></div>
-                  <app-skel width="30%" height="0.8rem" block />
-                </div>
-              </div>
-            }
-          </div>
-        </mat-card>
-      } @else if (myList().length === 0) {
-        <mat-card appearance="outlined" class="empty">
-          <mat-icon aria-hidden="true">group_off</mat-icon>
-          <p>You aren't in any leagues yet. Create one or join via a code.</p>
-        </mat-card>
-      } @else {
-        <mat-card appearance="outlined" class="my-leagues-card">
-          <mat-card-header>
-            <mat-icon matCardAvatar>groups</mat-icon>
-            <mat-card-title>Your leagues</mat-card-title>
-          </mat-card-header>
-          <mat-nav-list>
-            @for (item of myList(); track item.league.id) {
-              <a mat-list-item [routerLink]="['/leagues', item.league.id]">
-                <mat-icon matListItemIcon>{{ leagueIcon(item.league.type, item.role) }}</mat-icon>
-                <span matListItemTitle>{{ item.league.name }}</span>
-                <span matListItemLine>{{ leagueRoleLabel(item) }}</span>
-                <span matListItemMeta class="standing">
-                  @if (standingFor(item.league.id); as s) {
-                    <span class="rank">#{{ s.rank }} <span class="rank-of">of {{ s.total }}</span></span>
-                    <span class="pts">{{ s.points }} pts</span>
-                  } @else {
-                    <span class="rank-skel">—</span>
-                  }
-                </span>
-              </a>
-            }
-          </mat-nav-list>
-        </mat-card>
-      }
-
-      <!-- ===================================================================
-           Discover: public leagues the user hasn't joined yet
-      ==================================================================== -->
-      @if (discoverable().length > 0) {
-        <mat-card appearance="outlined" class="discover-card">
-          <mat-card-header>
-            <mat-icon matCardAvatar>public</mat-icon>
-            <mat-card-title>Discover</mat-card-title>
-            <mat-card-subtitle>Public leagues — join with one tap</mat-card-subtitle>
-          </mat-card-header>
-          <mat-nav-list>
-            @for (league of discoverable(); track league.id) {
-              <mat-list-item>
-                <mat-icon matListItemIcon>public</mat-icon>
-                <span matListItemTitle>{{ league.name }}</span>
-                <span matListItemLine>{{ league.memberCount }} members</span>
-                <button
-                  mat-stroked-button
-                  matListItemMeta
-                  [disabled]="joiningId() === league.id"
-                  (click)="joinPublic(league)"
-                >
-                  @if (joiningId() === league.id) {
-                    <mat-progress-spinner mode="indeterminate" diameter="18" />
-                  } @else {
-                    Join
-                  }
-                </button>
-              </mat-list-item>
-            }
-          </mat-nav-list>
-        </mat-card>
-      }
-    </section>
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow: hidden;
-      width: 100%;
-    }
-    .hero {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.5rem;
-      flex: 0 0 auto;
-    }
-    .hero h1 {
-      margin: 0;
-      font: var(--mat-sys-headline-medium);
-    }
-    .join {
-      display: flex;
-      gap: 0.5rem;
-      align-items: flex-start;
-    }
-    .code-field { flex: 1; }
-    .my-leagues-card {
-      padding-bottom: 0.25rem;
-    }
-    .empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 2rem;
-      color: var(--mat-sys-on-surface-variant);
-    }
-    .skel-list {
-      padding: 0.25rem 0.75rem 0.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-    .skel-row {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 0.75rem 1rem;
-      min-height: 64px;
-      box-sizing: border-box;
-    }
-    .skel-text {
-      flex: 1;
-    }
-
-    /* Trailing rank/points block on each league row. The rank is the big
-       number to draw the eye; points are secondary muted text below. */
-    .standing {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.1rem;
-      min-width: 64px;
-    }
-    .rank {
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      color: var(--mat-sys-on-surface);
-    }
-    .rank-of {
-      font-weight: 400;
-      color: var(--mat-sys-on-surface-variant);
-      font-size: 0.85em;
-    }
-    .pts {
-      font-size: 0.78rem;
-      color: var(--mat-sys-on-surface-variant);
-      font-variant-numeric: tabular-nums;
-    }
-    .rank-skel {
-      color: var(--mat-sys-on-surface-variant);
-      font-weight: 700;
-    }
-  `,
+  templateUrl: './leagues.component.html',
+  styleUrl: './leagues.component.scss',
 })
 export class LeaguesComponent {
   private readonly leagues = inject(LeaguesService);
@@ -352,7 +139,7 @@ export class LeaguesComponent {
 
   protected leagueIcon(type: League['type'], role: 'owner' | 'member'): string {
     if (type === 'global') return 'public';
-    if (type === 'public') return 'public';
+    if (type === 'public') return 'visibility';
     return role === 'owner' ? 'workspace_premium' : 'groups';
   }
 
@@ -360,6 +147,49 @@ export class LeaguesComponent {
     if (item.league.type === 'global') return 'auto-enrolled';
     if (item.league.type === 'public') return item.role === 'owner' ? 'owner · public' : 'public';
     return item.role;
+  }
+
+  /** "12 members · Owner · Public · 142 pts" — combined info line for
+   *  each row. Carries member count + role + type + your points score
+   *  in one dense but readable strip. Points live here (rather than
+   *  stacked under the rank in the meta column) because matListItemMeta
+   *  clips multi-line content. */
+  protected leagueSubline(
+    item: { league: League; role: 'owner' | 'member' },
+    standing: { points: number } | null,
+  ): string {
+    const parts: string[] = [];
+    const count = item.league.memberCount;
+    parts.push(`${count} member${count === 1 ? '' : 's'}`);
+    if (item.role === 'owner') {
+      parts.push('Owner');
+    }
+    if (item.league.type === 'global') {
+      parts.push('Global');
+    } else if (item.league.type === 'public') {
+      parts.push('Public');
+    }
+    if (standing) {
+      parts.push(`${standing.points} pts`);
+    }
+    return parts.join(' · ');
+  }
+
+  /** Card-header subtitle for the "Your leagues" card — short summary
+   *  of how many leagues the user is in. */
+  protected myLeaguesSubtitle(): string {
+    const n = this.myList().length;
+    return `${n} league${n === 1 ? '' : 's'}`;
+  }
+
+  /** CSS class for the rank text. Top-3 ranks get medal colours so a
+   *  glance at the card surfaces "you're winning" / "podium spot" /
+   *  "in the running" before the user reads any numbers. */
+  protected rankClass(rank: number): string {
+    if (rank === 1) return 'rank-gold';
+    if (rank === 2) return 'rank-silver';
+    if (rank === 3) return 'rank-bronze';
+    return '';
   }
 
   protected async joinPublic(league: League): Promise<void> {

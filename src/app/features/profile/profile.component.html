@@ -1,0 +1,324 @@
+    <section class="profile-scroll">
+      <div class="profile-content">
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>{{ displayName() }}</mat-card-title>
+          <mat-card-subtitle>{{ email() }}</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-actions>
+          <button mat-button (click)="changeName()">
+            <mat-icon>edit</mat-icon>
+            Change display name
+          </button>
+          <button mat-button (click)="signOut()">
+            <mat-icon>logout</mat-icon>
+            Sign out
+          </button>
+        </mat-card-actions>
+      </mat-card>
+
+      <!-- ===================================================================
+           Predictor personality
+           Second from the top, between the identity hero and the utility
+           cards below. AI-generated badge based on the user's pick
+           patterns; owner-mode shows the Generate/Regenerate button.
+      ==================================================================== -->
+      <app-predictor-personality-card
+        [personality]="personality.myPersonality()"
+        [loaded]="personality.loaded()"
+        [ownerMode]="true"
+        [eligibility]="personality.eligibility()"
+      />
+
+      <!-- ===================================================================
+           Theme picker
+      ==================================================================== -->
+      <mat-card appearance="outlined" class="theme-card">
+        <mat-card-header>
+          <mat-icon matCardAvatar>palette</mat-icon>
+          <mat-card-title>Theme</mat-card-title>
+          <mat-card-subtitle>Paint the app in your team's colors</mat-card-subtitle>
+
+          <!-- Theme randomizer — top-right of the header. Picks a random
+               team preset (excluding default and the currently-applied
+               one) and applies it instantly. -->
+          <button
+            type="button"
+            mat-icon-button
+            class="theme-shuffle"
+            (click)="randomizeTheme()"
+            matTooltip="Random theme"
+            aria-label="Randomize theme"
+          >
+            <mat-icon>casino</mat-icon>
+          </button>
+        </mat-card-header>
+
+        <mat-card-content>
+          <!-- ---- Color mode ---- -->
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-field">
+            <mat-label>Color mode</mat-label>
+            <mat-select
+              [value]="colorMode()"
+              (selectionChange)="setColorMode($event.value)"
+            >
+              <mat-select-trigger>
+                <span class="mode-trigger">
+                  <mat-icon class="mode-trigger-icon" aria-hidden="true">
+                    {{ modeIcon(colorMode()) }}
+                  </mat-icon>
+                  {{ modeLabel(colorMode()) }}
+                </span>
+              </mat-select-trigger>
+              <mat-option value="system">
+                <mat-icon aria-hidden="true">brightness_auto</mat-icon>
+                System
+              </mat-option>
+              <mat-option value="light">
+                <mat-icon aria-hidden="true">light_mode</mat-icon>
+                Light
+              </mat-option>
+              <mat-option value="dark">
+                <mat-icon aria-hidden="true">dark_mode</mat-icon>
+                Dark
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <!-- ---- Preset ---- -->
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-field">
+            <mat-label>Preset</mat-label>
+            <mat-select
+              [value]="presetCode()"
+              (selectionChange)="applyPreset($event.value)"
+            >
+              <mat-select-trigger>
+                <span class="palette-trigger">
+                  @if (currentPreset(); as p) {
+                    @if (p.crest) {
+                      <img class="preset-crest" [src]="p.crest" [alt]="p.name + ' crest'" />
+                    } @else {
+                      <mat-icon class="preset-icon" aria-hidden="true">
+                        {{ presetCode() === customPresetValue ? 'palette' : 'sports_soccer' }}
+                      </mat-icon>
+                    }
+                    {{ p.name }}
+                  } @else {
+                    <mat-icon class="preset-icon" aria-hidden="true">palette</mat-icon>
+                    Custom
+                  }
+                </span>
+              </mat-select-trigger>
+
+              @for (preset of presets(); track preset.id) {
+                <mat-option [value]="preset.id">
+                  @if (preset.crest) {
+                    <img class="preset-crest" [src]="preset.crest" [alt]="preset.name + ' crest'" />
+                  } @else {
+                    <mat-icon class="preset-icon" aria-hidden="true">
+                      {{ preset.id === defaultPresetValue ? 'sports_soccer' : 'shield' }}
+                    </mat-icon>
+                  }
+                  {{ preset.name }}
+                </mat-option>
+              }
+              <!-- 'Custom' is disabled so the user can't pick it from the
+                   list — Custom is something you become by editing colours,
+                   not something you select. The option only needs to exist
+                   so mat-select has a matching value to highlight via the
+                   trigger when presetCode() === 'custom'. -->
+              <mat-option [value]="customPresetValue" disabled>
+                <mat-icon class="preset-icon" aria-hidden="true">palette</mat-icon>
+                Custom
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <!-- ---- Color pickers ---- -->
+          <div class="color-pickers">
+            <div class="color-row">
+              <label class="color-meta" [for]="primaryInputId">
+                <span class="color-name">Primary</span>
+                <span class="color-hint">Buttons · accents · live now</span>
+              </label>
+              <div class="color-input-wrap">
+                <input
+                  type="color"
+                  [id]="primaryInputId"
+                  [value]="colors().primary"
+                  (input)="setPrimaryFromEvent($event)"
+                  class="color-input"
+                  aria-label="Primary color"
+                />
+                <span class="color-hex">{{ colors().primary }}</span>
+              </div>
+            </div>
+
+            <div class="color-row">
+              <label class="color-meta" [for]="secondaryInputId">
+                <span class="color-name">Secondary</span>
+                <span class="color-hint">Subtle accents · chips</span>
+              </label>
+              <div class="color-input-wrap">
+                <input
+                  type="color"
+                  [id]="secondaryInputId"
+                  [value]="colors().secondary"
+                  (input)="setSecondaryFromEvent($event)"
+                  class="color-input"
+                  aria-label="Secondary color"
+                />
+                <span class="color-hex">{{ colors().secondary }}</span>
+              </div>
+            </div>
+
+            <div class="color-row">
+              <label class="color-meta" [for]="tertiaryInputId">
+                <span class="color-name">Tertiary</span>
+                <span class="color-hint">Highlights · warnings · podium</span>
+              </label>
+              <div class="color-input-wrap">
+                <input
+                  type="color"
+                  [id]="tertiaryInputId"
+                  [value]="colors().tertiary"
+                  (input)="setTertiaryFromEvent($event)"
+                  class="color-input"
+                  aria-label="Tertiary color"
+                />
+                <span class="color-hex">{{ colors().tertiary }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ---- Style + contrast ---- -->
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-field">
+            <mat-label>Style</mat-label>
+            <mat-select [value]="variant()" (selectionChange)="setVariant($event.value)">
+              @for (option of variantOptions; track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <div class="slider-field">
+            <div class="slider-head">
+              <span class="slider-label">Contrast</span>
+              <span class="slider-value">{{ contrastLabel() }}</span>
+            </div>
+            <mat-slider min="-1" max="1" step="0.1" discrete showTickMarks>
+              <input
+                matSliderThumb
+                [value]="contrast()"
+                (valueChange)="setContrast($event)"
+                aria-label="Contrast level"
+              />
+            </mat-slider>
+            <div class="slider-scale" aria-hidden="true">
+              <span>Low</span>
+              <span>Standard</span>
+              <span>High</span>
+            </div>
+          </div>
+
+          <!-- ---- Preview ---- -->
+          <div class="preview" aria-label="Theme preview">
+            <h4 class="preview-title">Live preview</h4>
+            <p class="preview-blurb">
+              Each row uses the corresponding color tokens. Edit any picker above and
+              watch the matching row update.
+            </p>
+
+            <div class="preview-block">
+              <span class="preview-tag">Primary</span>
+              <div class="preview-items">
+                <button type="button" mat-flat-button class="preview-btn primary-btn">Action</button>
+                <span class="preview-swatch primary-bg"></span>
+                <span class="preview-swatch primary-container-bg">
+                  <span class="preview-on">Aa</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="preview-block">
+              <span class="preview-tag">Secondary</span>
+              <div class="preview-items">
+                <span class="preview-swatch secondary-bg"></span>
+                <span class="preview-swatch secondary-container-bg">
+                  <span class="preview-on">Aa</span>
+                </span>
+                <mat-chip-set>
+                  <mat-chip class="preview-secondary-chip">Selected</mat-chip>
+                </mat-chip-set>
+              </div>
+            </div>
+
+            <div class="preview-block">
+              <span class="preview-tag">Tertiary</span>
+              <div class="preview-items">
+                <button type="button" mat-flat-button class="preview-btn tertiary-btn">
+                  Highlight
+                </button>
+                <span class="preview-swatch tertiary-bg"></span>
+                <span class="preview-swatch tertiary-container-bg">
+                  <span class="preview-on">Aa</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="preview-block">
+              <span class="preview-tag">Surfaces</span>
+              <div class="preview-items">
+                <span class="preview-swatch surface-lowest"></span>
+                <span class="preview-swatch surface-low"></span>
+                <span class="preview-swatch surface"></span>
+                <span class="preview-swatch surface-high"></span>
+                <span class="preview-swatch surface-highest"></span>
+              </div>
+            </div>
+
+            <div class="preview-block">
+              <span class="preview-tag">Outline</span>
+              <div class="preview-items">
+                <span class="preview-swatch outline-swatch"></span>
+                <span class="preview-swatch outline-variant-swatch"></span>
+                <span class="preview-text on-surface">On-surface</span>
+                <span class="preview-text on-surface-variant">On-surface-variant</span>
+              </div>
+            </div>
+          </div>
+
+          @if (showResetButton()) {
+            <div class="reset-row">
+              <button type="button" mat-stroked-button (click)="resetTheme()">
+                <mat-icon>restart_alt</mat-icon>
+                Reset to defaults
+              </button>
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      @if (showDev()) {
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-icon matCardAvatar class="dev">build</mat-icon>
+            <mat-card-title>Tools</mat-card-title>
+            <mat-card-subtitle>Match state, role management, and other admin / developer surfaces</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-actions>
+            @if (isAdmin()) {
+              <a mat-button routerLink="/admin">
+                <mat-icon class="admin-icon">admin_panel_settings</mat-icon>
+                Admin
+              </a>
+            }
+            <a mat-button routerLink="/dev">
+              <mat-icon>handyman</mat-icon>
+              Dev tools
+            </a>
+          </mat-card-actions>
+        </mat-card>
+      }
+      </div>
+    </section>

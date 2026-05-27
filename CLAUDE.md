@@ -311,7 +311,7 @@ Material 3, generated from primary `#0F7B3A` (football-pitch green) and tertiary
       pipes/
   ```
 - **No barrel `index.ts` files.** Import directly from source files. Barrels cause circular import pain in standalone codebases.
-- **Inline templates** for components under ~40 lines of template; separate `.html` file above that.
+- **Always split components into `.ts` + `.html` + `.scss`.** No inline `template:` or `styles:` blocks, regardless of size.
 - **No CSS frameworks** beyond Angular Material + a thin global stylesheet for the bottom nav and any non-Material custom pieces.
 
 ## Phase 1 plan (May 26 → June 11)

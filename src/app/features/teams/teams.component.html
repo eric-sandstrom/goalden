@@ -1,0 +1,61 @@
+    <section class="page">
+      <header class="hero">
+        <h1>Teams</h1>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search">
+          <mat-icon matIconPrefix>search</mat-icon>
+          <mat-label>Filter</mat-label>
+          <input matInput [formControl]="searchControl" autocomplete="off" spellcheck="false" />
+        </mat-form-field>
+      </header>
+
+      <mat-card appearance="outlined" class="card-grow teams-card">
+        <div class="card-scroll">
+          @if (!loaded()) {
+            <div class="grid">
+              @for (i of skelRows; track i) {
+                <div class="skel-tile">
+                  <app-skel width="56px" height="56px" rounded />
+                  <app-skel width="70%" height="1rem" block />
+                  <app-skel width="40%" height="0.8rem" block />
+                </div>
+              }
+            </div>
+          } @else if (filteredTeams().length === 0) {
+            <div class="empty">
+              <mat-icon aria-hidden="true">groups_off</mat-icon>
+              <p>
+                @if (searchControl.value) {
+                  No teams match "{{ searchControl.value }}".
+                } @else {
+                  No teams yet. They populate on the next pollTeams run.
+                }
+              </p>
+            </div>
+          } @else {
+            <div class="grid">
+              @for (team of filteredTeams(); track team.id) {
+                <a class="tile" [routerLink]="['/teams', team.id]">
+                  @if (team.crest) {
+                    <img
+                      [ngSrc]="team.crest"
+                      width="56"
+                      height="56"
+                      [alt]="team.name + ' crest'"
+                      class="crest"
+                    />
+                  } @else {
+                    <div class="crest crest-fallback" aria-hidden="true">
+                      <mat-icon>shield</mat-icon>
+                    </div>
+                  }
+                  <span class="name">{{ team.name }}</span>
+                  @if (team.tla) {
+                    <span class="tla">{{ team.tla }}</span>
+                  }
+                </a>
+              }
+            </div>
+          }
+        </div>
+      </mat-card>
+    </section>

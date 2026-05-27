@@ -1,0 +1,98 @@
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+    }
+    .hero {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      flex: 0 0 auto;
+    }
+    h1 {
+      margin: 0;
+      font: var(--mat-sys-headline-medium);
+    }
+    .search { width: 100%; }
+    .teams-card {
+      padding: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem;
+      padding: 0.75rem;
+    }
+    .tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.875rem 0.5rem;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid var(--mat-sys-outline-variant);
+      border-radius: 14px;
+      background: var(--mat-sys-surface);
+      transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+      min-height: 132px;
+      box-sizing: border-box;
+    }
+    .tile:hover {
+      background: var(--mat-sys-surface-container-low);
+      border-color: var(--mat-sys-outline);
+    }
+    .tile:active { transform: scale(0.98); }
+    .crest {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+    }
+    .crest-fallback {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--mat-sys-surface-container);
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .crest-fallback mat-icon { font-size: 32px; width: 32px; height: 32px; }
+    .name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.2;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+    .tla {
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 3rem 1rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    /* Skeleton tile mirrors the real tile's shape so loading doesn't shift
+       layout when teams pop in. */
+    .skel-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.875rem 0.5rem;
+      border: 1px solid var(--mat-sys-outline-variant);
+      border-radius: 14px;
+      min-height: 132px;
+      box-sizing: border-box;
+    }

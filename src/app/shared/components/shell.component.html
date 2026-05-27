@@ -1,0 +1,11 @@
+<main class="content">
+  <app-install-banner />
+  <app-back-button />
+  <!-- Wraps the routed view so the pull-to-refresh gesture can
+       detect touchstart on whatever the user is actually scrolling.
+       Routes that don't scroll just don't trigger the gesture. -->
+  <app-pull-to-refresh>
+    <router-outlet />
+  </app-pull-to-refresh>
+</main>
+<app-bottom-nav />

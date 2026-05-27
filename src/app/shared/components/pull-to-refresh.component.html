@@ -1,0 +1,21 @@
+<!-- Indicator floats above the content. translateY is the only
+     thing that animates so we can keep it on the compositor. -->
+<div
+  class="indicator"
+  [class.visible]="visible()"
+  [class.armed]="state() === 'armed'"
+  [style.transform]="indicatorTransform()"
+  aria-hidden="true"
+>
+  @if (state() === 'refreshing') {
+    <mat-progress-spinner mode="indeterminate" [diameter]="22" />
+  } @else {
+    <!-- Rotate the refresh glyph proportionally to pull progress —
+         reaches ~360° at the threshold. Gives a visual sense of
+         "preloading the spin" before the actual refresh fires. -->
+    <mat-icon class="refresh-icon" [style.transform]="iconRotation()">
+      refresh
+    </mat-icon>
+  }
+</div>
+<ng-content />

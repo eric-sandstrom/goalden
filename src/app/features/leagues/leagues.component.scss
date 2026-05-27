@@ -1,0 +1,120 @@
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+    }
+    .join {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+    .code-field { flex: 1; }
+    .my-leagues-card {
+      padding-bottom: 0.25rem;
+    }
+    /* Top-right Create button inside the Your leagues card header.
+       Same flex-start trick used by the theme card's randomizer + the
+       league-detail QR/settings cluster — push it right with auto
+       margin while the title/subtitle anchor on the left. */
+    .my-leagues-card mat-card-header {
+      align-items: flex-start;
+    }
+    .my-leagues-card .create-action {
+      margin-left: auto;
+      align-self: flex-start;
+    }
+    /* Empty state: stack the icon, copy, and primary create CTA
+       vertically so the "no leagues yet" message has an obvious
+       resolution. */
+    .empty {
+      gap: 0.75rem;
+    }
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 2rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .skel-list {
+      padding: 0.25rem 0.75rem 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .skel-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      min-height: 64px;
+      box-sizing: border-box;
+    }
+    .skel-text {
+      flex: 1;
+    }
+
+    /* League-row polish. The list-item layout is Material's default
+       (icon + title + line + meta) — we just dress up the typography
+       and color the icon based on type/role so the row reads at a
+       glance. */
+    .league-row {
+      transition: background-color 120ms ease;
+    }
+    .league-name {
+      font-weight: 600;
+    }
+    .league-sub {
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.82rem;
+    }
+    /* Type/role icon tints. Mirrors the league-detail header's colour
+       language so people learn the visual mapping in one place. */
+    .league-icon-owner {
+      color: var(--mat-sys-tertiary);
+    }
+    .league-icon-global {
+      color: var(--mat-sys-primary);
+    }
+    .league-icon-public {
+      color: var(--mat-sys-tertiary);
+    }
+
+    /* Trailing rank/points block on each league row. Rank is the
+       headline number — bumped in size and medal-tinted for the top
+       three so podium positions feel rewarding at a glance. */
+    /* Single-line meta column (rank + total). Points moved into the
+       subtitle line because matListItemMeta clips anything that wraps
+       past one line. */
+    .standing {
+      display: inline-flex;
+      align-items: center;
+      min-width: 64px;
+      margin-left: 1rem;
+    }
+    .rank {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--mat-sys-on-surface);
+    }
+    .rank.rank-gold { color: var(--mat-sys-tertiary); }
+    .rank.rank-silver { color: var(--mat-sys-outline); }
+    .rank.rank-bronze {
+      color: color-mix(in srgb, var(--mat-sys-tertiary) 55%, var(--mat-sys-error) 45%);
+    }
+    .rank-of {
+      font-weight: 400;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.72em;
+      margin-left: 0.15rem;
+    }
+    .rank-skel {
+      color: var(--mat-sys-on-surface-variant);
+      font-weight: 700;
+    }

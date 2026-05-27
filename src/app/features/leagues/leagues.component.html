@@ -1,0 +1,140 @@
+    <section class="page">
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>login</mat-icon>
+          <mat-card-title>Join with a code</mat-card-title>
+          <mat-card-subtitle>Paste an invite link or code</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <form [formGroup]="joinForm" (ngSubmit)="join()" class="join">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="code-field">
+              <mat-label>Invite code</mat-label>
+              <input
+                matInput
+                formControlName="code"
+                placeholder="ABCD-1234"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+              />
+            </mat-form-field>
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="joinForm.invalid || joining()"
+            >
+              @if (joining()) {
+                <mat-progress-spinner mode="indeterminate" diameter="20" />
+              } @else {
+                Join
+              }
+            </button>
+          </form>
+        </mat-card-content>
+      </mat-card>
+
+      @if (!loaded()) {
+        <mat-card appearance="outlined" class="card-grow my-leagues-card">
+          <mat-card-header>
+            <mat-icon matCardAvatar>groups</mat-icon>
+            <mat-card-title>Your leagues</mat-card-title>
+            <button mat-flat-button color="primary" class="create-action" (click)="openCreate()">
+              <mat-icon>add</mat-icon>
+              Create
+            </button>
+          </mat-card-header>
+          <div class="card-scroll skel-list">
+            @for (i of skelRows; track i) {
+              <div class="skel-row">
+                <app-skel width="24px" height="24px" rounded />
+                <div class="skel-text">
+                  <app-skel width="50%" height="1rem" block />
+                  <div style="height: 4px;"></div>
+                  <app-skel width="30%" height="0.8rem" block />
+                </div>
+              </div>
+            }
+          </div>
+        </mat-card>
+      } @else if (myList().length === 0) {
+        <mat-card appearance="outlined" class="empty">
+          <mat-icon aria-hidden="true">group_off</mat-icon>
+          <p>You aren't in any leagues yet. Create one or join via a code.</p>
+          <button mat-flat-button color="primary" (click)="openCreate()">
+            <mat-icon>add</mat-icon>
+            Create league
+          </button>
+        </mat-card>
+      } @else {
+        <mat-card appearance="outlined" class="my-leagues-card">
+          <mat-card-header>
+            <mat-icon matCardAvatar>groups</mat-icon>
+            <mat-card-title>Your leagues</mat-card-title>
+            <mat-card-subtitle>{{ myLeaguesSubtitle() }}</mat-card-subtitle>
+            <button mat-flat-button color="primary" class="create-action" (click)="openCreate()">
+              <mat-icon>add</mat-icon>
+              Create
+            </button>
+          </mat-card-header>
+          <mat-nav-list>
+            @for (item of myList(); track item.league.id) {
+              <a mat-list-item [routerLink]="['/leagues', item.league.id]" class="league-row">
+                <mat-icon
+                  matListItemIcon
+                  class="league-icon"
+                  [class.league-icon-owner]="item.role === 'owner'"
+                  [class.league-icon-global]="item.league.type === 'global'"
+                  [class.league-icon-public]="item.league.type === 'public'"
+                >{{ leagueIcon(item.league.type, item.role) }}</mat-icon>
+                <span matListItemTitle class="league-name">{{ item.league.name }}</span>
+                <span matListItemLine class="league-sub">{{ leagueSubline(item, standingFor(item.league.id)) }}</span>
+                <span matListItemMeta class="standing">
+                  @if (standingFor(item.league.id); as s) {
+                    <span class="rank" [class]="rankClass(s.rank)">
+                      #{{ s.rank }} <span class="rank-of">of {{ s.total }}</span>
+                    </span>
+                  } @else {
+                    <span class="rank-skel">—</span>
+                  }
+                </span>
+              </a>
+            }
+          </mat-nav-list>
+        </mat-card>
+      }
+
+      <!-- ===================================================================
+           Discover: public leagues the user hasn't joined yet
+      ==================================================================== -->
+      @if (discoverable().length > 0) {
+        <mat-card appearance="outlined" class="discover-card">
+          <mat-card-header>
+            <mat-icon matCardAvatar>public</mat-icon>
+            <mat-card-title>Discover</mat-card-title>
+            <mat-card-subtitle>Public leagues — join with one tap</mat-card-subtitle>
+          </mat-card-header>
+          <mat-nav-list>
+            @for (league of discoverable(); track league.id) {
+              <mat-list-item>
+                <mat-icon matListItemIcon>public</mat-icon>
+                <span matListItemTitle>{{ league.name }}</span>
+                <span matListItemLine>{{ league.memberCount }} members</span>
+                <button
+                  mat-stroked-button
+                  matListItemMeta
+                  [disabled]="joiningId() === league.id"
+                  (click)="joinPublic(league)"
+                >
+                  @if (joiningId() === league.id) {
+                    <mat-progress-spinner mode="indeterminate" diameter="18" />
+                  } @else {
+                    Join
+                  }
+                </button>
+              </mat-list-item>
+            }
+          </mat-nav-list>
+        </mat-card>
+      }
+    </section>

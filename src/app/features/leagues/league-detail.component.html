@@ -1,0 +1,214 @@
+    <section class="page">
+      @if (!league()) {
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <app-skel width="40px" height="40px" rounded />
+            <div class="hdr-text">
+              <app-skel width="50%" height="1.25rem" block />
+              <div style="height: 6px;"></div>
+              <app-skel width="35%" height="1rem" block />
+            </div>
+          </mat-card-header>
+        </mat-card>
+        <mat-card appearance="outlined" class="card-grow">
+          <div class="card-scroll skel-list">
+            @for (i of skelRows; track i) {
+              <div class="skel-row">
+                <app-skel width="18px" height="1rem" />
+                <app-skel width="28px" height="28px" rounded />
+                <app-skel width="40%" height="1rem" />
+                <app-skel width="28px" height="1rem" />
+              </div>
+            }
+          </div>
+        </mat-card>
+      } @else {
+        <mat-card appearance="outlined" class="header-card">
+          <mat-card-header>
+            <mat-icon matCardAvatar [class.type-global]="league()!.type === 'global'">
+              {{ headerIcon() }}
+            </mat-icon>
+            <mat-card-title>
+              <span class="title-row">
+                <span class="title-text">{{ league()!.name }}</span>
+                @if (league()!.type !== 'private') {
+                  <mat-chip
+                    class="type-chip"
+                    [class.type-chip-global]="league()!.type === 'global'"
+                    [class.type-chip-public]="league()!.type === 'public'"
+                    [disableRipple]="true"
+                  >
+                    <mat-icon matChipAvatar>
+                      {{ league()!.type === 'global' ? 'public' : 'visibility' }}
+                    </mat-icon>
+                    {{ league()!.type === 'global' ? 'Global' : 'Public' }}
+                  </mat-chip>
+                }
+              </span>
+            </mat-card-title>
+            <mat-card-subtitle>{{ headerSubtitle() }}</mat-card-subtitle>
+
+            <!-- Top-right: QR (when there's an invite code to share) +
+                 settings button. The settings dropdown contains
+                 Copy link / Copy code / mod actions / Leave, so we don't
+                 need standalone copy buttons next to the QR. -->
+            <div class="header-actions">
+              @if (canShareInvite()) {
+                <qrcode
+                  class="header-qr"
+                  [qrdata]="inviteUrl()"
+                  [width]="56"
+                  [errorCorrectionLevel]="'L'"
+                  [margin]="1"
+                  [colorDark]="'#000000'"
+                  [colorLight]="'#ffffff'"
+                  [allowEmptyString]="false"
+                ></qrcode>
+              }
+              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="League settings">
+                <mat-icon>settings</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu">
+                <!-- Browse teams lives here (rather than on Profile) so it's
+                     contextually reachable from any league view. -->
+                <button mat-menu-item (click)="browseTeams()">
+                  <mat-icon>groups</mat-icon>
+                  Browse teams
+                </button>
+                @if (canShareInvite()) {
+                  <button mat-menu-item (click)="copyLink()">
+                    <mat-icon>link</mat-icon>
+                    Copy invite link
+                  </button>
+                  <button mat-menu-item (click)="copyCode()">
+                    <mat-icon>content_copy</mat-icon>
+                    Copy code
+                  </button>
+                }
+                @if (amOwner() && canModerate()) {
+                  <button mat-menu-item (click)="regenerateCode()">
+                    <mat-icon>autorenew</mat-icon>
+                    Regenerate invite code
+                  </button>
+                  <button mat-menu-item (click)="confirmDelete()">
+                    <mat-icon>delete</mat-icon>
+                    Delete league
+                  </button>
+                }
+                @if (canLeave()) {
+                  <button mat-menu-item (click)="leave()">
+                    <mat-icon>logout</mat-icon>
+                    Leave league
+                  </button>
+                }
+              </mat-menu>
+            </div>
+          </mat-card-header>
+        </mat-card>
+
+        <!-- Predict-next card: drop in one outstanding fixture for the
+             league's competition. Today every league shares the same
+             World Cup fixture pool; once leagues become multi-competition
+             this card will read a leagueId-scoped fixture source. -->
+        <app-predict-next-card />
+
+        <mat-card appearance="outlined" class="table-wrap card-grow">
+          <div class="card-scroll">
+            <table mat-table [dataSource]="rows()">
+              <ng-container matColumnDef="rank">
+                <th mat-header-cell *matHeaderCellDef>#</th>
+                <td mat-cell *matCellDef="let row">{{ row.rank }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="player">
+                <th mat-header-cell *matHeaderCellDef>Player</th>
+                <td mat-cell *matCellDef="let row">
+                  <span class="player">
+                    @if (row.photoURL) {
+                      <img
+                        [ngSrc]="row.photoURL"
+                        width="28"
+                        height="28"
+                        [alt]="row.displayName + ' avatar'"
+                        class="avatar"
+                      />
+                    } @else {
+                      <mat-icon class="avatar-fallback" aria-hidden="true">person</mat-icon>
+                    }
+                    <span class="name">{{ row.displayName }}</span>
+                    @if (row.role === 'owner') {
+                      <mat-icon
+                        class="owner-icon"
+                        aria-label="Owner"
+                        matTooltip="League owner"
+                      >workspace_premium</mat-icon>
+                    }
+                  </span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="exact">
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  matTooltip="Exact full-time score predictions (3 pts each)"
+                >Exact</th>
+                <td mat-cell *matCellDef="let row">{{ row.exactHits }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="outcome">
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  matTooltip="Correct outcome predictions — W/D/L (1 pt each)"
+                >Outcome</th>
+                <td mat-cell *matCellDef="let row">{{ row.outcomeHits }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="points">
+                <th mat-header-cell *matHeaderCellDef>Pts</th>
+                <td mat-cell *matCellDef="let row"><strong>{{ row.totalPoints }}</strong></td>
+              </ng-container>
+
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef></th>
+                <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+                  @if (canManageMember(row)) {
+                    <button
+                      mat-icon-button
+                      [matMenuTriggerFor]="rowMenu"
+                      aria-label="Manage member"
+                    >
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #rowMenu="matMenu">
+                      <button mat-menu-item (click)="confirmTransfer(row)">
+                        <mat-icon>workspace_premium</mat-icon>
+                        Transfer ownership
+                      </button>
+                      <button mat-menu-item (click)="confirmKick(row)">
+                        <mat-icon>person_remove</mat-icon>
+                        Kick member
+                      </button>
+                    </mat-menu>
+                  }
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+              <tr
+                mat-row
+                *matRowDef="let row; columns: columns"
+                [class.me]="row.uid === myUid()"
+                class="clickable"
+                role="link"
+                tabindex="0"
+                (click)="openUser(row)"
+                (keydown.enter)="openUser(row)"
+                (keydown.space)="openUser(row); $event.preventDefault()"
+              ></tr>
+            </table>
+          </div>
+        </mat-card>
+      }
+    </section>
