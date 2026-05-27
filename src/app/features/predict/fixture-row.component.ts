@@ -223,7 +223,7 @@ import {
       position: relative;
       overflow: hidden;
     }
-    /* Big rotated team crest backgrounds. Sit behind content, fade toward the
+    /* Big team crest backgrounds. Sit behind content, fade toward the
        center of the row, get clipped by .row overflow:hidden. */
     .crest-bg {
       position: absolute;
@@ -236,6 +236,7 @@ import {
       opacity: 0.32;
       pointer-events: none;
       z-index: 0;
+      transform: translateY(-50%);
     }
     /* mask-image only reads the alpha channel — the colour itself is
        irrelevant. We use --mat-sys-on-surface instead of a hardcoded
@@ -243,13 +244,11 @@ import {
        any fully opaque value would behave identically. */
     .crest-bg.home {
       left: -28px;
-      transform: translateY(-50%) rotate(-12deg);
       mask-image: linear-gradient(to right, var(--mat-sys-on-surface) 0%, var(--mat-sys-on-surface) 30%, transparent 100%);
       -webkit-mask-image: linear-gradient(to right, var(--mat-sys-on-surface) 0%, var(--mat-sys-on-surface) 30%, transparent 100%);
     }
     .crest-bg.away {
       right: -28px;
-      transform: translateY(-50%) rotate(12deg);
       mask-image: linear-gradient(to left, var(--mat-sys-on-surface) 0%, var(--mat-sys-on-surface) 30%, transparent 100%);
       -webkit-mask-image: linear-gradient(to left, var(--mat-sys-on-surface) 0%, var(--mat-sys-on-surface) 30%, transparent 100%);
     }
