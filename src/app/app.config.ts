@@ -1,15 +1,37 @@
 import {
   ApplicationConfig,
+  inject,
+  provideAppInitializer,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection, isDevMode,
 } from '@angular/core';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import {
+  MAT_SNACK_BAR_DEFAULT_OPTIONS,
+  MatSnackBarConfig,
+} from '@angular/material/snack-bar';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 
 import { environment } from '../environments/environment';
 import { provideFirebase } from './core/firebase/firebase.providers';
+import { AppUpdateService } from './core/services/app-update.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
+
+/**
+ * Global snack-bar defaults. Anchor every toast to the top of the
+ * viewport — keeps notifications away from the bottom-nav (which
+ * would otherwise overlap them on mobile) and matches the visual
+ * weight of the install-banner that also lives up top.
+ *
+ * Per-call configs passed to `MatSnackBar.open(...)` still win — this
+ * is just the baseline. Note that Material merges shallowly, so if a
+ * call provides its own `verticalPosition` it overrides ours.
+ */
+const SNACK_BAR_DEFAULTS: MatSnackBarConfig = {
+  verticalPosition: 'top',
+  horizontalPosition: 'center',
+};
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -25,5 +47,11 @@ export const appConfig: ApplicationConfig = {
             enabled: !isDevMode(),
             registrationStrategy: 'registerWhenStable:30000'
           }),
+    { provide: MAT_SNACK_BAR_DEFAULT_OPTIONS, useValue: SNACK_BAR_DEFAULTS },
+    // Boot the SwUpdate listener immediately so users see a "Reload" toast
+    // when a new build is deployed mid-session.
+    provideAppInitializer(() => {
+      inject(AppUpdateService).start();
+    }),
   ],
 };
