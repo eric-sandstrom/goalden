@@ -57,6 +57,14 @@ export class UserProfileComponent {
   private readonly predictions = inject(PredictionsService);
   private readonly personalityService = inject(PersonalityService);
 
+  /**
+   * Hardcoded to WC for now — the public profile view shows a user's
+   * locked predictions, and pre-multi-comp those are all WC. Once other
+   * comps go live this becomes "comps the visited user has totals in"
+   * derived from their `users/{uid}/totals/*` subcollection.
+   */
+  private readonly _wcFixtures = this.fixtures.fixturesFor('WC', '2026');
+
   /** Wired from the route param via withComponentInputBinding(). */
   readonly uid = input.required<string>();
 
@@ -83,8 +91,7 @@ export class UserProfileComponent {
    *  we're allowed to read this user's predictions for. */
   protected readonly lockedFixtures = computed(() => {
     const now = new Date();
-    return this.fixtures
-      .fixtures()
+    return this._wcFixtures()
       .filter((f) => isLocked(f, now))
       .sort((a, b) => b.utcKickoff.getTime() - a.utcKickoff.getTime());
   });
@@ -148,9 +155,10 @@ export class UserProfileComponent {
    *  Each read is rules-gated on the fixture being non-TIMED, which we
    *  guarantee by only iterating lockedFixtures(). */
   private async loadLockedPredictions(uid: string): Promise<void> {
-    // Wait until fixtures are loaded so lockedFixtures() returns the full list.
-    // The fixtures cache + live overlay populates the signal asynchronously.
-    if (this.fixtures.fixtures().length === 0) {
+    // Wait until fixtures are loaded so lockedFixtures() returns the full
+    // list. The fixtures cache + live overlay populate the signal
+    // asynchronously, so on a cold load we may arrive before data is in.
+    if (this._wcFixtures().length === 0) {
       // Best effort — if fixtures haven't loaded yet, retry shortly.
       await new Promise((r) => setTimeout(r, 250));
     }

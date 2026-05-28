@@ -77,11 +77,16 @@ export class DevToolsComponent {
     () => this.competitionsService.activeCompetitions().length,
   );
 
-  /** Every fixture, labelled with its current status — used by the state and
-   *  kickoff cards (which need to operate on any fixture, not just ones the
-   *  user has predicted). */
+  /**
+   * Every WC fixture, labelled with its current status — used by the state
+   * and kickoff cards. Hardcoded to WC for now since dev-tools predates the
+   * multi-comp picker; task #84 generalises the fixture select to take a
+   * comp parameter so admins can manipulate matches in any comp they have
+   * loaded.
+   */
+  private readonly _wcFixtures = this.fixtures.fixturesFor('WC', '2026');
   protected readonly fixtureOptions = computed(() => {
-    return this.fixtures.fixtures().map((f) => ({
+    return this._wcFixtures().map((f) => ({
       matchId: f.id,
       label: `${f.homeTeam.tla ?? '?'} vs ${f.awayTeam.tla ?? '?'} · ${f.status} · ${f.utcKickoff.toLocaleString(
         undefined,

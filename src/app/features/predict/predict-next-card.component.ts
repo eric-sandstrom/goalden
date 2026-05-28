@@ -38,6 +38,14 @@ export class PredictNextCardComponent {
   private readonly fixtures = inject(FixturesService);
   private readonly predictions = inject(PredictionsService);
 
+  /**
+   * Hardcoded to WC — this card is currently embedded in surfaces that
+   * are WC-only (league detail for the WC global league). The league-
+   * detail refactor in task #76 turns this into an input so the card
+   * picks up the host league's (compId, season).
+   */
+  private readonly compFixtures = this.fixtures.fixturesFor('WC', '2026');
+
   /** ID of the fixture currently shown. Stays put across predict
    *  submissions so the user only sees a new fixture when they ask for
    *  one via the Next button. */
@@ -49,8 +57,7 @@ export class PredictNextCardComponent {
    *  list automatically once pollFootballData fills in the team ids. */
   protected readonly upcomingFixtures = computed<readonly Fixture[]>(() => {
     const now = Date.now();
-    return this.fixtures
-      .fixtures()
+    return this.compFixtures()
       .filter(
         (f) =>
           f.status === 'TIMED' &&
@@ -86,9 +93,7 @@ export class PredictNextCardComponent {
   protected readonly nextLockedFixture = computed<Fixture | null>(() => {
     const now = Date.now();
     return (
-      this.fixtures
-        .fixtures()
-        .find((f) => f.utcKickoff.getTime() > now) ?? null
+      this.compFixtures().find((f) => f.utcKickoff.getTime() > now) ?? null
     );
   });
 

@@ -45,8 +45,15 @@ export class PodiumPicksComponent {
   private readonly snackBar = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
 
+  /**
+   * Podium picks are a WC-only concept (winner / runner-up / third of the
+   * tournament). Triggers a load of the WC fixtures so the `teams` cross-
+   * comp signal populates with WC participants — there's no consumer-side
+   * filtering because the only loaded comp here is WC.
+   */
+  private readonly _wcLoad = this.fixtures.fixturesFor('WC', '2026');
   protected readonly teams = this.fixtures.teams;
-  protected readonly fixturesLoaded = this.fixtures.loaded;
+  protected readonly fixturesLoaded = this.fixtures.loadedFor('WC', '2026');
   protected readonly podiumLoaded = this.predictions.podiumLoaded;
   protected readonly existingPick = this.predictions.podiumPick;
 

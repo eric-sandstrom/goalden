@@ -33,12 +33,20 @@ export class PredictComponent {
   private readonly fixturesService = inject(FixturesService);
   private readonly predictionsService = inject(PredictionsService);
 
+  /**
+   * Hardcoded to WC for now — Predict's tabs-per-competition layout
+   * lands in task #75, which replaces this with the user-selected tab's
+   * (compId, season). Until then the page shows WC fixtures as before.
+   */
+  private readonly wcFixtures = this.fixturesService.fixturesFor('WC', '2026');
   protected readonly filter = signal<Filter>('UPCOMING');
-  protected readonly loaded = computed(() => this.fixturesService.loaded());
+  protected readonly loaded = computed(() =>
+    this.fixturesService.loadedFor('WC', '2026')(),
+  );
   protected readonly skelRows = [0, 1, 2, 3, 4, 5];
 
   protected readonly groups = computed<readonly DateGroup[]>(() => {
-    const all = this.fixturesService.fixtures();
+    const all = this.wcFixtures();
     const filter = this.filter();
     const filtered = this.applyFilter(all, filter);
     // Finished matches are most useful in reverse-chronological order — the

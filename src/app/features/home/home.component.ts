@@ -52,7 +52,14 @@ export class HomeComponent {
   private readonly _userSelectedView = signal<MatchView | null>(null);
 
   protected readonly userLoaded = this.userService.loaded;
-  protected readonly fixturesLoaded = this.fixtures.loaded;
+  /**
+   * Hardcoded to WC for now — Home's "live / upcoming / recent" tabs are
+   * still WC-only because the user's set of comps isn't wired here yet.
+   * A follow-up turns this into a derived list of (comp, season) pairs
+   * from the user's league memberships, then iterates fixturesFor each.
+   */
+  private readonly _wcFixtures = this.fixtures.fixturesFor('WC', '2026');
+  protected readonly fixturesLoaded = this.fixtures.loadedFor('WC', '2026');
   protected readonly podiumLoaded = this.predictions.podiumLoaded;
   protected readonly totals = this.userService.totals;
   protected readonly skelRows = [0, 1, 2];
@@ -66,23 +73,20 @@ export class HomeComponent {
   // --------------------------------------------------------------------------
 
   protected readonly liveFixtures = computed(() =>
-    this.fixtures
-      .fixtures()
-      .filter((f) => f.status === 'IN_PLAY' || f.status === 'PAUSED'),
+    this._wcFixtures().filter((f) => f.status === 'IN_PLAY' || f.status === 'PAUSED'),
   );
 
   protected readonly upcomingFixtures = computed(() => {
     const now = this.nowTick();
-    return this.fixtures
-      .fixtures()
+    return this._wcFixtures()
       .filter((f) => f.status === 'TIMED' && f.utcKickoff.getTime() > now)
       .slice(0, UPCOMING_LIMIT);
   });
 
   protected readonly recentResults = computed(() => {
-    const all = this.fixtures
-      .fixtures()
-      .filter((f) => f.status === 'FINISHED' || f.status === 'AWARDED');
+    const all = this._wcFixtures().filter(
+      (f) => f.status === 'FINISHED' || f.status === 'AWARDED',
+    );
     return [...all]
       .sort((a, b) => b.utcKickoff.getTime() - a.utcKickoff.getTime())
       .slice(0, RECENT_LIMIT);
