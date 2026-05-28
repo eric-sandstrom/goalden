@@ -1,13 +1,6 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { httpsCallable } from 'firebase/functions';
-import {
-  DocumentData,
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-} from 'firebase/firestore';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -20,8 +13,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { FIRESTORE, FUNCTIONS } from '../../core/firebase/firebase.providers';
-import { Competition, CompetitionType } from '../../core/models/competition.model';
+import { FUNCTIONS } from '../../core/firebase/firebase.providers';
+import { Competition } from '../../core/models/competition.model';
+import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { PredictionsService } from '../../core/services/predictions.service';
 import { UserService } from '../../core/services/user.service';
@@ -59,11 +53,10 @@ export class DevToolsComponent {
   private readonly fixtures = inject(FixturesService);
   private readonly predictions = inject(PredictionsService);
   private readonly userService = inject(UserService);
+  private readonly competitionsService = inject(CompetitionsService);
   private readonly functions = inject(FUNCTIONS);
-  private readonly db = inject(FIRESTORE);
   private readonly snackBar = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
-  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly running = signal(false);
 
@@ -75,13 +68,13 @@ export class DevToolsComponent {
    *  callables behind the buttons re-check the role server-side. */
   protected readonly isOwner = this.userService.isOwner;
 
-  /** Discovered competitions, kept live via onSnapshot. Read-only here —
-   *  the proper CompetitionsService (task #70) replaces this when the
-   *  Predict UI starts depending on the same data. */
-  protected readonly competitions = signal<readonly Competition[]>([]);
+  /** Discovered competitions, exposed through CompetitionsService so the
+   *  Predict tab, create-league dialog, and league detail page all read
+   *  from the same live listener. */
+  protected readonly competitions = this.competitionsService.competitions;
 
   protected readonly activeCount = computed(
-    () => this.competitions().filter((c) => c.active).length,
+    () => this.competitionsService.activeCompetitions().length,
   );
 
   /** Every fixture, labelled with its current status — used by the state and
@@ -135,24 +128,6 @@ export class DevToolsComponent {
   protected readonly roleForm = this.fb.nonNullable.group({
     uid: ['', [Validators.required, Validators.minLength(1)]],
   });
-
-  constructor() {
-    // Live listener for the competitions catalogue. Ordering by name
-    // gives a stable, scannable list in the UI; the proper
-    // CompetitionsService (task #70) will keep the same order.
-    const unsub = onSnapshot(
-      query(collection(this.db, 'competitions'), orderBy('name')),
-      (snap) => {
-        const list: Competition[] = [];
-        snap.forEach((d) => list.push(parseComp(d.id, d.data())));
-        this.competitions.set(list);
-      },
-      (err) => {
-        console.error('[dev-tools] competitions listener failed', err);
-      },
-    );
-    this.destroyRef.onDestroy(() => unsub());
-  }
 
   // --------------------------------------------------------------------------
   // Competitions
@@ -488,40 +463,3 @@ export class DevToolsComponent {
   }
 }
 
-/**
- * Adapts a raw Firestore document into our typed Competition shape.
- * Tolerant of missing/legacy fields so a partially-written doc never
- * blows up the live listener.
- */
-function parseComp(id: string, data: DocumentData): Competition {
-  const area = (data['area'] ?? {}) as Record<string, unknown>;
-  const season = data['currentSeason'] as Record<string, unknown> | null | undefined;
-  return {
-    id,
-    fdId: typeof data['fdId'] === 'number' ? data['fdId'] : 0,
-    name: typeof data['name'] === 'string' ? data['name'] : id,
-    emblem: typeof data['emblem'] === 'string' ? data['emblem'] : null,
-    type: (data['type'] === 'CUP' ? 'CUP' : 'LEAGUE') satisfies CompetitionType,
-    plan: typeof data['plan'] === 'string' ? data['plan'] : null,
-    area: {
-      id: typeof area['id'] === 'number' ? area['id'] : 0,
-      name: typeof area['name'] === 'string' ? area['name'] : '',
-      code: typeof area['code'] === 'string' ? area['code'] : null,
-      flag: typeof area['flag'] === 'string' ? area['flag'] : null,
-    },
-    currentSeason: season
-      ? {
-          id: typeof season['id'] === 'number' ? season['id'] : 0,
-          startDate:
-            typeof season['startDate'] === 'string' ? season['startDate'] : '',
-          endDate: typeof season['endDate'] === 'string' ? season['endDate'] : '',
-          currentMatchday:
-            typeof season['currentMatchday'] === 'number'
-              ? season['currentMatchday']
-              : null,
-        }
-      : null,
-    active: data['active'] === true,
-    hasGlobalLeague: data['hasGlobalLeague'] === true,
-  };
-}
