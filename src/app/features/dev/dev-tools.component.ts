@@ -215,6 +215,49 @@ export class DevToolsComponent {
   }
 
   // --------------------------------------------------------------------------
+  // Multi-comp migration
+  // --------------------------------------------------------------------------
+
+  /**
+   * Fires the one-shot data backfill that tags legacy WC fixtures /
+   * leagues with `(competitionId='WC', season='2026')` and mirrors
+   * users' nested totals into the per-comp shard at
+   * `users/{uid}/totals/WC_2026`.
+   *
+   * Safe to re-run — every write is idempotent. Refuses if the WC
+   * competition doc hasn't been synced yet (precondition surfaced as
+   * a permission-style error from the callable).
+   */
+  protected async runMultiCompMigration(): Promise<void> {
+    this.running.set(true);
+    try {
+      const call = httpsCallable<
+        unknown,
+        {
+          ok: boolean;
+          fixturesBackfilled: number;
+          leaguesBackfilled: number;
+          usersMigrated: number;
+          usersSkipped: number;
+        }
+      >(this.functions, 'migrateToMultiComp');
+      const res = await call({});
+      const { fixturesBackfilled, leaguesBackfilled, usersMigrated, usersSkipped } = res.data;
+      this.snackBar.open(
+        `Migration ok · fixtures ${fixturesBackfilled} · leagues ${leaguesBackfilled} · users ${usersMigrated} (+${usersSkipped} skipped)`,
+        undefined,
+        { duration: 5000 },
+      );
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Migration failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 6000 });
+      console.error('migrateToMultiComp failed', e);
+    } finally {
+      this.running.set(false);
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Fixture state
   // --------------------------------------------------------------------------
 

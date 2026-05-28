@@ -90,6 +90,46 @@
       </mat-card>
 
       <!-- ===================================================================
+           Multi-comp migration (one-shot at cutover)
+           Tags every WC fixture + league with (compId='WC', season='2026')
+           and mirrors the legacy users/{uid}.totals.* into per-comp shards.
+           Idempotent — re-runs reconcile rather than double-count.
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar class="warn">swap_horiz</mat-icon>
+          <mat-card-title>Multi-comp migration</mat-card-title>
+          <mat-card-subtitle>
+            One-shot backfill at cutover · safe to re-run · requires WC sync first
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p class="hint">
+            Tags every legacy WC fixture and league with <code>(WC, 2026)</code>
+            and mirrors each user's <code>totals</code> nested field into
+            <code>users/{{ '{' }}uid{{ '}' }}/totals/WC_2026</code>.
+            Sync competitions first if you haven't already.
+          </p>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button
+            type="button"
+            mat-flat-button
+            color="primary"
+            [disabled]="running()"
+            (click)="runMultiCompMigration()"
+          >
+            @if (running()) {
+              <mat-progress-spinner mode="indeterminate" diameter="20" />
+            } @else {
+              <mat-icon>play_arrow</mat-icon>
+            }
+            <span>{{ running() ? 'Migrating…' : 'Run migration' }}</span>
+          </button>
+        </mat-card-actions>
+      </mat-card>
+
+      <!-- ===================================================================
            Fixture state control
       ==================================================================== -->
       <mat-card appearance="outlined">
