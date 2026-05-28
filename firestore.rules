@@ -110,6 +110,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ----- users/{uid}/totals/{compId_season} ------------------------------
+    //
+    // Per-competition score shard. One doc per (user, comp, season), each
+    // carrying that comp's running totals: total, match, podium, bracket,
+    // exactScoreHits, correctOutcomeHits, updatedAt.
+    //
+    // Read open to any signed-in user — mirrors the policy on the parent
+    // /users/{uid} doc (which has always been world-readable so leaderboards
+    // can render names + totals). LIST is allowed so the lifetime-totals
+    // card can sum across every shard for a user in one query; without it
+    // the card would need to read each (compId, season) shard by name,
+    // which it can't enumerate without listing.
+    //
+    // Writes are server-only — the scoreMatch trigger updates totals via
+    // Admin SDK (which bypasses rules), and the migrateToMultiComp admin
+    // callable does the initial backfill. Clients never write here.
+
+    match /users/{uid}/totals/{shardId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ----- fixtures --------------------------------------------------------
     //
     // World-readable (for any signed-in user). All writes server-only.
@@ -146,12 +168,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ----- cache/teams -----------------------------------------------------
+    // ----- cache/* ---------------------------------------------------------
     //
-    // Aggregated rollup of every team doc, rewritten by pollTeams on every
-    // run. Clients (TeamsService) read this single document instead of
-    // querying the entire `teams` collection, saving ~48 reads per cold
-    // cache miss.
+    // Aggregated rollups maintained by the Cloud Function pollers, read by
+    // the client to avoid expensive collection-wide reads. Single-segment
+    // wildcard so every doc directly under `cache/` is covered:
+    //
+    //   - cache/teams           — rollup of every team doc (pollTeams)
+    //   - cache/fixtures        — legacy WC-only fixtures rollup, kept
+    //                             during the multi-comp cutover window
+    //   - cache/fixtures-{cId}  — per-competition fixtures rollup
+    //                             (pollFootballData)
+    //   - cache/standings-{cId} — per-competition real standings
+    //                             snapshot (added in task #66)
+    //
+    // World-readable for signed-in users; all writes server-only.
 
     match /cache/{doc} {
       allow read: if isSignedIn();
