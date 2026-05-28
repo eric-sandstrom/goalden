@@ -46,7 +46,27 @@
                 }
               </span>
             </mat-card-title>
-            <mat-card-subtitle>{{ headerSubtitle() }}</mat-card-subtitle>
+            <mat-card-subtitle>
+              <span class="subtitle-meta">
+                <!-- Competition pill — surfaces which comp this league
+                     predicts on (e.g. World Cup 2026, Premier League
+                     2025). Renders the emblem inline when the catalogue
+                     entry has one. -->
+                <span class="comp-pill">
+                  @if (competition()?.emblem) {
+                    <img
+                      class="comp-pill-crest"
+                      [src]="competition()!.emblem!"
+                      [alt]="competition()!.name + ' emblem'"
+                      width="14"
+                      height="14"
+                    />
+                  }
+                  <span>{{ competition()?.name ?? league()!.competitionId }} · {{ league()!.season }}</span>
+                </span>
+                <span class="subtitle-text">{{ headerSubtitle() }}</span>
+              </span>
+            </mat-card-subtitle>
 
             <!-- Top-right: QR (when there's an invite code to share) +
                  settings button. The settings dropdown contains
@@ -107,10 +127,13 @@
         </mat-card>
 
         <!-- Predict-next card: drop in one outstanding fixture for the
-             league's competition. Today every league shares the same
-             World Cup fixture pool; once leagues become multi-competition
-             this card will read a leagueId-scoped fixture source. -->
-        <app-predict-next-card />
+             league's competition. Inputs scope the card to the league's
+             (comp, season) so a Premier League card surfaces EPL
+             fixtures, WC card surfaces WC fixtures, etc. -->
+        <app-predict-next-card
+          [competitionId]="league()!.competitionId"
+          [season]="league()!.season"
+        />
 
         <mat-card appearance="outlined" class="table-wrap card-grow">
           <div class="card-scroll">

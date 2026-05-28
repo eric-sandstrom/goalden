@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -39,12 +39,21 @@ export class PredictNextCardComponent {
   private readonly predictions = inject(PredictionsService);
 
   /**
-   * Hardcoded to WC — this card is currently embedded in surfaces that
-   * are WC-only (league detail for the WC global league). The league-
-   * detail refactor in task #76 turns this into an input so the card
-   * picks up the host league's (compId, season).
+   * The (comp, season) this card pulls fixtures from. Supplied by the
+   * host surface (league detail) so the card naturally scopes to the
+   * league's competition without each consumer needing to filter
+   * downstream. Defaults exist so any future caller without context
+   * still gets a working WC card.
    */
-  private readonly compFixtures = this.fixtures.fixturesFor('WC', '2026');
+  readonly competitionId = input<string>('WC');
+  readonly season = input<string>('2026');
+
+  /** Per-comp fixture signal — recomputes when the inputs change so a
+   *  parent swapping leagues (e.g. via routing) re-points the card
+   *  without needing to tear it down. */
+  private readonly compFixtures = computed<readonly Fixture[]>(() =>
+    this.fixtures.fixturesFor(this.competitionId(), this.season())(),
+  );
 
   /** ID of the fixture currently shown. Stays put across predict
    *  submissions so the user only sees a new fixture when they ask for
@@ -92,9 +101,7 @@ export class PredictNextCardComponent {
    *  starts at …" rather than feeling like a dead end. */
   protected readonly nextLockedFixture = computed<Fixture | null>(() => {
     const now = Date.now();
-    return (
-      this.compFixtures().find((f) => f.utcKickoff.getTime() > now) ?? null
-    );
+    return this.compFixtures().find((f) => f.utcKickoff.getTime() > now) ?? null;
   });
 
   /** Whether there's another unpredicted fixture *besides* the one currently
@@ -115,9 +122,23 @@ export class PredictNextCardComponent {
   });
 
   constructor() {
+    // Clear the sticky current-fixture id when the (comp, season) inputs
+    // change. Otherwise we'd carry a stale match id across competitions
+    // and end up looking it up against the wrong comp's fixturesById
+    // map (which currently spans every loaded comp — the id might
+    // even resolve, but to a fixture from the previous league's comp).
+    effect(() => {
+      // Read both inputs so the effect re-runs when either changes.
+      void this.competitionId();
+      void this.season();
+      this.currentFixtureId.set(null);
+    });
+
     // Seed the current fixture once data arrives. Don't overwrite an
     // existing selection — that would defeat the "stay until Next is
-    // pressed" behaviour.
+    // pressed" behaviour. Runs after the input-change effect above
+    // because that one clears `currentFixtureId` to null, which then
+    // lets this effect re-seed against the new comp's unpredicted list.
     effect(() => {
       const list = this.unpredicted();
       const already = untracked(() => this.currentFixtureId());

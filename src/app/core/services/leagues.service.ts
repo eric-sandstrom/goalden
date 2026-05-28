@@ -281,6 +281,41 @@ export class LeaguesService {
     return result;
   }
 
+  /**
+   * Fetches each member's per-(comp, season) totals shard. Used by the
+   * league detail leaderboard to render points scoped to that league's
+   * competition rather than the legacy global `users/{uid}.totals`
+   * nested field (which only carries WC data during the dual-write
+   * window and would show 0 for non-WC leagues).
+   *
+   * One round-trip per member doc — Firestore doesn't have a "batch
+   * get by full path" primitive in the client SDK. For a 500-member
+   * league that's 500 reads on each load; acceptable today and could
+   * later be optimized via a denormalized leaderboard collection if
+   * needed.
+   */
+  async getMemberTotals(
+    uids: readonly string[],
+    competitionId: string,
+    season: string,
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const result = new Map<string, Record<string, unknown>>();
+    if (uids.length === 0) return result;
+    const shardId = `${competitionId}_${season}`;
+    const settled = await Promise.allSettled(
+      uids.map(async (uid) => {
+        const snap = await getDoc(doc(this.db, `users/${uid}/totals/${shardId}`));
+        return { uid, data: snap.exists() ? snap.data() : null };
+      }),
+    );
+    for (const entry of settled) {
+      if (entry.status !== 'fulfilled') continue;
+      const { uid, data } = entry.value;
+      if (data) result.set(uid, data);
+    }
+    return result;
+  }
+
   // ---------------------------------------------------------------------------
   // Callable wrappers
   // ---------------------------------------------------------------------------

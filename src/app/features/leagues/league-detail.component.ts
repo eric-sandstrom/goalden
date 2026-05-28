@@ -24,6 +24,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { AuthService } from '../../core/services/auth.service';
+import { CompetitionsService } from '../../core/services/competitions.service';
 import { LeaguesService } from '../../core/services/leagues.service';
 import { parseTotals } from '../../core/services/user.service';
 import { League, LeagueMember } from '../../core/models/league.model';
@@ -65,6 +66,7 @@ export class LeagueDetailComponent {
   readonly leagueId = input.required<string>();
 
   private readonly leagues = inject(LeaguesService);
+  private readonly competitionsService = inject(CompetitionsService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
@@ -73,6 +75,12 @@ export class LeagueDetailComponent {
 
   private readonly _members = signal<readonly LeagueMember[]>([]);
   private readonly _memberUsers = signal<ReadonlyMap<string, Record<string, unknown>>>(new Map());
+  /** Per-(comp, season) totals shards keyed by uid. Scoped to the
+   *  league's competition so a Premier League leaderboard shows only
+   *  EPL points, even if those members also have WC predictions. */
+  private readonly _memberTotals = signal<ReadonlyMap<string, Record<string, unknown>>>(
+    new Map(),
+  );
 
   // Read league data directly from the LeaguesService cache instead of opening
   // a second listener for the same doc — saves one Firestore listener per
@@ -88,6 +96,15 @@ export class LeagueDetailComponent {
     const l = this.league();
     const uid = this.auth.uid();
     return !!l && !!uid && l.ownerId === uid;
+  });
+
+  /** Catalogue entry for the league's competition. Drives the comp
+   *  emblem + name in the header chip; null while the competitions
+   *  collection is still hydrating. */
+  protected readonly competition = computed(() => {
+    const l = this.league();
+    if (!l) return null;
+    return this.competitionsService.byId(l.competitionId);
   });
 
   // ---------------------------------------------------------------------------
@@ -158,16 +175,20 @@ export class LeagueDetailComponent {
   protected readonly rows = computed<readonly LeagueRow[]>(() => {
     const members = this._members();
     const users = this._memberUsers();
+    const totals = this._memberTotals();
     const list = members.map((m) => {
       const u = users.get(m.uid) ?? {};
-      const totals = parseTotals((u as Record<string, unknown>)['totals']);
+      // Per-(comp, season) shard if present — otherwise zeros. A
+      // missing shard means the member hasn't scored in this comp yet
+      // (or has never been scored at all if the season hasn't started).
+      const t = parseTotals(totals.get(m.uid));
       return {
         uid: m.uid,
         displayName: (u['displayName'] as string) ?? 'Unknown',
         photoURL: (u['photoURL'] as string | null) ?? null,
-        totalPoints: totals.total,
-        exactHits: totals.exactScoreHits,
-        outcomeHits: totals.correctOutcomeHits,
+        totalPoints: t.total,
+        exactHits: t.exactScoreHits,
+        outcomeHits: t.correctOutcomeHits,
         role: m.role,
       };
     });
@@ -190,6 +211,7 @@ export class LeagueDetailComponent {
       if (!id) {
         this._members.set([]);
         this._memberUsers.set(new Map());
+        this._memberTotals.set(new Map());
         return;
       }
 
@@ -204,16 +226,37 @@ export class LeagueDetailComponent {
         const missing = members
           .map((m) => m.uid)
           .filter((uid) => !cached.has(uid));
-        if (missing.length === 0) return;
+        if (missing.length > 0) {
+          try {
+            const fresh = await this.leagues.getMemberUserDocs(missing);
+            if (fresh.size > 0) {
+              const next = new Map(this._memberUsers());
+              for (const [uid, data] of fresh) next.set(uid, data);
+              this._memberUsers.set(next);
+            }
+          } catch (e: unknown) {
+            console.error('[LeagueDetail] user-doc fetch failed:', e);
+          }
+        }
 
+        // Per-comp totals — always refetched for every member on every
+        // snapshot, because totals tick up live as scoreMatch runs and
+        // we want the leaderboard to follow. Caching by uid here would
+        // staleness the very thing the leaderboard exists to surface.
+        const league = this.league();
+        if (!league || members.length === 0) {
+          if (members.length === 0) this._memberTotals.set(new Map());
+          return;
+        }
         try {
-          const fresh = await this.leagues.getMemberUserDocs(missing);
-          if (fresh.size === 0) return;
-          const next = new Map(this._memberUsers());
-          for (const [uid, data] of fresh) next.set(uid, data);
-          this._memberUsers.set(next);
+          const fresh = await this.leagues.getMemberTotals(
+            members.map((m) => m.uid),
+            league.competitionId,
+            league.season,
+          );
+          this._memberTotals.set(fresh);
         } catch (e: unknown) {
-          console.error('[LeagueDetail] user-doc fetch failed:', e);
+          console.error('[LeagueDetail] per-comp totals fetch failed:', e);
         }
       });
 

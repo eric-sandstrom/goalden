@@ -35,6 +35,32 @@
       background-color: color-mix(in srgb, var(--mat-sys-primary) 18%, transparent) !important;
       color: var(--mat-sys-on-primary-container) !important;
     }
+    /* Competition pill in the subtitle — small emblem + name + season.
+       Goes first in subtitle-meta so it reads as the league's
+       anchoring context, with the membership/role line as the
+       follow-up after the visual separator. */
+    .subtitle-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .comp-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78rem;
+      color: var(--mat-sys-on-surface-variant);
+      font-weight: 500;
+    }
+    .comp-pill-crest {
+      width: 14px;
+      height: 14px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .subtitle-text {
+      font-size: 0.8rem;
+    }
     /* Tint the header avatar icon for global leagues so the page feels
        distinct top-to-bottom, not just a chip in the corner. */
     .type-global {
