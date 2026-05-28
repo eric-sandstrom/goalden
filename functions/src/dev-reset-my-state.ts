@@ -11,9 +11,14 @@ import { requireAdminOrEmulator } from './lib/admin-check';
  * Flags (all default false — caller must opt in explicitly):
  *   - `clearMatchPredictions`: delete every doc under predictions/{uid}/matches
  *   - `clearPodium`: delete predictions/{uid}/podium/picks
- *   - `resetTotals`: zero out users/{uid}.totals
+ *   - `resetTotals`: zero out the legacy users/{uid}.totals nested field
+ *     AND delete every per-comp totals shard under
+ *     users/{uid}/totals/{compId_season}. Both are touched because
+ *     during the multi-comp cutover the scoring engine dual-writes WC
+ *     points to both locations — clearing only one leaves the other
+ *     stale and confuses the UI.
  *
- * Emulator-only.
+ * Admin-gated so this can run in production (friends-test workflow).
  */
 export const devResetMyState = onCall(
   { region: 'europe-west1' },
@@ -36,6 +41,7 @@ export const devResetMyState = onCall(
 
     const db = getFirestore();
     let deletedMatches = 0;
+    let deletedShards = 0;
 
     // Match predictions live in their own subcollection — we need to fetch
     // every doc ref to delete them. Batches are capped at 500 ops; if a user
@@ -56,13 +62,18 @@ export const devResetMyState = onCall(
     }
 
     if (resetTotals) {
+      // 1) Zero out the legacy nested totals on the user doc. Uses the
+      //    same field names the scoring engine writes (`total`, `match`,
+      //    `podium`, `bracket`, `exactScoreHits`, `correctOutcomeHits`)
+      //    so the readers actually see zeros instead of stale stats
+      //    sitting next to fresh zeros under different names.
       await db.doc(`users/${uid}`).set(
         {
           totals: {
-            totalPoints: 0,
-            matchPoints: 0,
-            podiumPoints: 0,
-            bracketPoints: 0,
+            total: 0,
+            match: 0,
+            podium: 0,
+            bracket: 0,
             exactScoreHits: 0,
             correctOutcomeHits: 0,
             updatedAt: FieldValue.serverTimestamp(),
@@ -70,10 +81,24 @@ export const devResetMyState = onCall(
         },
         { merge: true },
       );
+
+      // 2) Delete every per-comp totals shard. We could `set` zeros
+      //    instead, but the shard is fully derived from prediction
+      //    points so deletion is cleaner — next scored prediction
+      //    creates the shard fresh. Chunked into batches the same
+      //    way we delete match predictions.
+      const shardsSnap = await db.collection(`users/${uid}/totals`).get();
+      const shards = shardsSnap.docs;
+      for (let i = 0; i < shards.length; i += 400) {
+        const batch = db.batch();
+        for (const d of shards.slice(i, i + 400)) batch.delete(d.ref);
+        await batch.commit();
+      }
+      deletedShards = shards.length;
     }
 
     logger.info(
-      `devResetMyState: uid=${uid} matches=${clearMatchPredictions ? deletedMatches : 'skip'} podium=${clearPodium} totals=${resetTotals}`,
+      `devResetMyState: uid=${uid} matches=${clearMatchPredictions ? deletedMatches : 'skip'} podium=${clearPodium} totals=${resetTotals} shards=${deletedShards}`,
     );
 
     return {
@@ -81,6 +106,7 @@ export const devResetMyState = onCall(
       deletedMatches,
       clearedPodium: clearPodium,
       resetTotals,
+      deletedShards,
     };
   },
 );
