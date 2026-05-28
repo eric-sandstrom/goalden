@@ -65,10 +65,32 @@ export class CompetitionsService {
   readonly competitions: Signal<readonly Competition[]> = this._competitions.asReadonly();
   readonly loaded: Signal<boolean> = this._loaded.asReadonly();
 
-  /** Subset that's currently being polled by pollFootballData. Drives
-   *  which comps appear in the Predict tab + the create-league picker. */
+  /** Subset that's currently being polled by pollFootballData. Used
+   *  internally and by admin surfaces; user-facing pickers use the
+   *  season-aware `selectableCompetitions` below instead. */
   readonly activeCompetitions = computed(() =>
     this._competitions().filter((c) => c.active),
+  );
+
+  /**
+   * Subset surfaced to users in pickers (create-league, Predict tabs).
+   * A comp is "selectable" when its `currentSeason.endDate` is in the
+   * future — that auto-includes upcoming comps (WC before kickoff) and
+   * auto-excludes comps whose season just ended (EPL 2025–26 the
+   * moment football-data hasn't yet flipped currentSeason to 2026–27).
+   *
+   * Comps with no currentSeason at all are kept in the list — those
+   * are typically freshly-synced entries where football-data hasn't
+   * surfaced season metadata yet; hiding them would create a chicken-
+   * and-egg problem.
+   *
+   * The `active` flag is NOT consulted here. Admins can activate a
+   * comp early (to seed fixtures) without making it disappear post-
+   * season, and a comp can be selectable before polling starts so
+   * users can pre-create leagues for upcoming tournaments.
+   */
+  readonly selectableCompetitions = computed(() =>
+    this._competitions().filter(isSelectable),
   );
 
   /** O(1) lookup by shortcode (e.g. 'WC', 'PL'). Used everywhere a
@@ -80,22 +102,21 @@ export class CompetitionsService {
     return m;
   });
 
-  /** Active competitions partitioned by football-data type — used by
-   *  the create-league picker to render the Tournaments / Domestic
-   *  Leagues optgroups. CUP covers WC, Euros, CL, EL etc.; LEAGUE
-   *  covers EPL, La Liga, etc. Hybrid formats (Championship-style)
-   *  collapse into LEAGUE since they share the round-robin spine. */
+  /** Active competitions partitioned by football-data type. Kept for
+   *  admin surfaces that want to see polling state at a glance. */
   readonly activeByType = computed<{
     readonly leagues: readonly Competition[];
     readonly cups: readonly Competition[];
-  }>(() => {
-    const leagues: Competition[] = [];
-    const cups: Competition[] = [];
-    for (const c of this.activeCompetitions()) {
-      (c.type === 'CUP' ? cups : leagues).push(c);
-    }
-    return { leagues, cups };
-  });
+  }>(() => partitionByType(this.activeCompetitions()));
+
+  /** Selectable competitions partitioned by football-data type — the
+   *  source for the create-league picker's Tournaments / Domestic
+   *  Leagues optgroups. Uses the same season-aware filter as
+   *  `selectableCompetitions`. */
+  readonly selectableByType = computed<{
+    readonly leagues: readonly Competition[];
+    readonly cups: readonly Competition[];
+  }>(() => partitionByType(this.selectableCompetitions()));
 
   constructor() {
     // 1. Cache hydration. Lets first paint of any signed-in surface
@@ -177,6 +198,41 @@ export class CompetitionsService {
 // =============================================================================
 // Firestore document parsing
 // =============================================================================
+
+/**
+ * True when the competition's `currentSeason.endDate` is in the future
+ * (the season is upcoming or in progress), OR no season metadata is
+ * known yet. Used to gate which comps users can create leagues for —
+ * past seasons are out of scope, but freshly-synced comps stay
+ * available until football-data populates their season info.
+ */
+function isSelectable(c: Competition): boolean {
+  if (!c.currentSeason) return true;
+  const endDate = c.currentSeason.endDate;
+  if (!endDate) return true;
+  // YYYY-MM-DD parsed by Date → midnight UTC. That's accurate enough
+  // for "has this season wrapped up". Tournaments end on a specific
+  // calendar day; whatever timezone the user is in, we want the
+  // comp to disappear roughly when the trophy is lifted.
+  const end = new Date(endDate).getTime();
+  if (Number.isNaN(end)) return true; // unparseable string → don't filter out
+  return end > Date.now();
+}
+
+/** Splits a competition list into the CUP / LEAGUE buckets the picker
+ *  uses for its optgroups. Hybrid formats collapse into LEAGUE since
+ *  they share the round-robin spine. */
+function partitionByType(comps: readonly Competition[]): {
+  readonly leagues: readonly Competition[];
+  readonly cups: readonly Competition[];
+} {
+  const leagues: Competition[] = [];
+  const cups: Competition[] = [];
+  for (const c of comps) {
+    (c.type === 'CUP' ? cups : leagues).push(c);
+  }
+  return { leagues, cups };
+}
 
 /**
  * Adapts a raw Firestore doc into the typed Competition shape. Tolerant

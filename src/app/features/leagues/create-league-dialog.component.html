@@ -23,7 +23,7 @@
           <mat-label>Competition</mat-label>
           <mat-select
             formControlName="competitionId"
-            [disabled]="noActiveComps()"
+            [disabled]="noSelectableComps()"
             panelClass="comp-picker-panel"
           >
             @if (groupedComps().cups.length > 0) {
@@ -71,10 +71,10 @@
               </mat-optgroup>
             }
           </mat-select>
-          @if (noActiveComps()) {
+          @if (noSelectableComps()) {
             <mat-hint>
-              No competitions enabled yet — an admin needs to activate one
-              in dev tools.
+              No upcoming or in-progress competitions found — an admin
+              needs to sync the catalogue from football-data first.
             </mat-hint>
           }
         </mat-form-field>
@@ -107,7 +107,7 @@
         mat-flat-button
         color="primary"
         (click)="submit()"
-        [disabled]="form.invalid || creating() || noActiveComps()"
+        [disabled]="form.invalid || creating() || noSelectableComps()"
       >
         @if (creating()) {
           <mat-progress-spinner mode="indeterminate" diameter="20" />

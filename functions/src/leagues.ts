@@ -28,14 +28,18 @@ function validName(name: unknown): name is string {
 }
 
 /**
- * Looks up the competition doc and asserts it's active. Throws an
- * HttpsError that the client surfaces as a snackbar — the create-
- * league dialog never has access to the active flag itself (it only
- * sees competitions where active==true via CompetitionsService), so
- * "comp is inactive" only happens when something's drifted between
- * the dialog opening and submit being clicked.
+ * Looks up the competition doc and asserts it exists. The `active`
+ * flag is intentionally NOT consulted here — that flag is the polling
+ * switch, not a user-facing gate. Admins might activate WC weeks
+ * before kickoff (to seed fixtures), or leave a comp active for a
+ * day after its final to let scoreMatch catch up; neither state
+ * should block users from creating leagues against the comp.
+ *
+ * The client-side picker filters comps by `currentSeason.endDate >
+ * now` so just-ended seasons don't appear; the server is the
+ * defence-in-depth check for "comp actually exists in the catalogue."
  */
-async function assertActiveCompetition(
+async function assertCompetitionExists(
   db: FirebaseFirestore.Firestore,
   compId: string,
 ): Promise<void> {
@@ -44,13 +48,6 @@ async function assertActiveCompetition(
     throw new HttpsError(
       'not-found',
       `Competition '${compId}' not found. Has it been synced from football-data?`,
-    );
-  }
-  const data = snap.data() ?? {};
-  if (data['active'] !== true) {
-    throw new HttpsError(
-      'failed-precondition',
-      `Competition '${compId}' is not active. Ask an admin to enable it before creating a league.`,
     );
   }
 }
@@ -106,7 +103,7 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
   const { competitionId, season } = parseCompTag(request.data);
 
   const db = getFirestore();
-  await assertActiveCompetition(db, competitionId);
+  await assertCompetitionExists(db, competitionId);
 
   const inviteCode = await generateUniqueInviteCode();
   const leagueRef = db.collection('leagues').doc();

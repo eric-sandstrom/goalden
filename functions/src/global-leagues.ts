@@ -143,12 +143,9 @@ export const createGlobalLeague = onCall(
         `Competition '${competitionId}' not found. Sync it from football-data first.`,
       );
     }
-    if (compSnap.data()?.['active'] !== true) {
-      throw new HttpsError(
-        'failed-precondition',
-        `Competition '${competitionId}' is not active. Activate it before spinning up a global league.`,
-      );
-    }
+    // No `active` check — global leagues are admin-curated. The admin
+    // might want to spin one up before activating polling (e.g. WC
+    // months ahead of kickoff). The catalogue having a doc is enough.
 
     const leagueRef = db.collection('leagues').doc();
 

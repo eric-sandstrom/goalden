@@ -47,15 +47,23 @@ export class CreateLeagueDialogComponent {
   /** Pre-grouped by football-data `type` for the optgroup layout. CUP
    *  becomes "Tournaments" (WC, Euros, CL, EL); LEAGUE becomes "Domestic
    *  leagues" (EPL, La Liga, Bundesliga, ...). Each group is sorted by
-   *  display name in CompetitionsService. */
-  protected readonly groupedComps = this.competitionsService.activeByType;
-  protected readonly activeComps = this.competitionsService.activeCompetitions;
+   *  display name in CompetitionsService.
+   *
+   *  Uses the season-aware `selectable*` set rather than the polling-
+   *  active set — surfaces upcoming comps (WC before kickoff) and
+   *  drops just-ended ones (EPL between seasons). The `active` flag is
+   *  intentionally not consulted here; it's purely a polling switch. */
+  protected readonly groupedComps = this.competitionsService.selectableByType;
+  protected readonly selectableComps = this.competitionsService.selectableCompetitions;
 
-  /** True only when no comp is available to pick — happens during the
-   *  cutover window before any has been toggled active. Disables the
-   *  Create button with a clear inline hint rather than letting the
-   *  user submit and get a server-side error. */
-  protected readonly noActiveComps = computed(() => this.activeComps().length === 0);
+  /** True when no comp is available to pick. Disables the Create button
+   *  with a clear inline hint rather than letting the user submit and
+   *  get a server-side error. Empty state happens when (a) the comp
+   *  catalogue hasn't been synced yet, or (b) every synced comp has a
+   *  past-end-date season. */
+  protected readonly noSelectableComps = computed(
+    () => this.selectableComps().length === 0,
+  );
 
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(40)]],
@@ -64,18 +72,18 @@ export class CreateLeagueDialogComponent {
   });
 
   constructor() {
-    // Seed the picker default once active comps arrive. Use WC if it's
-    // among them; otherwise fall back to whatever's first (alphabetical
-    // order from the service). Only sets the value if the user hasn't
-    // touched it — guards against clobbering an in-progress selection
-    // when the live listener re-emits.
+    // Seed the picker default once selectable comps arrive. Use WC if
+    // it's among them; otherwise fall back to whatever's first
+    // (alphabetical order from the service). Only sets the value if the
+    // user hasn't touched it — guards against clobbering an in-progress
+    // selection when the live listener re-emits.
     effect(() => {
-      const active = this.activeComps();
-      if (active.length === 0) return;
+      const selectable = this.selectableComps();
+      if (selectable.length === 0) return;
       const ctrl = this.form.controls.competitionId;
       if (ctrl.touched || ctrl.value) return;
       const preferred =
-        active.find((c) => c.id === PREFERRED_DEFAULT_COMP_ID) ?? active[0];
+        selectable.find((c) => c.id === PREFERRED_DEFAULT_COMP_ID) ?? selectable[0];
       ctrl.setValue(preferred.id);
     });
   }
