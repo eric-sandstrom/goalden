@@ -204,6 +204,13 @@ export class LeaguesService {
       name: (data['name'] as string) ?? '',
       type,
       globalConfig,
+      // Legacy leagues from before multi-comp lack these fields entirely.
+      // Default both to WC/2026 — the only thing every existing league is.
+      // migrateToMultiComp persists explicit values so the fallback only
+      // activates during the cutover gap.
+      competitionId:
+        typeof data['competitionId'] === 'string' ? data['competitionId'] : 'WC',
+      season: typeof data['season'] === 'string' ? data['season'] : '2026',
       ownerId: (data['ownerId'] as string) ?? '',
       inviteCode: (data['inviteCode'] as string) ?? '',
       memberCount: (data['memberCount'] as number) ?? 0,
@@ -278,15 +285,39 @@ export class LeaguesService {
   // Callable wrappers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Creates a private or public league tied to a specific (comp, season).
+   * Both `competitionId` and `season` are immutable after creation — the
+   * league's leaderboard, predicted standings, and fixture scope are all
+   * derived from this pair. The callable server-side (see task #73)
+   * validates that the comp exists in `competitions/` and rejects
+   * unknown shortcodes.
+   *
+   * Defaults exist so callers that haven't been multi-comp-aware'd yet
+   * (e.g. legacy create-league UI surfaces) still produce a working WC
+   * league. Once task #74 lands the comp picker, callers always pass
+   * an explicit competitionId.
+   */
   async createLeague(
     name: string,
     type: 'private' | 'public' = 'private',
-  ): Promise<{ leagueId: string; inviteCode: string; type: 'private' | 'public' }> {
+    competitionId: string = 'WC',
+    season: string = '2026',
+  ): Promise<{
+    leagueId: string;
+    inviteCode: string;
+    type: 'private' | 'public';
+  }> {
     const call = httpsCallable<
-      { name: string; type: 'private' | 'public' },
+      {
+        name: string;
+        type: 'private' | 'public';
+        competitionId: string;
+        season: string;
+      },
       { leagueId: string; inviteCode: string; type: 'private' | 'public' }
     >(this.functions, 'createLeague');
-    const res = await call({ name, type });
+    const res = await call({ name, type, competitionId, season });
     return res.data;
   }
 

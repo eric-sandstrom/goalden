@@ -39,6 +39,23 @@ export interface League {
   readonly type: LeagueType;
   /** Only present when `type === 'global'`. Null for private leagues. */
   readonly globalConfig: LeagueGlobalConfig | null;
+  /**
+   * Football-data competition shortcode this league predicts on
+   * (e.g. `'WC'`, `'PL'`, `'CL'`). Immutable after league creation.
+   * Defaults to `'WC'` in the client parser for legacy leagues that
+   * pre-date multi-competition; the `migrateToMultiComp` admin
+   * callable backfills the real field on the league doc so the
+   * fallback eventually stops activating.
+   */
+  readonly competitionId: string;
+  /**
+   * Season identifier — uses the starting calendar year (e.g. `'2025'`
+   * for EPL 2025–26, `'2026'` for WC 2026, Allsvenskan 2026). Paired
+   * with `competitionId` to form the totals-shard key
+   * `${competitionId}_${season}` and to scope fixture queries.
+   * Defaults to `'2026'` for legacy leagues, same migration path.
+   */
+  readonly season: string;
   /** Empty string for global leagues (they have no owner). */
   readonly ownerId: string;
   /** Empty string for global leagues (no invite mechanism). */
