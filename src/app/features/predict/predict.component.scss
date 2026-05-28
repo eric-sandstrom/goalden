@@ -6,6 +6,53 @@
   overflow: hidden;
   width: 100%;
 }
+
+/* Comp tab bar — top-level competition selector. Sits above the
+   status filter chips. Hidden when there's only one comp to show.
+   Layout: tabs scroll horizontally on narrow viewports; the show-all
+   icon button hugs the right edge as a fixed-width sibling. */
+.comp-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: stretch;
+  flex: 0 0 auto;
+}
+.comp-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+.comp-tabs .mat-button-toggle,
+.comp-tabs .mat-button-toggle .mat-button-toggle-button {
+  height: 40px;
+}
+.comp-tab-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.comp-tab-crest {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.comp-tab-label {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.show-all-toggle {
+  flex: 0 0 auto;
+  /* When the show-all expansion is active, tint the icon so the user
+     can tell at a glance that they're in 'see comps I'm not in' mode. */
+  &.active {
+    color: var(--mat-sys-primary);
+  }
+}
+
+/* Status filter chips — same layout as before; sits directly under
+   the comp tabs (when visible). */
 mat-button-toggle-group {
   align-self: stretch;
   overflow-x: auto;

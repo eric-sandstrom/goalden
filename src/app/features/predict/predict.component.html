@@ -1,4 +1,45 @@
 <section class="page">
+  @if (showTabBar()) {
+    <div class="comp-bar">
+      <mat-button-toggle-group
+        class="comp-tabs"
+        [value]="selectedComp()?.key"
+        (change)="selectComp($event.value)"
+        hideSingleSelectionIndicator
+        aria-label="Select competition"
+      >
+        @for (tab of visibleComps(); track tab.key) {
+          <mat-button-toggle [value]="tab.key" [attr.aria-label]="tab.comp.name">
+            <span class="comp-tab-inner">
+              @if (tab.comp.emblem) {
+                <img
+                  class="comp-tab-crest"
+                  [src]="tab.comp.emblem"
+                  [alt]="tab.comp.name + ' emblem'"
+                  width="20"
+                  height="20"
+                />
+              }
+              <span class="comp-tab-label">{{ tab.comp.id }}</span>
+            </span>
+          </mat-button-toggle>
+        }
+      </mat-button-toggle-group>
+
+      <button
+        type="button"
+        mat-icon-button
+        class="show-all-toggle"
+        [class.active]="showAll()"
+        (click)="toggleShowAll()"
+        [attr.aria-label]="showAll() ? 'Show only my competitions' : 'Show all competitions'"
+        [attr.title]="showAll() ? 'Show only my competitions' : 'Show all competitions'"
+      >
+        <mat-icon>{{ showAll() ? 'filter_alt_off' : 'filter_alt' }}</mat-icon>
+      </button>
+    </div>
+  }
+
   <mat-button-toggle-group
       [value]="filter()"
       (change)="filter.set($event.value)"
@@ -8,8 +49,10 @@
       <mat-button-toggle value="UPCOMING">Upcoming</mat-button-toggle>
       <mat-button-toggle value="LIVE">Live</mat-button-toggle>
       <mat-button-toggle value="FINISHED">Finished</mat-button-toggle>
-      <mat-button-toggle value="GROUP">Group</mat-button-toggle>
-      <mat-button-toggle value="KNOCKOUTS">Knockouts</mat-button-toggle>
+      @if (showStageFilters()) {
+        <mat-button-toggle value="GROUP">Group</mat-button-toggle>
+        <mat-button-toggle value="KNOCKOUTS">Knockouts</mat-button-toggle>
+      }
       <mat-button-toggle value="ALL">All</mat-button-toggle>
   </mat-button-toggle-group>
 
