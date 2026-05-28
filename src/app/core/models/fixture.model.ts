@@ -23,6 +23,18 @@ export interface FixtureScore {
 
 export interface Fixture {
   readonly id: string;
+  /** Competition shortcode (e.g. 'WC', 'PL', 'CL'). Matches the
+   *  `competitions/{compId}` doc id. Always present on freshly polled
+   *  fixtures; legacy WC fixtures get this backfilled by the
+   *  `migrateToMultiComp` admin callable. Until that runs, client code
+   *  should treat a missing value as 'WC' for backwards compat. */
+  readonly competitionId: string;
+  /** Season identifier — uses the starting calendar year of the season
+   *  (e.g. '2025' for EPL 2025–26, '2026' for WC 2026, Allsvenskan
+   *  2026). Pairs with competitionId to form the totals-shard key
+   *  `${competitionId}_${season}`. Backwards-compat: missing means
+   *  '2026' (the WC season). */
+  readonly season: string;
   readonly homeTeam: Team;
   readonly awayTeam: Team;
   readonly utcKickoff: Date;

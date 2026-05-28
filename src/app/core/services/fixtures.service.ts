@@ -45,6 +45,8 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 /** Cached representation. utcKickoff serialises as ISO string for JSON. */
 interface CachedFixture {
   id: string;
+  competitionId: string;
+  season: string;
   homeTeam: Fixture['homeTeam'];
   awayTeam: Fixture['awayTeam'];
   utcKickoff: string;
@@ -293,6 +295,15 @@ export class FixturesService {
     }
     return {
       id,
+      // Backwards-compat: pre-migration WC fixtures lack these fields.
+      // Default to ('WC', '2026') so the rest of the app can treat
+      // every Fixture as carrying a (comp, season) tag without
+      // null-checking. Once migrateToMultiComp runs, every fixture
+      // doc has the real values written and these fallbacks no
+      // longer activate.
+      competitionId:
+        typeof data['competitionId'] === 'string' ? data['competitionId'] : 'WC',
+      season: typeof data['season'] === 'string' ? data['season'] : '2026',
       homeTeam: data['homeTeam'],
       awayTeam: data['awayTeam'],
       utcKickoff: parsedKickoff,
@@ -311,6 +322,8 @@ export class FixturesService {
 function fixtureToCache(f: Fixture): CachedFixture {
   return {
     id: f.id,
+    competitionId: f.competitionId,
+    season: f.season,
     homeTeam: f.homeTeam,
     awayTeam: f.awayTeam,
     utcKickoff: f.utcKickoff.toISOString(),
@@ -324,6 +337,13 @@ function fixtureToCache(f: Fixture): CachedFixture {
 function fixtureFromCache(c: CachedFixture): Fixture {
   return {
     id: c.id,
+    // Caches written by an older app version (before competitionId
+    // existed in the cache shape) hydrate with ('WC', '2026') so we
+    // never produce a Fixture missing these fields. The 5-min cache
+    // TTL will replace the entry with a properly-tagged version on
+    // the next bulk fetch.
+    competitionId: c.competitionId ?? 'WC',
+    season: c.season ?? '2026',
     homeTeam: c.homeTeam,
     awayTeam: c.awayTeam,
     utcKickoff: new Date(c.utcKickoff),

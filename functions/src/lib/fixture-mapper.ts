@@ -41,6 +41,16 @@ const STATUS_MAP: Record<string, string> = {
 };
 
 export interface FixtureDoc {
+  /** Competition shortcode (e.g. 'WC', 'PL', 'CL'). Injected by the
+   *  polling loop from the competitions/{code} doc it's currently
+   *  iterating. Defaults to 'WC' when `mapFixture` is called without
+   *  context so legacy callers (the single-comp pollFootballData) keep
+   *  working until the multi-comp polling refactor lands. */
+  competitionId: string;
+  /** Season starting year as a string (e.g. '2025' for the 2025–26
+   *  league seasons, '2026' for WC 2026). Same default + reasoning as
+   *  competitionId. */
+  season: string;
   homeTeam: {
     id: number | null;
     name: string | null;
@@ -63,6 +73,20 @@ export interface FixtureDoc {
   };
 }
 
+/** Context the polling loop passes to mapFixture so the produced doc
+ *  carries its (comp, season) tag without inspecting the API response.
+ *  Defaults exist to keep the single-comp pollFootballData working
+ *  until task #65 swaps it for the multi-comp loop. */
+export interface FixtureMapContext {
+  readonly competitionId: string;
+  readonly season: string;
+}
+
+const DEFAULT_CONTEXT: FixtureMapContext = {
+  competitionId: 'WC',
+  season: '2026',
+};
+
 export function mapWinner(w: string | null): 'HOME' | 'AWAY' | 'DRAW' | null {
   if (w === 'HOME_TEAM') return 'HOME';
   if (w === 'AWAY_TEAM') return 'AWAY';
@@ -74,8 +98,13 @@ export function mapGroup(g: string | null): string | null {
   return g ? g.replace(/^GROUP_/, '') : null;
 }
 
-export function mapFixture(m: FootballDataMatch): FixtureDoc {
+export function mapFixture(
+  m: FootballDataMatch,
+  ctx: FixtureMapContext = DEFAULT_CONTEXT,
+): FixtureDoc {
   return {
+    competitionId: ctx.competitionId,
+    season: ctx.season,
     homeTeam: {
       id: m.homeTeam.id,
       name: m.homeTeam.name,
