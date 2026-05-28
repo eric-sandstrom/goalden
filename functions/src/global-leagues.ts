@@ -7,6 +7,15 @@ const NAME_MIN = 2;
 const NAME_MAX = 60;
 const FIRESTORE_BATCH_LIMIT = 400;
 
+/**
+ * Defaults applied when an admin creates a global league without
+ * specifying (comp, season). Kept aligned with the createLeague
+ * callable so legacy admin flows still produce the WC global league
+ * everyone expects.
+ */
+const DEFAULT_COMP_ID = 'WC';
+const DEFAULT_SEASON = '2026';
+
 // =============================================================================
 // Shared types
 // =============================================================================
@@ -110,7 +119,37 @@ export const createGlobalLeague = onCall(
     }
     const config = parseConfig(request.data?.globalConfig);
 
+    // Same (comp, season) treatment as createLeague — global leagues
+    // are also bound to a specific competition season. The doc on the
+    // catalogue side gets its `hasGlobalLeague` flag flipped further
+    // down so the picker knows this comp already has a global.
+    const compRaw = request.data?.['competitionId'];
+    const seasonRaw = request.data?.['season'];
+    const competitionId =
+      typeof compRaw === 'string' && compRaw.trim().length > 0
+        ? compRaw.trim()
+        : DEFAULT_COMP_ID;
+    const season =
+      typeof seasonRaw === 'string' && seasonRaw.trim().length > 0
+        ? seasonRaw.trim()
+        : DEFAULT_SEASON;
+
     const db = getFirestore();
+    const compRef = db.collection('competitions').doc(competitionId);
+    const compSnap = await compRef.get();
+    if (!compSnap.exists) {
+      throw new HttpsError(
+        'not-found',
+        `Competition '${competitionId}' not found. Sync it from football-data first.`,
+      );
+    }
+    if (compSnap.data()?.['active'] !== true) {
+      throw new HttpsError(
+        'failed-precondition',
+        `Competition '${competitionId}' is not active. Activate it before spinning up a global league.`,
+      );
+    }
+
     const leagueRef = db.collection('leagues').doc();
 
     // Initial doc has memberCount=0; syncGlobalLeagueInner fills it in.
@@ -118,6 +157,8 @@ export const createGlobalLeague = onCall(
       name: (name as string).trim(),
       description: typeof description === 'string' ? description.trim() : '',
       type: 'global',
+      competitionId,
+      season,
       globalConfig: config,
       ownerId: '',
       inviteCode: '',
@@ -126,9 +167,15 @@ export const createGlobalLeague = onCall(
       createdBy: uid,
     });
 
+    // Flip the catalogue flag so the create-league picker can hint
+    // "this comp already has a global league" if it wants to.
+    await compRef.update({ hasGlobalLeague: true });
+
     const { added } = await syncGlobalLeagueInner(leagueRef.id);
 
-    logger.info(`Global league created: ${leagueRef.id} by ${uid}, enrolled ${added}`);
+    logger.info(
+      `Global league created: ${leagueRef.id} by ${uid} for ${competitionId} ${season}, enrolled ${added}`,
+    );
     return { leagueId: leagueRef.id, enrolled: added };
   },
 );

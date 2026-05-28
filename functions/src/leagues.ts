@@ -7,6 +7,15 @@ const MEMBER_CAP = 500;
 const NAME_MIN = 2;
 const NAME_MAX = 40;
 
+/**
+ * Defaults applied when the client sends no (comp, season). Exists for
+ * the brief window between when we deploy server-side multi-comp and
+ * when every client is on the new createLeague wrapper. Once all
+ * clients pass explicit values these defaults become dead code.
+ */
+const DEFAULT_COMP_ID = 'WC';
+const DEFAULT_SEASON = '2026';
+
 function requireAuth(request: { auth?: { uid: string } | null }): string {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in first.');
@@ -16,6 +25,57 @@ function requireAuth(request: { auth?: { uid: string } | null }): string {
 
 function validName(name: unknown): name is string {
   return typeof name === 'string' && name.trim().length >= NAME_MIN && name.trim().length <= NAME_MAX;
+}
+
+/**
+ * Looks up the competition doc and asserts it's active. Throws an
+ * HttpsError that the client surfaces as a snackbar — the create-
+ * league dialog never has access to the active flag itself (it only
+ * sees competitions where active==true via CompetitionsService), so
+ * "comp is inactive" only happens when something's drifted between
+ * the dialog opening and submit being clicked.
+ */
+async function assertActiveCompetition(
+  db: FirebaseFirestore.Firestore,
+  compId: string,
+): Promise<void> {
+  const snap = await db.collection('competitions').doc(compId).get();
+  if (!snap.exists) {
+    throw new HttpsError(
+      'not-found',
+      `Competition '${compId}' not found. Has it been synced from football-data?`,
+    );
+  }
+  const data = snap.data() ?? {};
+  if (data['active'] !== true) {
+    throw new HttpsError(
+      'failed-precondition',
+      `Competition '${compId}' is not active. Ask an admin to enable it before creating a league.`,
+    );
+  }
+}
+
+/**
+ * Coerces and validates `(competitionId, season)` from the call
+ * payload. Falls back to (WC, 2026) when either is absent so older
+ * clients keep working; once they're all updated this can tighten
+ * to require explicit values.
+ */
+function parseCompTag(data: Record<string, unknown> | null | undefined): {
+  competitionId: string;
+  season: string;
+} {
+  const compRaw = data?.['competitionId'];
+  const seasonRaw = data?.['season'];
+  const competitionId =
+    typeof compRaw === 'string' && compRaw.trim().length > 0
+      ? compRaw.trim()
+      : DEFAULT_COMP_ID;
+  const season =
+    typeof seasonRaw === 'string' && seasonRaw.trim().length > 0
+      ? seasonRaw.trim()
+      : DEFAULT_SEASON;
+  return { competitionId, season };
 }
 
 // ---------------------------------------------------------------------------
@@ -39,7 +99,15 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
   }
   const type: 'private' | 'public' = rawType === 'public' ? 'public' : 'private';
 
+  // (competitionId, season) — defaulted to (WC, 2026) for now (see
+  // parseCompTag rationale). Validated against the competitions
+  // catalogue so a typo or stale picker entry surfaces a clean error
+  // instead of producing a league bound to a non-existent comp.
+  const { competitionId, season } = parseCompTag(request.data);
+
   const db = getFirestore();
+  await assertActiveCompetition(db, competitionId);
+
   const inviteCode = await generateUniqueInviteCode();
   const leagueRef = db.collection('leagues').doc();
   const memberRef = leagueRef.collection('members').doc(uid);
@@ -50,6 +118,8 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
   batch.set(leagueRef, {
     name: trimmed,
     type,
+    competitionId,
+    season,
     ownerId: uid,
     inviteCode,
     memberCount: 1,
@@ -71,7 +141,9 @@ export const createLeague = onCall({ region: 'europe-west1' }, async (request) =
   });
   await batch.commit();
 
-  logger.info(`${type} league created: ${leagueRef.id} (${inviteCode}) by ${uid}`);
+  logger.info(
+    `${type} league created: ${leagueRef.id} (${inviteCode}) by ${uid} for ${competitionId} ${season}`,
+  );
   return { leagueId: leagueRef.id, inviteCode, type };
 });
 
