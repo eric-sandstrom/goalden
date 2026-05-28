@@ -319,17 +319,29 @@ export class DevToolsComponent {
   protected async pollFixturesNow(): Promise<void> {
     this.running.set(true);
     try {
-      const call = httpsCallable<unknown, { ok: boolean; fetched: number; written: number }>(
-        this.functions,
-        'devPollFixturesNow',
-      );
+      // Response shape mirrors the server's PollSummary — total counts
+      // plus per-competition breakdown for partial-success surfaces.
+      const call = httpsCallable<
+        unknown,
+        {
+          ok: boolean;
+          fetched: number;
+          written: number;
+          competitions: ReadonlyArray<{ compId: string; ok: boolean; written: number }>;
+          message?: string;
+        }
+      >(this.functions, 'devPollFixturesNow');
       const res = await call({});
-      const { fetched, written } = res.data;
-      this.snackBar.open(
-        `Fetched ${fetched} fixtures, wrote ${written}`,
-        undefined,
-        { duration: 2500 },
-      );
+      const { fetched, written, competitions, message } = res.data;
+      if (message && competitions.length === 0) {
+        this.snackBar.open(message, 'Dismiss', { duration: 4000 });
+      } else {
+        const failed = competitions.filter((c) => !c.ok).length;
+        const summary = failed > 0
+          ? `Polled ${competitions.length} comps · ${failed} failed · wrote ${written}`
+          : `Polled ${competitions.length} comp(s) · fetched ${fetched} · wrote ${written}`;
+        this.snackBar.open(summary, undefined, { duration: 3000 });
+      }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Poll failed';
       this.snackBar.open(message, 'Dismiss', { duration: 5000 });

@@ -4,15 +4,20 @@ import { FOOTBALL_DATA_TOKEN, runPollFootballData } from './poll-football-data';
 import { requireAdminOrEmulator } from './lib/admin-check';
 
 /**
- * Dev-only callable: forces a fixtures poll immediately instead of waiting
- * up to 10 minutes for the scheduled cron. Reuses the exact same logic the
- * scheduled function runs — including the cache/fixtures rollup write — so
- * the client's FixturesService sees populated data right after a click.
+ * Force a fixtures poll immediately instead of waiting up to 10 minutes
+ * for the scheduled cron. Reuses the exact same logic the scheduled
+ * function runs — including the per-comp rollup writes — so the client's
+ * FixturesService sees populated data right after a click.
  *
- * Refuses to run anywhere except the local Functions emulator.
+ * Accepts an optional `compId` to scope the poll to one competition.
+ * Without it, polls every `competitions/* where active == true` in
+ * sequence, same as the scheduled cron.
+ *
+ * Gated by `requireAdminOrEmulator` so admins can run it in production
+ * during the friends-test workflow without needing the emulator.
  */
 export const devPollFixturesNow = onCall(
-  { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN] },
+  { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN], timeoutSeconds: 540 },
   async (request) => {
     await requireAdminOrEmulator(request);
 
@@ -24,8 +29,18 @@ export const devPollFixturesNow = onCall(
       );
     }
 
-    const result = await runPollFootballData(token);
-    logger.info('devPollFixturesNow finished', result);
+    const compId = request.data?.compId;
+    if (compId !== undefined && (typeof compId !== 'string' || compId.length === 0)) {
+      throw new HttpsError('invalid-argument', 'compId must be a non-empty string when provided');
+    }
+
+    const result = await runPollFootballData(token, compId);
+    logger.info('devPollFixturesNow finished', {
+      compId: compId ?? '(all active)',
+      fetched: result.fetched,
+      written: result.written,
+      perComp: result.competitions.length,
+    });
     return result;
   },
 );
