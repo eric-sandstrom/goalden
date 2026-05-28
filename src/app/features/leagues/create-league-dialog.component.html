@@ -19,6 +19,66 @@
           }
         </mat-form-field>
 
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="comp-field">
+          <mat-label>Competition</mat-label>
+          <mat-select
+            formControlName="competitionId"
+            [disabled]="noActiveComps()"
+            panelClass="comp-picker-panel"
+          >
+            @if (groupedComps().cups.length > 0) {
+              <mat-optgroup label="Tournaments">
+                @for (comp of groupedComps().cups; track comp.id) {
+                  <mat-option [value]="comp.id">
+                    <span class="opt">
+                      @if (comp.emblem) {
+                        <img
+                          class="opt-crest"
+                          [src]="comp.emblem"
+                          [alt]="comp.name + ' emblem'"
+                          width="20"
+                          height="20"
+                        />
+                      } @else {
+                        <span class="opt-crest placeholder" aria-hidden="true"></span>
+                      }
+                      <span class="opt-name">{{ comp.name }}</span>
+                    </span>
+                  </mat-option>
+                }
+              </mat-optgroup>
+            }
+            @if (groupedComps().leagues.length > 0) {
+              <mat-optgroup label="Domestic leagues">
+                @for (comp of groupedComps().leagues; track comp.id) {
+                  <mat-option [value]="comp.id">
+                    <span class="opt">
+                      @if (comp.emblem) {
+                        <img
+                          class="opt-crest"
+                          [src]="comp.emblem"
+                          [alt]="comp.name + ' emblem'"
+                          width="20"
+                          height="20"
+                        />
+                      } @else {
+                        <span class="opt-crest placeholder" aria-hidden="true"></span>
+                      }
+                      <span class="opt-name">{{ comp.name }}</span>
+                    </span>
+                  </mat-option>
+                }
+              </mat-optgroup>
+            }
+          </mat-select>
+          @if (noActiveComps()) {
+            <mat-hint>
+              No competitions enabled yet — an admin needs to activate one
+              in dev tools.
+            </mat-hint>
+          }
+        </mat-form-field>
+
         <div class="type-row">
           <span class="type-label">Visibility</span>
           <mat-button-toggle-group formControlName="type" hideSingleSelectionIndicator>
@@ -47,7 +107,7 @@
         mat-flat-button
         color="primary"
         (click)="submit()"
-        [disabled]="form.invalid || creating()"
+        [disabled]="form.invalid || creating() || noActiveComps()"
       >
         @if (creating()) {
           <mat-progress-spinner mode="indeterminate" diameter="20" />

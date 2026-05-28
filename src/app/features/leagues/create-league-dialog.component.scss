@@ -29,3 +29,29 @@
       font-size: 0.78rem;
       color: var(--mat-sys-on-surface-variant);
     }
+    .comp-field {
+      margin-top: 0.5rem;
+    }
+    /* Option layout — crest + name in a row. Used for both optgroup
+       sections; the placeholder span keeps the name aligned across rows
+       where the crest is missing. */
+    .opt {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .opt-crest {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      flex-shrink: 0;
+      border-radius: 3px;
+    }
+    .opt-crest.placeholder {
+      background: var(--mat-sys-surface-container);
+    }
+    .opt-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
