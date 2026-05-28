@@ -55,3 +55,21 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    /* Trailing fixture-count chip. Pushed to the far right via margin-
+       left:auto so the comp name owns the natural width and the count
+       hugs the option edge — easy scan when comparing options. */
+    .opt-count {
+      margin-left: auto;
+      padding-left: 12px;
+      font-size: 0.78rem;
+      color: var(--mat-sys-on-surface-variant);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    /* When a comp has zero matches left to predict (post-season but the
+       season hasn't ended yet, e.g. CL just before currentSeason flips),
+       dim further so the user knows nothing's actionable. */
+    .opt-count.zero {
+      opacity: 0.6;
+      font-style: italic;
+    }

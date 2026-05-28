@@ -43,6 +43,11 @@
                         <span class="opt-crest placeholder" aria-hidden="true"></span>
                       }
                       <span class="opt-name">{{ comp.name }}</span>
+                      @if (remainingForOption(comp); as remaining) {
+                        <span class="opt-count" [class.zero]="remaining === 0">
+                          {{ remaining }} to predict
+                        </span>
+                      }
                     </span>
                   </mat-option>
                 }
@@ -65,6 +70,11 @@
                         <span class="opt-crest placeholder" aria-hidden="true"></span>
                       }
                       <span class="opt-name">{{ comp.name }}</span>
+                      @if (remainingForOption(comp); as remaining) {
+                        <span class="opt-count" [class.zero]="remaining === 0">
+                          {{ remaining }} to predict
+                        </span>
+                      }
                     </span>
                   </mat-option>
                 }

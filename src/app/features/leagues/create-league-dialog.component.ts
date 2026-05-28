@@ -11,6 +11,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Competition } from '../../core/models/competition.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
+import { FixturesService } from '../../core/services/fixtures.service';
 import { LeaguesService } from '../../core/services/leagues.service';
 
 /** Hard-coded preferred default while WC is the focal competition. Once the
@@ -38,6 +39,7 @@ const PREFERRED_DEFAULT_COMP_ID = 'WC';
 export class CreateLeagueDialogComponent {
   private readonly leagues = inject(LeaguesService);
   private readonly competitionsService = inject(CompetitionsService);
+  private readonly fixtures = inject(FixturesService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialogRef = inject(MatDialogRef<CreateLeagueDialogComponent, string>);
   private readonly fb = inject(FormBuilder);
@@ -86,6 +88,37 @@ export class CreateLeagueDialogComponent {
         selectable.find((c) => c.id === PREFERRED_DEFAULT_COMP_ID) ?? selectable[0];
       ctrl.setValue(preferred.id);
     });
+
+    // Eagerly trigger a fixture load for every selectable comp the
+    // moment the picker renders, so the "N to predict" counts populate
+    // without the user having to open the dropdown first. Each
+    // fixturesFor() call is memoized and cache-backed, so this is at
+    // most one rollup-doc read per comp on cold start — same cost as
+    // the user picking each one manually.
+    effect(() => {
+      for (const comp of this.selectableComps()) {
+        const season = seasonFromComp(comp);
+        if (season) {
+          this.fixtures.fixturesFor(comp.id, season);
+        }
+      }
+    });
+  }
+
+  /**
+   * Number of `TIMED` fixtures left to predict for the given comp.
+   * Returns `null` while fixtures are still loading so the template
+   * can show a placeholder instead of "0 to predict" briefly. Reads
+   * the per-comp signal — recomputes naturally when polling refreshes
+   * a comp's fixtures.
+   */
+  protected remainingForOption(comp: Competition): number | null {
+    const season = seasonFromComp(comp);
+    if (!season) return null;
+    if (!this.fixtures.loadedFor(comp.id, season)()) return null;
+    return this.fixtures
+      .fixturesFor(comp.id, season)()
+      .filter((f) => f.status === 'TIMED').length;
   }
 
   /**
