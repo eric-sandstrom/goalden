@@ -119,6 +119,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ----- competitions ----------------------------------------------------
+    //
+    // Catalogue of competitions Goalden supports. Discovered from football-data
+    // by the `syncCompetitionsFromApi` admin callable; the `active` flag is
+    // toggled per-comp by admins in dev-tools to gate fixture polling.
+    //
+    // World-readable for signed-in users so the comp picker in the create-
+    // league dialog and the Predict tab's competition tabs can render. Writes
+    // server-only — both discovery and the activate toggle go through admin
+    // callables (which use Admin SDK and bypass these rules).
+
+    match /competitions/{compId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ----- teams -----------------------------------------------------------
     //
     // Team info, coach, and squad. World-readable for signed-in users so we

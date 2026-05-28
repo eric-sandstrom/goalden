@@ -1,22 +1,39 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { httpsCallable } from 'firebase/functions';
+import {
+  DocumentData,
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+} from 'firebase/firestore';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
+import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { FUNCTIONS } from '../../core/firebase/firebase.providers';
+import { FIRESTORE, FUNCTIONS } from '../../core/firebase/firebase.providers';
+import { Competition, CompetitionType } from '../../core/models/competition.model';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { PredictionsService } from '../../core/services/predictions.service';
 import { UserService } from '../../core/services/user.service';
 
 type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
+
+interface SyncResult {
+  ok: boolean;
+  discovered: number;
+  created: number;
+  updated: number;
+}
 
 @Component({
   selector: 'app-dev-tools',
@@ -25,12 +42,14 @@ type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
     MatButtonModule,
     MatButtonToggleModule,
     MatCardModule,
+    MatChipsModule,
     MatDividerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    MatSlideToggleModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dev-tools.component.html',
@@ -41,14 +60,29 @@ export class DevToolsComponent {
   private readonly predictions = inject(PredictionsService);
   private readonly userService = inject(UserService);
   private readonly functions = inject(FUNCTIONS);
+  private readonly db = inject(FIRESTORE);
   private readonly snackBar = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly running = signal(false);
+
+  /** Per-comp pending state for the active toggle row buttons. Keeps
+   *  one comp's spinner from disabling every other comp's toggle. */
+  protected readonly togglePending = signal<ReadonlySet<string>>(new Set());
 
   /** Owners see the role-management card; everyone else doesn't. The
    *  callables behind the buttons re-check the role server-side. */
   protected readonly isOwner = this.userService.isOwner;
+
+  /** Discovered competitions, kept live via onSnapshot. Read-only here —
+   *  the proper CompetitionsService (task #70) replaces this when the
+   *  Predict UI starts depending on the same data. */
+  protected readonly competitions = signal<readonly Competition[]>([]);
+
+  protected readonly activeCount = computed(
+    () => this.competitions().filter((c) => c.active).length,
+  );
 
   /** Every fixture, labelled with its current status — used by the state and
    *  kickoff cards (which need to operate on any fixture, not just ones the
@@ -101,6 +135,84 @@ export class DevToolsComponent {
   protected readonly roleForm = this.fb.nonNullable.group({
     uid: ['', [Validators.required, Validators.minLength(1)]],
   });
+
+  constructor() {
+    // Live listener for the competitions catalogue. Ordering by name
+    // gives a stable, scannable list in the UI; the proper
+    // CompetitionsService (task #70) will keep the same order.
+    const unsub = onSnapshot(
+      query(collection(this.db, 'competitions'), orderBy('name')),
+      (snap) => {
+        const list: Competition[] = [];
+        snap.forEach((d) => list.push(parseComp(d.id, d.data())));
+        this.competitions.set(list);
+      },
+      (err) => {
+        console.error('[dev-tools] competitions listener failed', err);
+      },
+    );
+    this.destroyRef.onDestroy(() => unsub());
+  }
+
+  // --------------------------------------------------------------------------
+  // Competitions
+  // --------------------------------------------------------------------------
+
+  protected async syncCompetitions(): Promise<void> {
+    this.running.set(true);
+    try {
+      const call = httpsCallable<unknown, SyncResult>(
+        this.functions,
+        'syncCompetitionsFromApi',
+      );
+      const res = await call({});
+      const { discovered, created, updated } = res.data;
+      this.snackBar.open(
+        `Discovered ${discovered} competitions · ${created} new · ${updated} updated`,
+        undefined,
+        { duration: 3500 },
+      );
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Sync failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
+      console.error('syncCompetitionsFromApi failed', e);
+    } finally {
+      this.running.set(false);
+    }
+  }
+
+  protected async toggleCompetitionActive(comp: Competition): Promise<void> {
+    // Mark just this comp as pending so the rest of the list stays
+    // interactive while this one's request is in flight.
+    this.togglePending.update((s) => new Set([...s, comp.id]));
+    const next = !comp.active;
+    try {
+      const call = httpsCallable<unknown, { ok: boolean }>(
+        this.functions,
+        'setCompetitionActive',
+      );
+      await call({ compId: comp.id, active: next });
+      this.snackBar.open(
+        next ? `${comp.name} activated` : `${comp.name} deactivated`,
+        undefined,
+        { duration: 1800 },
+      );
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Toggle failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
+      console.error('setCompetitionActive failed', e);
+    } finally {
+      this.togglePending.update((s) => {
+        const copy = new Set(s);
+        copy.delete(comp.id);
+        return copy;
+      });
+    }
+  }
+
+  protected isTogglePending(compId: string): boolean {
+    return this.togglePending().has(compId);
+  }
 
   // --------------------------------------------------------------------------
   // Fixture state
@@ -319,4 +431,42 @@ export class DevToolsComponent {
       this.running.set(false);
     }
   }
+}
+
+/**
+ * Adapts a raw Firestore document into our typed Competition shape.
+ * Tolerant of missing/legacy fields so a partially-written doc never
+ * blows up the live listener.
+ */
+function parseComp(id: string, data: DocumentData): Competition {
+  const area = (data['area'] ?? {}) as Record<string, unknown>;
+  const season = data['currentSeason'] as Record<string, unknown> | null | undefined;
+  return {
+    id,
+    fdId: typeof data['fdId'] === 'number' ? data['fdId'] : 0,
+    name: typeof data['name'] === 'string' ? data['name'] : id,
+    emblem: typeof data['emblem'] === 'string' ? data['emblem'] : null,
+    type: (data['type'] === 'CUP' ? 'CUP' : 'LEAGUE') satisfies CompetitionType,
+    plan: typeof data['plan'] === 'string' ? data['plan'] : null,
+    area: {
+      id: typeof area['id'] === 'number' ? area['id'] : 0,
+      name: typeof area['name'] === 'string' ? area['name'] : '',
+      code: typeof area['code'] === 'string' ? area['code'] : null,
+      flag: typeof area['flag'] === 'string' ? area['flag'] : null,
+    },
+    currentSeason: season
+      ? {
+          id: typeof season['id'] === 'number' ? season['id'] : 0,
+          startDate:
+            typeof season['startDate'] === 'string' ? season['startDate'] : '',
+          endDate: typeof season['endDate'] === 'string' ? season['endDate'] : '',
+          currentMatchday:
+            typeof season['currentMatchday'] === 'number'
+              ? season['currentMatchday']
+              : null,
+        }
+      : null,
+    active: data['active'] === true,
+    hasGlobalLeague: data['hasGlobalLeague'] === true,
+  };
 }

@@ -20,6 +20,7 @@ export { devSignInAsAdmin } from './dev-sign-in-admin';
 export { grantAdminRole, revokeAdminRole } from './admin-roles';
 export { devPollTeamsNow } from './dev-poll-teams';
 export { devPollFixturesNow } from './dev-poll-fixtures';
+export { syncCompetitionsFromApi, setCompetitionActive } from './sync-competitions';
 export {
   createLeague,
   joinLeague,
