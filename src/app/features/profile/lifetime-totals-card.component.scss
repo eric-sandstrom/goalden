@@ -2,6 +2,16 @@
   display: block;
 }
 
+/* In the profile's side-by-side row, the host is a stretched grid cell.
+   Fill it so this card matches the height of its partner. Scoped to
+   .duo-card so other usages (e.g. user-profile) keep natural height. */
+:host(.duo-card) {
+  display: flex;
+}
+:host(.duo-card) .lifetime-card {
+  flex: 1;
+}
+
 .headline {
   display: flex;
   align-items: baseline;

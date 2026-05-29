@@ -39,6 +39,26 @@
       gap: 1rem;
       box-sizing: border-box;
     }
+    /* Lifetime points + predictor personality: stacked on phones, two equal
+       columns (1fr each) on wider screens. align-items: stretch makes both
+       cells the same height (the taller card sets it); each card carries the
+       .duo-card class so its inner mat-card fills that height (see the card
+       components' scss). min-width: 0 stops a card's content from forcing its
+       column wider than its 1fr share. */
+    .profile-duo {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    .profile-duo > * {
+      min-width: 0;
+    }
+    @media (min-width: 768px) {
+      .profile-duo {
+        grid-template-columns: 1fr 1fr;
+        align-items: stretch;
+      }
+    }
     mat-card-actions {
       display: flex;
       flex-direction: column;

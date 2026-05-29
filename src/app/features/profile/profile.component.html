@@ -18,22 +18,23 @@
       </mat-card>
 
       <!-- ===================================================================
-           Lifetime points — aggregate of every per-competition totals shard.
+           Lifetime points + predictor personality. Stacked on phones; sit
+           side by side on wider screens (see .profile-duo in the scss).
       ==================================================================== -->
-      <app-lifetime-totals-card [uid]="uid()" />
+      <div class="profile-duo">
+        <!-- Lifetime points — aggregate of every per-competition totals shard. -->
+        <app-lifetime-totals-card class="duo-card" [uid]="uid()" />
 
-      <!-- ===================================================================
-           Predictor personality
-           Second from the top, between the identity hero and the utility
-           cards below. AI-generated badge based on the user's pick
-           patterns; owner-mode shows the Generate/Regenerate button.
-      ==================================================================== -->
-      <app-predictor-personality-card
-        [personality]="personality.myPersonality()"
-        [loaded]="personality.loaded()"
-        [ownerMode]="true"
-        [eligibility]="personality.eligibility()"
-      />
+        <!-- Predictor personality — AI-generated badge from the user's pick
+             patterns; owner-mode shows the Generate/Regenerate button. -->
+        <app-predictor-personality-card
+          class="duo-card"
+          [personality]="personality.myPersonality()"
+          [loaded]="personality.loaded()"
+          [ownerMode]="true"
+          [eligibility]="personality.eligibility()"
+        />
+      </div>
 
       <!-- ===================================================================
            Theme picker
