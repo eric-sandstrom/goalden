@@ -143,3 +143,35 @@ app-root {
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
 }
+
+// =============================================================================
+// Scrollbars
+// =============================================================================
+//
+// App-wide thin, themed scrollbars. Firefox reads the inherited `scrollbar-*`
+// from :root; WebKit/Blink needs the ::-webkit-scrollbar pseudo-elements, which
+// don't inherit, so they're applied broadly. Styling these also opts elements
+// out of auto-hiding overlay bars, so scroll regions get a consistent visible
+// bar on desktop. (Individual scrollers still choose overflow: auto vs scroll;
+// this only governs appearance.)
+
+// `scrollbar-width` is NOT inherited, so set it on every element (not just
+// :root) for Firefox; `scrollbar-color` does inherit but is harmless here too.
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mat-sys-outline-variant) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--mat-sys-outline-variant);
+  border-radius: 5px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--mat-sys-outline);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}

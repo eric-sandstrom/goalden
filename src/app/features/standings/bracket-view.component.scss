@@ -9,22 +9,9 @@
    can stick while scrolling down a tall bracket. */
 .bracket {
   height: 100%;
+  // Keep the horizontal bar always visible; appearance is global (styles.scss).
   overflow-x: scroll;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--mat-sys-outline-variant) transparent;
-}
-/* Force a visible scrollbar on WebKit (opts out of auto-hiding overlay bars). */
-.bracket::-webkit-scrollbar {
-  height: 10px;
-  width: 10px;
-}
-.bracket::-webkit-scrollbar-thumb {
-  background: var(--mat-sys-outline-variant);
-  border-radius: 5px;
-}
-.bracket::-webkit-scrollbar-track {
-  background: transparent;
 }
 
 /* Content-sized track inside the scroller: as wide as all rounds, as tall as
