@@ -1,5 +1,14 @@
 import { Injectable, Signal, computed, effect, inject, signal } from '@angular/core';
-import { Timestamp, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  Timestamp,
+  collection,
+  doc,
+  getDocs,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { AuthService } from './auth.service';
 
@@ -10,6 +19,14 @@ export interface UserTotals {
   readonly bracket: number;
   readonly exactScoreHits: number;
   readonly correctOutcomeHits: number;
+}
+
+/** One per-(competition, season) totals shard at
+ *  `users/{uid}/totals/{compId}_{season}`. */
+export interface CompetitionTotals {
+  readonly competitionId: string;
+  readonly season: string;
+  readonly totals: UserTotals;
 }
 
 export const EMPTY_TOTALS: UserTotals = {
@@ -130,6 +147,38 @@ export class UserService {
 
       onCleanup(() => unsub());
     });
+  }
+
+  /**
+   * One-shot load of every per-competition totals shard for a user, for the
+   * lifetime-totals card. Lists `users/{uid}/totals` (the security rules
+   * allow LIST so this single query covers all comps). Reads the stored
+   * `competitionId` / `season` fields, falling back to parsing the doc id
+   * (`${compId}_${season}`) for older shards that predate those fields.
+   *
+   * Pure read, no signals — designed to back an Angular `resource()`.
+   */
+  async loadTotalsShards(uid: string): Promise<readonly CompetitionTotals[]> {
+    const snap = await getDocs(collection(this.db, 'users', uid, 'totals'));
+    const out: CompetitionTotals[] = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      const sep = d.id.indexOf('_');
+      const competitionId =
+        typeof data['competitionId'] === 'string'
+          ? data['competitionId']
+          : sep > 0
+            ? d.id.slice(0, sep)
+            : d.id;
+      const season =
+        typeof data['season'] === 'string'
+          ? data['season']
+          : sep > 0
+            ? d.id.slice(sep + 1)
+            : '';
+      out.push({ competitionId, season, totals: parseTotals(data) });
+    });
+    return out;
   }
 
   async setDisplayName(name: string): Promise<void> {

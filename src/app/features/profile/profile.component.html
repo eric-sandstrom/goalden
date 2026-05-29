@@ -18,6 +18,11 @@
       </mat-card>
 
       <!-- ===================================================================
+           Lifetime points — aggregate of every per-competition totals shard.
+      ==================================================================== -->
+      <app-lifetime-totals-card [uid]="uid()" />
+
+      <!-- ===================================================================
            Predictor personality
            Second from the top, between the identity hero and the utility
            cards below. AI-generated badge based on the user's pick

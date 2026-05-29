@@ -21,6 +21,7 @@ import {
   VariantName,
 } from '../../core/services/theme.service';
 import { UserService } from '../../core/services/user.service';
+import { LifetimeTotalsCardComponent } from './lifetime-totals-card.component';
 import { PredictorPersonalityCardComponent } from './predictor-personality-card.component';
 
 @Component({
@@ -35,6 +36,7 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
     MatSelectModule,
     MatSliderModule,
     MatTooltipModule,
+    LifetimeTotalsCardComponent,
     PredictorPersonalityCardComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -63,6 +65,8 @@ export class ProfileComponent {
     () => this.userService.userDoc()?.displayName ?? '',
   );
   protected readonly email = computed(() => this.auth.user()?.email ?? '');
+  /** Current user's uid — feeds the lifetime-totals card. */
+  protected readonly uid = computed(() => this.auth.uid() ?? '');
   protected readonly isAdmin = this.userService.isAdmin;
   /** Show the "Dev tools" link when we're in a non-production build OR
    *  the user has the admin role. Matches the `devOrAdminGuard` on the

@@ -1,0 +1,60 @@
+<mat-card appearance="outlined" class="lifetime-card">
+  <mat-card-header>
+    <mat-icon matCardAvatar aria-hidden="true">military_tech</mat-icon>
+    <mat-card-title>Lifetime points</mat-card-title>
+    <mat-card-subtitle>
+      @if (loading()) {
+        Loading…
+      } @else if (breakdown().length > 0) {
+        Across {{ breakdown().length }} competition{{ breakdown().length === 1 ? '' : 's' }}
+      } @else {
+        No points yet
+      }
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (error()) {
+      <p class="hint">Couldn't load your totals.</p>
+    } @else if (loading()) {
+      <div class="state">
+        <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
+      </div>
+    } @else {
+      <div class="headline">
+        <span class="big">{{ lifetime().total }}</span>
+        <span class="unit">pts</span>
+      </div>
+
+      <div class="substats">
+        <div class="stat">
+          <span class="num">{{ lifetime().exact }}</span>
+          <span class="lbl">Exact scores</span>
+        </div>
+        <div class="stat">
+          <span class="num">{{ lifetime().outcome }}</span>
+          <span class="lbl">Correct outcomes</span>
+        </div>
+      </div>
+
+      @if (breakdown().length > 0) {
+        <ul class="breakdown">
+          @for (row of breakdown(); track row.competitionId + '_' + row.season) {
+            <li class="row">
+              @if (row.emblem) {
+                <img class="crest" [src]="row.emblem" alt="" width="20" height="20" loading="lazy" />
+              } @else {
+                <mat-icon class="crest-fallback" aria-hidden="true">emoji_events</mat-icon>
+              }
+              <span class="name">{{ row.name }}</span>
+              <span class="season">{{ row.season }}</span>
+              <span class="row-pts">{{ row.total }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="hint">Points show up here once matches you've predicted finish.</p>
+      }
+    }
+  </mat-card-content>
+</mat-card>

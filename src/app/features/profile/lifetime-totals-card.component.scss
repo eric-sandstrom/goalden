@@ -1,0 +1,106 @@
+:host {
+  display: block;
+}
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.headline .big {
+  font: var(--mat-sys-display-small);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.headline .unit {
+  font-size: 0.9rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.substats {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.75rem;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+.stat .num {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.stat .lbl {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* Per-competition breakdown list. */
+.breakdown {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+.breakdown .row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.breakdown .row:last-child {
+  border-bottom: none;
+}
+.crest {
+  object-fit: contain;
+}
+.crest-fallback {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--mat-sys-on-surface-variant);
+}
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-weight: 500;
+}
+.season {
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+.row-pts {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.state {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.spin {
+  animation: lifetime-spin 1s linear infinite;
+}
+@keyframes lifetime-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
