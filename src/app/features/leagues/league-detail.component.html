@@ -156,6 +156,18 @@
 
         <mat-tab-nav-panel #lowerPanel class="lower-panel">
           @if (lowerView() === 'leaderboard') {
+          @if (!leaderboardLoaded()) {
+            <div class="card-scroll skel-list">
+              @for (i of skelRows; track i) {
+                <div class="skel-row">
+                  <app-skel width="18px" height="1rem" />
+                  <app-skel width="28px" height="28px" rounded />
+                  <app-skel width="40%" height="1rem" />
+                  <app-skel width="28px" height="1rem" />
+                </div>
+              }
+            </div>
+          } @else {
           <div class="card-scroll">
             <table mat-table [dataSource]="rows()">
               <ng-container matColumnDef="rank">
@@ -252,6 +264,7 @@
               ></tr>
             </table>
           </div>
+          }
           } @else {
             <app-standings-view
               [competitionId]="league()!.competitionId"

@@ -85,6 +85,11 @@ export class LeagueDetailComponent {
   private readonly _memberTotals = signal<ReadonlyMap<string, Record<string, unknown>>>(
     new Map(),
   );
+  /** False until the current league's rows are fully hydrated (user docs +
+   *  per-comp totals). Gates the leaderboard behind a skeleton so the table
+   *  renders once — correctly named and sorted — instead of flashing
+   *  "Unknown" + zero points and then re-sorting as the data lands. */
+  protected readonly leaderboardLoaded = signal(false);
 
   // Read league data directly from the LeaguesService cache instead of opening
   // a second listener for the same doc — saves one Firestore listener per
@@ -216,6 +221,9 @@ export class LeagueDetailComponent {
   constructor() {
     effect((onCleanup) => {
       const id = this.leagueId();
+      // New league (or none) → hide the table behind the skeleton until this
+      // league's members + their data finish loading.
+      this.leaderboardLoaded.set(false);
       if (!id) {
         this._members.set([]);
         this._memberUsers.set(new Map());
@@ -254,6 +262,7 @@ export class LeagueDetailComponent {
         const league = this.league();
         if (!league || members.length === 0) {
           if (members.length === 0) this._memberTotals.set(new Map());
+          this.leaderboardLoaded.set(true);
           return;
         }
         try {
@@ -265,6 +274,10 @@ export class LeagueDetailComponent {
           this._memberTotals.set(fresh);
         } catch (e: unknown) {
           console.error('[LeagueDetail] per-comp totals fetch failed:', e);
+        } finally {
+          // Reveal the table now the rows are fully populated — user docs were
+          // awaited above and totals just landed — for one clean, sorted render.
+          this.leaderboardLoaded.set(true);
         }
       });
 
