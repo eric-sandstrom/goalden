@@ -29,10 +29,26 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './fixture-row.component.html',
   styleUrl: './fixture-row.component.scss',
+  host: {
+    // Compact variant — tighter padding + smaller score widget, for embeds
+    // like the predict-next card where vertical space is at a premium.
+    '[class.compact]': 'compact()',
+  },
 })
 export class FixtureRowComponent {
   readonly fixture = input.required<Fixture>();
   readonly prediction = input<MatchPrediction | null>(null);
+  /** When true (default), the row saves the pick automatically a beat after
+   *  the score changes. Set false to defer saving to an explicit `save()`
+   *  call — e.g. the predict-next card persists only when you press Next. */
+  readonly autoSave = input(true);
+  /** Compact layout (tighter padding, smaller score widget + meta) for
+   *  space-constrained embeds like the predict-next card. */
+  readonly compact = input(false);
+  /** Seed an unpredicted, editable fixture's score inputs at 0–0 instead of
+   *  blank — a baseline to step from in the predict-next card. The main list
+   *  keeps blank inputs so an untouched match still reads as "not predicted". */
+  readonly defaultToZero = input(false);
 
   private readonly predictions = inject(PredictionsService);
   private readonly snackBar = inject(MatSnackBar);
@@ -92,9 +108,19 @@ export class FixtureRowComponent {
     return null;
   });
 
-  /** Actual full-time score from the API, when populated. */
-  protected readonly actualScore = computed(() => this.fixture().score?.fullTime ?? null);
-  protected readonly hasActualScore = computed(() => this.actualScore() !== null);
+  /**
+   * Score to display: ESPN's live score while the match is in progress
+   * (football-data's free tier lags the running score), otherwise the
+   * authoritative full-time score. Display-only — `predictionResult`'s
+   * points still finalise off the authoritative score at FT, and this never
+   * touches lock state.
+   */
+  protected readonly displayScore = computed(() => {
+    const f = this.fixture();
+    if (f.liveState === 'in' && f.liveScore) return f.liveScore;
+    return f.score?.fullTime ?? null;
+  });
+  protected readonly hasDisplayScore = computed(() => this.displayScore() !== null);
 
   /**
    * Live/HT/FT badge derived from fixture status. Takes precedence over the
@@ -106,7 +132,15 @@ export class FixtureRowComponent {
     icon: string;
     tone: 'live' | 'pause' | 'final';
   } | null>(() => {
-    switch (this.fixture().status) {
+    const f = this.fixture();
+    // ESPN reports the match in progress — surface it (with ESPN's live
+    // clock) even if the authoritative status hasn't flipped yet on the
+    // free tier. Display-only; never gates editing or locking.
+    if (f.liveState === 'in') {
+      const clock = f.liveClock?.trim();
+      return { label: clock && clock.length > 0 ? clock : 'Live', icon: '', tone: 'live' };
+    }
+    switch (f.status) {
       case 'IN_PLAY':
         return { label: 'Live', icon: '', tone: 'live' };
       case 'PAUSED':
@@ -131,7 +165,7 @@ export class FixtureRowComponent {
     points: number;
     icon: string;
   } | null>(() => {
-    const actual = this.actualScore();
+    const actual = this.displayScore();
     const pred = this.prediction();
     if (!actual || !pred) return null;
     if (pred.homeScore === actual.home && pred.awayScore === actual.away) {
@@ -158,10 +192,14 @@ export class FixtureRowComponent {
 
       const p = this.prediction();
       const locked = this.locked();
+      // Blank by default; 0 when `defaultToZero` is on and the fixture is
+      // actually editable (don't show a phantom 0–0 on a locked/TBD match).
+      const editable = !locked && !this.tbd();
+      const fallback = this.defaultToZero() && editable ? 0 : null;
       this.form.patchValue(
         {
-          home: p?.homeScore ?? null,
-          away: p?.awayScore ?? null,
+          home: p?.homeScore ?? fallback,
+          away: p?.awayScore ?? fallback,
         },
         { emitEvent: false },
       );
@@ -177,7 +215,9 @@ export class FixtureRowComponent {
 
     const sub = this.form.valueChanges
       .pipe(debounceTime(400), distinctUntilChanged((a, b) => a.home === b.home && a.away === b.away))
-      .subscribe(() => this.tryAutoSave());
+      .subscribe(() => {
+        if (this.autoSave()) void this.save();
+      });
     this.destroyRef.onDestroy(() => sub.unsubscribe());
 
     const tickInterval = setInterval(() => this.nowTick.set(Date.now()), 30_000);
@@ -199,7 +239,13 @@ export class FixtureRowComponent {
     control.setValue(next);
   }
 
-  private async tryAutoSave(): Promise<void> {
+  /**
+   * Persist the current score when it's a complete, changed, editable pick
+   * (no-op otherwise). Public so a parent that defers saving can trigger it —
+   * the predict-next card calls this on "Next". The debounced auto-save path
+   * calls it too when `autoSave` is on (the default).
+   */
+  async save(): Promise<void> {
     if (this.editDisabled()) return;
     const { home, away } = this.form.getRawValue();
     if (home === null || away === null) return;

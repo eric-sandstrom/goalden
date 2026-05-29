@@ -1,0 +1,70 @@
+@if (errored()) {
+  <div class="state">
+    <mat-icon aria-hidden="true">cloud_off</mat-icon>
+    <p>Couldn't load standings.</p>
+    <button mat-stroked-button (click)="retry()">
+      <mat-icon>refresh</mat-icon>
+      Try again
+    </button>
+  </div>
+} @else if (loading()) {
+  <div class="state">
+    <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
+  </div>
+} @else if (empty()) {
+  <div class="state">
+    @if (view() === 'predicted') {
+      <mat-icon aria-hidden="true">edit_note</mat-icon>
+      <p>Predict some matches to build this table.</p>
+    } @else {
+      <mat-icon aria-hidden="true">event_busy</mat-icon>
+      <p>No official standings yet.</p>
+    }
+  </div>
+} @else {
+  <table class="standings-table">
+    <thead>
+      <tr>
+        <th class="c-pos">#</th>
+        <th class="c-team">Team</th>
+        <th class="c-num">P</th>
+        <th class="c-num">GD</th>
+        <th class="c-num c-pts">Pts</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of rows(); track r.row.team.id ?? r.row.position) {
+        <tr [class.highlight]="r.row.team.id !== null && highlightSet().has(r.row.team.id)">
+          <td class="c-pos">
+            <span class="pos">{{ r.row.position }}</span>
+            @if (r.delta !== null && r.delta !== 0) {
+              <span class="delta" [class.up]="r.delta > 0" [class.down]="r.delta < 0">
+                <mat-icon aria-hidden="true">{{
+                  r.delta > 0 ? 'arrow_drop_up' : 'arrow_drop_down'
+                }}</mat-icon>{{ abs(r.delta) }}
+              </span>
+            }
+          </td>
+          <td class="c-team">
+            <span class="team">
+              @if (r.row.team.crest) {
+                <img
+                  class="crest"
+                  [src]="r.row.team.crest!"
+                  alt=""
+                  width="18"
+                  height="18"
+                  loading="lazy"
+                />
+              }
+              <span class="team-name">{{ r.row.team.tla ?? r.row.team.name }}</span>
+            </span>
+          </td>
+          <td class="c-num">{{ r.row.playedGames }}</td>
+          <td class="c-num">{{ r.row.goalDifference }}</td>
+          <td class="c-num c-pts">{{ r.row.points }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

@@ -1,6 +1,11 @@
-<section class="standings-root" [class.page]="!embedded()">
-  <mat-card appearance="outlined" class="standings-card">
-    @if (!embedded()) {
+@if (embedded()) {
+  <!-- Card-less: the host (e.g. the league-detail tab card) provides the card. -->
+  <div class="standings-root embedded-root">
+    <ng-container [ngTemplateOutlet]="body" />
+  </div>
+} @else {
+  <section class="standings-root page">
+    <mat-card appearance="outlined" class="standings-card">
       <mat-card-header>
         @if (competition()?.emblem) {
           <img
@@ -18,194 +23,53 @@
           }
         </mat-card-subtitle>
       </mat-card-header>
-    }
+      <mat-card-content class="card-body">
+        <ng-container [ngTemplateOutlet]="body" />
+      </mat-card-content>
+    </mat-card>
+  </section>
+}
 
-    <mat-card-content class="card-body">
-      <!-- View switch: mobile-only for league comps (both tables fit side by
-           side on desktop), but always shown in group mode where the grid
-           shows one view at a time. -->
-      <mat-button-toggle-group
-        class="view-toggle"
-        [class.always]="isGroupMode()"
-        [value]="view()"
-        (change)="view.set($event.value)"
-        hideSingleSelectionIndicator
-        aria-label="Choose which table to show"
-      >
-        <mat-button-toggle value="predicted">Predicted</mat-button-toggle>
-        <mat-button-toggle value="real">Actual</mat-button-toggle>
-      </mat-button-toggle-group>
+<!-- Picker + table layout, shared by the carded and card-less variants. -->
+<ng-template #body>
+  <mat-button-toggle-group
+    class="view-toggle"
+    [value]="view()"
+    (change)="view.set($event.value)"
+    hideSingleSelectionIndicator
+    aria-label="Choose predicted or actual standings"
+  >
+    <mat-button-toggle value="predicted">Predicted</mat-button-toggle>
+    <mat-button-toggle value="real">Actual</mat-button-toggle>
+  </mat-button-toggle-group>
 
-      @if (isGroupMode()) {
-        <!-- Group stage: a responsive grid of group mini-tables for the
-             chosen view. The predicted view's rows still carry their delta
-             vs the real table, so the comparison survives the single-view
-             layout. -->
-        <div class="compare-scroll">
-          @if (activeError()) {
-            <div class="state">
-              <mat-icon aria-hidden="true">cloud_off</mat-icon>
-              <p>Couldn't load standings.</p>
-              <button mat-stroked-button (click)="retry()">
-                <mat-icon>refresh</mat-icon>
-                Try again
-              </button>
-            </div>
-          } @else if (activeLoading()) {
-            <div class="state">
-              <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
-            </div>
-          } @else if (activeEmpty()) {
-            <div class="state">
-              @if (view() === 'predicted') {
-                <mat-icon aria-hidden="true">edit_note</mat-icon>
-                <p>Predict some matches to build your tables.</p>
-              } @else {
-                <mat-icon aria-hidden="true">event_busy</mat-icon>
-                <p>No official standings yet.</p>
-              }
-            </div>
-          } @else {
-            <div class="group-grid">
-              @for (t of activeTables(); track t.group) {
-                <div class="group-card">
-                  <ng-container
-                    [ngTemplateOutlet]="tableTpl"
-                    [ngTemplateOutletContext]="{ $implicit: t }"
-                  />
-                </div>
-              }
-            </div>
-          }
-        </div>
-      } @else {
-        <!-- League: predicted and real tables side by side (one at a time on
-             a phone, behind the toggle). -->
-        <div class="compare-scroll">
-          <div
-            class="compare"
-            [class.show-predicted]="view() === 'predicted'"
-            [class.show-real]="view() === 'real'"
-          >
-            <section class="side side-predicted">
-              <h2 class="side-title">
-                <mat-icon aria-hidden="true">insights</mat-icon> Predicted
-              </h2>
-              @if (!fixturesLoaded()) {
-                <div class="state">
-                  <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
-                </div>
-              } @else if (predictedEmpty()) {
-                <div class="state">
-                  <mat-icon aria-hidden="true">edit_note</mat-icon>
-                  <p>Predict some matches to build your table.</p>
-                </div>
-              } @else {
-                <ng-container
-                  [ngTemplateOutlet]="tablesTpl"
-                  [ngTemplateOutletContext]="{ $implicit: predictedTables() }"
-                />
-              }
-            </section>
-
-            <!-- Center divider — only visible when both sides show (desktop). -->
-            <div class="v-divider" aria-hidden="true"></div>
-
-            <section class="side side-real">
-              <h2 class="side-title">
-                <mat-icon aria-hidden="true">verified</mat-icon> Actual
-              </h2>
-              @if (realError()) {
-                <div class="state">
-                  <mat-icon aria-hidden="true">cloud_off</mat-icon>
-                  <p>Couldn't load standings.</p>
-                  <button mat-stroked-button (click)="retry()">
-                    <mat-icon>refresh</mat-icon>
-                    Try again
-                  </button>
-                </div>
-              } @else if (realLoading()) {
-                <div class="state">
-                  <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
-                </div>
-              } @else if (realEmpty()) {
-                <div class="state">
-                  <mat-icon aria-hidden="true">event_busy</mat-icon>
-                  <p>No official standings yet.</p>
-                </div>
-              } @else {
-                <ng-container
-                  [ngTemplateOutlet]="tablesTpl"
-                  [ngTemplateOutletContext]="{ $implicit: realDisplayTables() }"
-                />
-              }
-            </section>
+  <div class="standings-scroll">
+    @if (!fixturesLoaded()) {
+      <div class="state">
+        <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
+      </div>
+    } @else if (isGroupMode()) {
+      <div class="group-grid">
+        @for (g of groups(); track g) {
+          <div class="group-card">
+            <h3 class="group-label">Group {{ g }}</h3>
+            <app-standings-table
+              [competitionId]="competitionId()"
+              [season]="effectiveSeason()"
+              [group]="g"
+              [view]="view()"
+              [highlightTeamIds]="highlightTeamIds()"
+            />
           </div>
-        </div>
-      }
-    </mat-card-content>
-  </mat-card>
-</section>
-
-<!-- One compared table: optional group label + the rows. Rows carry a
-     `delta` (null on the real side); the arrow only renders on a non-zero
-     move. -->
-<ng-template #tableTpl let-t>
-  <div class="table-block">
-    @if (t.group) {
-      <h3 class="group-label">Group {{ t.group }}</h3>
-    }
-    <table class="standings-table">
-      <thead>
-        <tr>
-          <th class="c-pos">#</th>
-          <th class="c-team">Team</th>
-          <th class="c-num">P</th>
-          <th class="c-num">GD</th>
-          <th class="c-num c-pts">Pts</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (r of t.rows; track r.row.team.id ?? r.row.position) {
-          <tr>
-            <td class="c-pos">
-              <span class="pos">{{ r.row.position }}</span>
-              @if (r.delta !== null && r.delta !== 0) {
-                <span class="delta" [class.up]="r.delta > 0" [class.down]="r.delta < 0">
-                  <mat-icon aria-hidden="true">{{
-                    r.delta > 0 ? 'arrow_drop_up' : 'arrow_drop_down'
-                  }}</mat-icon>{{ abs(r.delta) }}
-                </span>
-              }
-            </td>
-            <td class="c-team">
-              <span class="team">
-                @if (r.row.team.crest) {
-                  <img
-                    class="crest"
-                    [src]="r.row.team.crest!"
-                    alt=""
-                    width="18"
-                    height="18"
-                    loading="lazy"
-                  />
-                }
-                <span class="team-name">{{ r.row.team.tla ?? r.row.team.name }}</span>
-              </span>
-            </td>
-            <td class="c-num">{{ r.row.playedGames }}</td>
-            <td class="c-num">{{ r.row.goalDifference }}</td>
-            <td class="c-num c-pts">{{ r.row.points }}</td>
-          </tr>
         }
-      </tbody>
-    </table>
+      </div>
+    } @else {
+      <app-standings-table
+        [competitionId]="competitionId()"
+        [season]="effectiveSeason()"
+        [view]="view()"
+        [highlightTeamIds]="highlightTeamIds()"
+      />
+    }
   </div>
-</ng-template>
-
-<!-- A list of compared tables (the league side panels). -->
-<ng-template #tablesTpl let-tables>
-  @for (t of tables; track t.group) {
-    <ng-container [ngTemplateOutlet]="tableTpl" [ngTemplateOutletContext]="{ $implicit: t }" />
-  }
 </ng-template>

@@ -27,7 +27,7 @@
       </div>
     }
 
-    @if (actualScore(); as actual) {
+    @if (displayScore(); as actual) {
       <div
         class="result-board"
         [class.live]="liveStatus()?.tone === 'live'"
@@ -121,7 +121,7 @@
     }
   </div>
 
-  @if (hasActualScore()) {
+  @if (hasDisplayScore()) {
     <div class="result-strip">
       @if (prediction(); as p) {
         <span class="pick">

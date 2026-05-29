@@ -2,11 +2,29 @@
   padding: 0;
   overflow: hidden;
 }
+/* Compact header — no avatar, tight padding, smaller type. */
 .predict-next-card mat-card-header {
-  padding: 1rem 1rem 0;
+  padding: 0.6rem 0.85rem 0;
+}
+.predict-next-card mat-card-title {
+  font: var(--mat-sys-title-small);
+  margin: 0;
+}
+.predict-next-card mat-card-subtitle {
+  font-size: 0.78rem;
+  margin: 0;
 }
 .fixture-slot {
-  padding: 0.5rem 0 0;
+  padding: 0.25rem 0 0.5rem;
+}
+/* Next/Save lives top-right in the header — pushed there with margin-left
+   auto and vertically centred against the title block. */
+.predict-next-card mat-card-header {
+  align-items: center;
+}
+.next-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 .empty {
   display: flex;

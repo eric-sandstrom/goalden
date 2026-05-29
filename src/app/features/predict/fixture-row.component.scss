@@ -2,6 +2,34 @@
   display: block;
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
+
+/* Compact variant (embeds like the predict-next card): trims padding, the
+   score widget, and the meta line so the host card stays short. */
+:host(.compact) .row {
+  padding: 0.4rem 0.75rem;
+}
+:host(.compact) .match {
+  gap: 0.5rem;
+}
+:host(.compact) .name {
+  font-size: 0.85rem;
+}
+:host(.compact) .score-box {
+  height: 36px;
+}
+:host(.compact) .step-stack {
+  width: 20px;
+}
+:host(.compact) .score-input {
+  width: 40px;
+  font-size: 0.9rem;
+}
+:host(.compact) .meta {
+  margin-top: 0.25rem;
+}
+:host(.compact) .status {
+  font-size: 0.76rem;
+}
 :host:last-of-type { border-bottom: none; }
 :host:nth-of-type(even) { background: var(--mat-sys-surface-container-low); }
 .row {

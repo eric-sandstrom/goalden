@@ -1,22 +1,27 @@
 <mat-card appearance="outlined" class="predict-next-card">
   <mat-card-header>
-    <mat-icon matCardAvatar>sports_soccer</mat-icon>
     <mat-card-title>Predict next match</mat-card-title>
     <mat-card-subtitle>{{ subtitle() }}</mat-card-subtitle>
+    @if (currentFixture()) {
+      <button mat-button class="next-btn" (click)="saveAndNext()">
+        {{ hasOtherUnpredicted() ? 'Next' : 'Save' }}
+        @if (hasOtherUnpredicted()) {
+          <mat-icon iconPositionEnd>chevron_right</mat-icon>
+        }
+      </button>
+    }
   </mat-card-header>
 
   @if (currentFixture(); as f) {
     <div class="fixture-slot">
-      <app-fixture-row [fixture]="f" [prediction]="predictionFor(f.id)" />
+      <app-fixture-row
+        [fixture]="f"
+        [prediction]="predictionFor(f.id)"
+        [autoSave]="false"
+        [compact]="true"
+        [defaultToZero]="true"
+      />
     </div>
-    @if (hasOtherUnpredicted()) {
-      <mat-card-actions align="end">
-        <button mat-button (click)="next()">
-          Next
-          <mat-icon iconPositionEnd>chevron_right</mat-icon>
-        </button>
-      </mat-card-actions>
-    }
   } @else {
     <mat-card-content class="empty">
       <mat-icon class="empty-icon" aria-hidden="true">check_circle</mat-icon>

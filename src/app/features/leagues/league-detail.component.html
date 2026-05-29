@@ -131,6 +131,7 @@
              (comp, season) so a Premier League card surfaces EPL
              fixtures, WC card surfaces WC fixtures, etc. -->
         <app-predict-next-card
+          #predictNext
           [competitionId]="league()!.competitionId"
           [season]="league()!.season"
         />
@@ -139,6 +140,7 @@
              winning this league) and the competition standings (your predicted
              table vs the real one). Both occupy the single fills-and-scrolls
              slot, so they never fight for height. -->
+        <mat-card appearance="outlined" class="lower-card card-grow">
         <nav mat-tab-nav-bar [tabPanel]="lowerPanel" class="section-tabs">
           <a
             mat-tab-link
@@ -154,7 +156,6 @@
 
         <mat-tab-nav-panel #lowerPanel class="lower-panel">
           @if (lowerView() === 'leaderboard') {
-            <mat-card appearance="outlined" class="table-wrap card-grow">
           <div class="card-scroll">
             <table mat-table [dataSource]="rows()">
               <ng-container matColumnDef="rank">
@@ -251,15 +252,15 @@
               ></tr>
             </table>
           </div>
-        </mat-card>
           } @else {
             <app-standings-view
-              class="card-grow"
               [competitionId]="league()!.competitionId"
               [season]="league()!.season"
               [embedded]="true"
+              [highlightTeamIds]="predictNext.highlightTeamIds()"
             />
           }
         </mat-tab-nav-panel>
+        </mat-card>
       }
     </section>

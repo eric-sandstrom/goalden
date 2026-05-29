@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -97,6 +107,15 @@ export class PredictNextCardComponent {
     return this.unpredicted()[0] ?? this.upcomingFixtures()[0] ?? null;
   });
 
+  /** Team ids of the match currently up for prediction. Consumed by the
+   *  standings table (via the league detail page) to highlight + scroll to
+   *  those teams. Empty when nothing's pending or the teams are TBD. */
+  readonly highlightTeamIds = computed<readonly number[]>(() => {
+    const f = this.currentFixture();
+    if (!f) return [];
+    return [f.homeTeam.id, f.awayTeam.id].filter((id): id is number => id !== null);
+  });
+
   /** Earliest upcoming fixture so the empty state can hint at "next match
    *  starts at …" rather than feeling like a dead end. */
   protected readonly nextLockedFixture = computed<Fixture | null>(() => {
@@ -151,6 +170,17 @@ export class PredictNextCardComponent {
 
   protected predictionFor(matchId: string): MatchPrediction | null {
     return this.predictions.matchPredictions().get(matchId) ?? null;
+  }
+
+  /** The embedded row, queried so the header's Next/Save button (rendered
+   *  outside the fixture block) can trigger its deferred save. */
+  private readonly rowRef = viewChild(FixtureRowComponent);
+
+  /** Save the shown pick (the embedded row has auto-save off), then advance.
+   *  This is the only place a prediction gets persisted from this card. */
+  protected async saveAndNext(): Promise<void> {
+    await this.rowRef()?.save();
+    this.next();
   }
 
   /**

@@ -9,10 +9,13 @@
     .grow { flex: 1; }
     mat-card-header { align-items: center; }
 
-    /* Leaderboard / Standings tabs + the panel they switch between. The nav
-       bar is header-only, so the panel keeps the app's fill-and-scroll model:
-       it fills the remaining height and its `.card-grow` child owns the
-       scroll (no nested tab-body scroller to fight). */
+    /* One card holding the Leaderboard / Standings tabs + the switched panel.
+       Padding:0 so the tab bar and table go edge-to-edge inside the card. The
+       header-only nav bar keeps the app's fill-and-scroll model: the panel
+       fills the remaining height and its scroll child owns the scroll. */
+    .lower-card {
+      padding: 0;
+    }
     .section-tabs {
       flex: 0 0 auto;
     }

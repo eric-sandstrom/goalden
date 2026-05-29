@@ -12,7 +12,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { FIRESTORE } from '../firebase/firebase.providers';
-import { Fixture, FixtureStage, FixtureStatus } from '../models/fixture.model';
+import { Fixture, FixtureStage, FixtureStatus, LiveState } from '../models/fixture.model';
 import { KnownTeam, asKnownTeam } from '../models/podium.model';
 import { AuthService } from './auth.service';
 
@@ -54,6 +54,11 @@ interface CachedFixture {
   stage: FixtureStage;
   group: string | null;
   score: Fixture['score'];
+  liveScore?: Fixture['liveScore'];
+  liveState?: Fixture['liveState'];
+  liveClock?: Fixture['liveClock'];
+  liveDetail?: Fixture['liveDetail'];
+  espnEventId?: Fixture['espnEventId'];
 }
 
 /** 5-minute cache freshness window — short enough that kickoff time
@@ -123,6 +128,13 @@ export class FixturesService {
    * store.
    */
   private readonly _liveById = signal<ReadonlyMap<string, Fixture>>(new Map());
+
+  /** Raw live docs per listener source ('auth' = football-data status,
+   *  'espn' = ESPN overlay). Each snapshot replaces its source's map
+   *  wholesale; `recomputeLive` unions them (dedup by doc id) into
+   *  `_liveById` and the per-comp overlay. Not a signal — it's just the
+   *  scratch state behind the reactive `_liveById`. */
+  private readonly _liveSources = new Map<'auth' | 'espn', Map<string, Fixture>>();
 
   // ---------------------------------------------------------------------------
   // Cross-comp derived signals
@@ -204,22 +216,31 @@ export class FixturesService {
       }
     });
 
-    // Live overlay — one global listener for every active live match
-    // across every comp. Routes incoming updates into the per-comp
-    // signal by inspecting each doc's competitionId/season.
+    // Live overlay — two global listeners, unioned into the live set:
+    //   1. Authoritative: football-data flipped status to IN_PLAY / PAUSED.
+    //   2. ESPN overlay: ESPN reports the match in progress (liveState 'in'),
+    //      which on football-data's free tier typically LEADS the
+    //      authoritative status flip — so this surfaces a live score sooner.
+    // Both route updates into the per-comp signal by competitionId/season.
+    // Each set is small (0–5 docs); the union dedupes by doc id.
     effect((onCleanup) => {
       const uid = this.auth.uid();
       if (!uid) return;
-      const liveQuery = query(
-        collection(this.db, 'fixtures'),
-        where('status', 'in', ['IN_PLAY', 'PAUSED']),
+      const fixtures = collection(this.db, 'fixtures');
+      const unsubAuth = onSnapshot(
+        query(fixtures, where('status', 'in', ['IN_PLAY', 'PAUSED'])),
+        (snap) => this.mergeLiveUpdates('auth', snap),
+        (err) => console.error('[FixturesService] live (auth) listener failed:', err),
       );
-      const unsub = onSnapshot(
-        liveQuery,
-        (snap) => this.mergeLiveUpdates(snap),
-        (err) => console.error('[FixturesService] live listener failed:', err),
+      const unsubEspn = onSnapshot(
+        query(fixtures, where('liveState', '==', 'in')),
+        (snap) => this.mergeLiveUpdates('espn', snap),
+        (err) => console.error('[FixturesService] live (espn) listener failed:', err),
       );
-      onCleanup(() => unsub());
+      onCleanup(() => {
+        unsubAuth();
+        unsubEspn();
+      });
     });
   }
 
@@ -469,28 +490,42 @@ export class FixturesService {
   }
 
   /**
-   * Merges incoming live-overlay updates into the appropriate per-comp
-   * signal. Each doc is routed by its (competitionId, season). Comps
-   * that haven't been loaded yet are skipped — they'll pick up the
-   * latest state via their initial fetch when first requested.
+   * Stores one listener source's complete live set, then recomputes the
+   * union. Each query returns the COMPLETE set for that source every time
+   * it fires, so we replace the source's map wholesale — this naturally
+   * drops matches that left the source's set (e.g. finished, or ESPN
+   * flipped to 'post').
    */
-  private mergeLiveUpdates(snap: QuerySnapshot): void {
-    // The live query returns the COMPLETE set of in-progress matches
-    // each time it fires, so rebuild the by-id map wholesale rather
-    // than diffing — this naturally drops matches that just finished.
-    const liveById = new Map<string, Fixture>();
-    const grouped = new Map<string, Map<string, Fixture>>();
+  private mergeLiveUpdates(source: 'auth' | 'espn', snap: QuerySnapshot): void {
+    const bySource = new Map<string, Fixture>();
     snap.forEach((d) => {
       const data = d.data();
       const compId =
         typeof data['competitionId'] === 'string' ? data['competitionId'] : 'WC';
       const season = typeof data['season'] === 'string' ? data['season'] : '2026';
-      const fixture = this.parse(d.id, data, compId, season);
-      liveById.set(d.id, fixture);
-      const key = mapKeyFor(compId, season);
-      if (!grouped.has(key)) grouped.set(key, new Map());
-      grouped.get(key)!.set(d.id, fixture);
+      bySource.set(d.id, this.parse(d.id, data, compId, season));
     });
+    this._liveSources.set(source, bySource);
+    this.recomputeLive();
+  }
+
+  /**
+   * Unions every source's live docs (dedup by id) into `_liveById` and
+   * overlays them onto the per-comp `_all` store. Routed by each doc's
+   * (competitionId, season); comps not yet loaded are skipped — they pick
+   * up the latest state via their initial fetch when first requested.
+   */
+  private recomputeLive(): void {
+    const liveById = new Map<string, Fixture>();
+    const grouped = new Map<string, Map<string, Fixture>>();
+    for (const bySource of this._liveSources.values()) {
+      for (const [id, fixture] of bySource) {
+        liveById.set(id, fixture);
+        const key = mapKeyFor(fixture.competitionId, fixture.season);
+        if (!grouped.has(key)) grouped.set(key, new Map());
+        grouped.get(key)!.set(id, fixture);
+      }
+    }
     this._liveById.set(liveById);
 
     if (grouped.size === 0) return;
@@ -623,6 +658,13 @@ export class FixturesService {
       stage: (data['stage'] as FixtureStage) ?? 'GROUP',
       group: data['group'] ?? null,
       score: data['score'] ?? null,
+      // ESPN live overlay (display-only). Absent on docs ESPN hasn't
+      // matched yet — default to null so consumers can treat uniformly.
+      liveScore: (data['liveScore'] as Fixture['liveScore']) ?? null,
+      liveState: (data['liveState'] as LiveState) ?? null,
+      liveClock: (data['liveClock'] as string) ?? null,
+      liveDetail: (data['liveDetail'] as string) ?? null,
+      espnEventId: (data['espnEventId'] as string) ?? null,
     };
   }
 }
@@ -643,6 +685,11 @@ function fixtureToCache(f: Fixture): CachedFixture {
     stage: f.stage,
     group: f.group,
     score: f.score,
+    liveScore: f.liveScore ?? null,
+    liveState: f.liveState ?? null,
+    liveClock: f.liveClock ?? null,
+    liveDetail: f.liveDetail ?? null,
+    espnEventId: f.espnEventId ?? null,
   };
 }
 
@@ -658,5 +705,10 @@ function fixtureFromCache(c: CachedFixture): Fixture {
     stage: c.stage,
     group: c.group,
     score: c.score,
+    liveScore: c.liveScore ?? null,
+    liveState: c.liveState ?? null,
+    liveClock: c.liveClock ?? null,
+    liveDetail: c.liveDetail ?? null,
+    espnEventId: c.espnEventId ?? null,
   };
 }

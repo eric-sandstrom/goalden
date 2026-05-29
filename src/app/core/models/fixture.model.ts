@@ -30,6 +30,9 @@ export interface FixtureScore {
   readonly winner: 'HOME' | 'AWAY' | 'DRAW' | null;
 }
 
+/** ESPN match state from the live overlay: pre-match, in progress, ended. */
+export type LiveState = 'pre' | 'in' | 'post';
+
 export interface Fixture {
   readonly id: string;
   /** Competition shortcode (e.g. 'WC', 'PL', 'CL'). Matches the
@@ -51,6 +54,22 @@ export interface Fixture {
   readonly stage: FixtureStage;
   readonly group: string | null;
   readonly score: FixtureScore | null;
+
+  // --- ESPN live overlay (display-only) ------------------------------------
+  // Written server-side by the poller's ESPN pass, never by the
+  // authoritative football-data path. The UI prefers these while a match is
+  // in progress (football-data's free tier lags), but they NEVER affect
+  // scoring or lock state — `isLocked` and points read `status`/`score` only.
+  /** ESPN's event id, the resolved cross-provider link. */
+  readonly espnEventId?: string | null;
+  /** ESPN's live score; null before kickoff. */
+  readonly liveScore?: { readonly home: number; readonly away: number } | null;
+  /** ESPN match state: 'pre' | 'in' | 'post'. */
+  readonly liveState?: LiveState | null;
+  /** ESPN display clock, e.g. "67'". */
+  readonly liveClock?: string | null;
+  /** ESPN short status label, e.g. 'HT', 'Final'. */
+  readonly liveDetail?: string | null;
 }
 
 export function isLocked(fixture: Fixture, now: Date = new Date()): boolean {

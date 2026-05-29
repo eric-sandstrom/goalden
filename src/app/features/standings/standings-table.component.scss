@@ -1,0 +1,129 @@
+:host {
+  display: block;
+}
+
+table.standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* Fixed layout: numeric columns hold their widths and the team column soaks
+     up the remainder, so tables line up wherever they're placed. */
+  table-layout: fixed;
+  font-size: 0.85rem;
+}
+.standings-table th {
+  background: var(--mat-sys-surface);
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mat-sys-on-surface-variant);
+}
+.standings-table td {
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.standings-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* The next match up for prediction — both teams highlighted so you can see
+   where your pick sits in the table. */
+.standings-table tr.highlight td {
+  background: color-mix(in srgb, var(--mat-sys-primary) 14%, transparent);
+}
+.standings-table tr.highlight td:first-child {
+  box-shadow: inset 3px 0 0 var(--mat-sys-primary);
+}
+
+/* Numeric stat columns: narrow, fixed, right-aligned header + cells. The
+   `th.c-num` selector is needed to beat the base `th { text-align: left }`. */
+.standings-table th.c-num,
+.standings-table td.c-num {
+  width: 2rem;
+  padding-left: 0.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.c-pts {
+  font-weight: 700;
+}
+/* Position (+ movement arrow): compact fixed column. */
+.standings-table th.c-pos,
+.standings-table td.c-pos {
+  width: 2.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.pos {
+  font-variant-numeric: tabular-nums;
+}
+/* Team column carries no width → absorbs the remainder under fixed layout. */
+.c-team {
+  overflow: hidden;
+}
+
+.team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.crest {
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.team-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Position movement vs the real table (predicted view only). Green = the
+   prediction ranks the team higher than reality; red = lower. */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  margin-left: 0.05rem;
+  vertical-align: middle;
+}
+.delta mat-icon {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+}
+.delta.up {
+  color: var(--mat-sys-primary);
+}
+.delta.down {
+  color: var(--mat-sys-error);
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+}
+.state p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.spin {
+  animation: standings-table-spin 1s linear infinite;
+}
+@keyframes standings-table-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

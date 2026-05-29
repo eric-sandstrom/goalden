@@ -6,9 +6,8 @@
   width: 100%;
 }
 
-/* The fill column. In standalone (route) mode it also carries `.page` (global
-   padding + 720px max-width + centering); embedded, it's a bare flex column
-   so it slots edge-to-edge into the host view. */
+/* Fill column. Standalone it also carries `.page` (global padding + 720px
+   max-width + centering); embedded it's a bare flex column. */
 .standings-root {
   display: flex;
   flex-direction: column;
@@ -24,7 +23,12 @@
   overflow: hidden;
 }
 
-/* Card body: a fixed mobile toggle above the single shared scroll area. */
+/* Card-less (embedded) variant — the host supplies the card, so we just add
+   a little inset around the picker + tables. */
+.embedded-root {
+  padding: 0.6rem 0.75rem;
+}
+
 .card-body {
   display: flex;
   flex-direction: column;
@@ -36,81 +40,21 @@
   object-fit: contain;
 }
 
-/* Mobile-only Predicted / Actual switch (both tables show side by side on
-   wider viewports). */
 .view-toggle {
-  display: none;
-  flex: 0 0 auto;
   align-self: flex-start;
+  flex: 0 0 auto;
   margin-bottom: 0.75rem;
 }
-/* Group mode shows the toggle on every viewport (no side-by-side there). */
-.view-toggle.always {
-  display: inline-flex;
-}
 
-/* One scroll container wrapping both tables, so they scroll together. */
-.compare-scroll {
+/* Single scroll region holding the table(s). */
+.standings-scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
 
-.compare {
-  display: flex;
-  align-items: stretch;
-  min-height: 100%;
-}
-
-.side {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 0 0.85rem;
-}
-.side:first-child {
-  padding-left: 0;
-}
-
-/* Full-height rule between the two tables; hidden when only one shows. */
-.v-divider {
-  flex: 0 0 auto;
-  width: 1px;
-  align-self: stretch;
-  background: var(--mat-sys-outline-variant);
-}
-
-/* Sticky column-group label, kept above the (also sticky) table header. */
-.side-title {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  height: 2rem;
-  margin: 0;
-  background: var(--mat-sys-surface);
-  font: var(--mat-sys-title-small);
-  color: var(--mat-sys-on-surface-variant);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.side-title mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-}
-
-.table-block + .table-block {
-  margin-top: 1rem;
-}
-.group-label {
-  margin: 0 0 0.25rem;
-  font: var(--mat-sys-title-small);
-}
-
-/* Group-stage grid: one card per group. Capped at two columns (three is
-   too cramped at the 720px page width); collapses to one on narrow phones. */
+/* Group-stage grid: one card per group, capped at two columns (three is too
+   cramped at the 720px page width); one column on narrow phones. */
 .group-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -129,154 +73,23 @@
   padding: 0.4rem 0.55rem 0.25rem;
   background: var(--mat-sys-surface-container-low);
 }
-.group-card .group-label {
+.group-label {
   margin: 0 0 0.2rem;
+  font: var(--mat-sys-title-small);
 }
 
-table.standings-table {
-  width: 100%;
-  border-collapse: collapse;
-  /* Fixed layout: numeric columns hold their set widths and the team column
-     soaks up the remainder, so both sides' columns line up identically. */
-  table-layout: fixed;
-  font-size: 0.85rem;
-}
-.standings-table th {
-  background: var(--mat-sys-surface);
-  text-align: left;
-  padding: 0.3rem 0.4rem;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--mat-sys-on-surface-variant);
-}
-/* Sticky headers only in the side-by-side (league) layout. The short group
-   mini-tables don't need them, and sticky would misbehave inside the grid. */
-.side .standings-table th {
-  position: sticky;
-  top: 2rem; /* sits directly below the sticky side title */
-  z-index: 1;
-}
-.standings-table td {
-  padding: 0.3rem 0.4rem;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
-}
-.standings-table tr:last-child td {
-  border-bottom: none;
-}
-
-/* Numeric stat columns: narrow, fixed, right-aligned header *and* cells.
-   The `th.c-num` selector is needed to beat the base `th { text-align: left }`. */
-.standings-table th.c-num,
-.standings-table td.c-num {
-  width: 2rem;
-  padding-left: 0.2rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.c-pts {
-  font-weight: 700;
-}
-/* Position (+ movement arrow): compact fixed column. */
-.standings-table th.c-pos,
-.standings-table td.c-pos {
-  width: 2.4rem;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.pos {
-  font-variant-numeric: tabular-nums;
-}
-/* Team column carries no width, so under fixed layout it absorbs all the
-   remaining space — the "flex: 1" column. Clip overflow; the name ellipsizes. */
-.c-team {
-  overflow: hidden;
-}
-
-.team {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-  max-width: 100%;
-}
-.crest {
-  object-fit: contain;
-  flex-shrink: 0;
-}
-.team-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-/* Position movement vs the real table (predicted side only). Green = the
-   prediction ranks the team higher than reality; red = lower. */
-.delta {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.68rem;
-  font-weight: 600;
-  margin-left: 0.05rem;
-  vertical-align: middle;
-}
-.delta mat-icon {
-  font-size: 13px;
-  width: 13px;
-  height: 13px;
-}
-.delta.up {
-  color: var(--mat-sys-primary);
-}
-.delta.down {
-  color: var(--mat-sys-error);
-}
-
+/* Orchestrator-level loading spinner (before fixtures resolve). */
 .state {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: 0.5rem;
   padding: 1.75rem 1rem;
   color: var(--mat-sys-on-surface-variant);
-  text-align: center;
-}
-.state p {
-  margin: 0;
-  font-size: 0.85rem;
 }
 .spin {
-  animation: standings-spin 1s linear infinite;
+  animation: standings-view-spin 1s linear infinite;
 }
-@keyframes standings-spin {
+@keyframes standings-view-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-/* Phone: stack to one table behind the toggle; drop the divider + side insets. */
-@media (max-width: 760px) {
-  .view-toggle {
-    display: inline-flex;
-  }
-  .compare {
-    display: block;
-  }
-  .v-divider {
-    display: none;
-  }
-  .side,
-  .side:first-child {
-    padding: 0;
-  }
-  .compare.show-predicted .side-real {
-    display: none;
-  }
-  .compare.show-real .side-predicted {
-    display: none;
   }
 }
