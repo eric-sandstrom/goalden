@@ -14,6 +14,13 @@ import {
   resolveCompetitionContexts,
   sleep,
 } from './lib/competition-contexts';
+import {
+  MappedEspnEvent,
+  fetchEspnScoreboard,
+  getEspnSlug,
+  mapEspnEvent,
+  naturalKey,
+} from './lib/espn-live';
 
 export const FOOTBALL_DATA_TOKEN = defineSecret('FOOTBALL_DATA_TOKEN');
 
@@ -88,6 +95,19 @@ export async function runPollFootballData(
         fetched: 0,
         written: 0,
         error: message,
+      });
+    }
+
+    // Best-effort ESPN live overlay for this comp. Isolated in its own
+    // try/catch so a failure can't affect the authoritative poll result
+    // recorded above — it writes only the display-only `live*` fields. No-ops
+    // (without a fetch) when the comp has no ESPN slug or no fixture is in
+    // the live window.
+    try {
+      await pollEspnLive(db, ctx);
+    } catch (e: unknown) {
+      logger.warn(`[${ctx.id}] ESPN live overlay failed (non-fatal)`, {
+        error: e instanceof Error ? e.message : String(e),
       });
     }
 
@@ -289,6 +309,116 @@ async function isMatchWindow(
     .limit(50)
     .get();
   return snap.docs.some((d) => !TERMINAL_STATUSES.has((d.data() as FixtureDoc).status));
+}
+
+/**
+ * Best-effort live-score overlay from ESPN's public (unofficial) scoreboard
+ * for one competition. Writes ONLY the `live*` fields onto matching fixture
+ * docs — never the authoritative `score`/`status`/`winner`, which stay
+ * football-data's exclusively. The client treats `live*` as display-only and
+ * scoring never reads them, so a wrong or stale ESPN value can't move points.
+ *
+ * Matching: ESPN and football-data have disjoint id spaces, so a fixture is
+ * reconciled to an ESPN event by a natural key (UTC match day + the unordered
+ * pair of FIFA 3-letter codes). The resolved ESPN id is written back as
+ * `espnEventId` so subsequent polls short-circuit to a direct id lookup.
+ *
+ * Cost control: scoped to fixtures already in the live window (same bounds as
+ * `isMatchWindow`), so with nothing live it returns before even hitting ESPN.
+ * The window query is a single-field range (auto-indexed); the comp is
+ * filtered in code to avoid a composite index — same trick as isMatchWindow.
+ */
+async function pollEspnLive(
+  db: FirebaseFirestore.Firestore,
+  ctx: CompetitionContext,
+): Promise<void> {
+  const slug = getEspnSlug(ctx.id);
+  if (!slug) return; // comp not mapped to an ESPN league — skip silently
+
+  const now = new Date();
+  const lower = Timestamp.fromDate(new Date(now.getTime() - MAX_MATCH_DURATION_MS));
+  const upper = Timestamp.fromDate(new Date(now.getTime() + MATCH_LOOKAHEAD_MS));
+  const snap = await db
+    .collection('fixtures')
+    .where('utcKickoff', '>=', lower)
+    .where('utcKickoff', '<=', upper)
+    .limit(50)
+    .get();
+  const candidates = snap.docs
+    .map((d) => ({ id: d.id, fx: d.data() as FixtureDoc }))
+    .filter((c) => (c.fx.competitionId ?? 'WC') === ctx.id);
+  if (candidates.length === 0) return; // nothing live for this comp — no fetch
+
+  const events = await fetchEspnScoreboard(slug);
+  if (events.length === 0) return;
+
+  const mapped = events
+    .map(mapEspnEvent)
+    .filter((e): e is MappedEspnEvent => e !== null);
+  const byId = new Map<string, MappedEspnEvent>(
+    mapped.map((e) => [e.eventId, e] as [string, MappedEspnEvent]),
+  );
+  const byKey = new Map<string, MappedEspnEvent>(
+    mapped.map((e) => [e.key, e] as [string, MappedEspnEvent]),
+  );
+
+  const batch = db.batch();
+  let writes = 0;
+  let matched = 0;
+  const unmatched: string[] = [];
+
+  for (const { id, fx } of candidates) {
+    const home = fx.homeTeam.tla?.toUpperCase().trim();
+    const away = fx.awayTeam.tla?.toUpperCase().trim();
+
+    // Prefer the stored id (stable); fall back to the natural key on first
+    // resolution. TBD fixtures (null codes) can't be keyed, so they skip.
+    let ev = fx.espnEventId ? byId.get(fx.espnEventId) : undefined;
+    if (!ev && home && away) {
+      ev = byKey.get(naturalKey(fx.utcKickoff.toDate().toISOString(), home, away));
+    }
+    if (!ev) {
+      if (home && away) unmatched.push(`${home}-${away}`);
+      continue;
+    }
+    matched++;
+
+    if (!liveOverlayChanged(fx, ev)) continue;
+    batch.set(
+      db.collection('fixtures').doc(id),
+      {
+        espnEventId: ev.eventId,
+        liveScore: ev.live.score,
+        liveState: ev.live.state,
+        liveClock: ev.live.clock,
+        liveDetail: ev.live.detail,
+        liveSyncedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    writes++;
+  }
+
+  if (writes > 0) await batch.commit();
+  logger.info(
+    `[${ctx.id}] ESPN live: ${matched}/${candidates.length} matched, ${writes} written`,
+    { unmatched },
+  );
+}
+
+/** True when ESPN's snapshot differs from what's stored, so we only write
+ *  (and trigger client onSnapshot fanout) on a real change. The cosmetic
+ *  `detail` string is intentionally excluded to avoid churn from minute-label
+ *  rewrites that carry no new score/state information. */
+function liveOverlayChanged(fx: FixtureDoc, ev: MappedEspnEvent): boolean {
+  if ((fx.espnEventId ?? null) !== ev.eventId) return true;
+  if ((fx.liveState ?? null) !== ev.live.state) return true;
+  if ((fx.liveClock ?? null) !== (ev.live.clock ?? null)) return true;
+  const ph = fx.liveScore?.home ?? null;
+  const pa = fx.liveScore?.away ?? null;
+  const nh = ev.live.score?.home ?? null;
+  const na = ev.live.score?.away ?? null;
+  return ph !== nh || pa !== na;
 }
 
 export const pollFootballData = onSchedule(

@@ -76,6 +76,28 @@ export interface FixtureDoc {
     fullTime: { home: number; away: number } | null;
     winner: 'HOME' | 'AWAY' | 'DRAW' | null;
   };
+
+  // --- ESPN live overlay (display-only) ------------------------------------
+  // Written EXCLUSIVELY by the ESPN pass in the poller (pollEspnLive), never
+  // by mapFixture or scoreMatch, and always via merge so the two write paths
+  // don't clobber each other. The authoritative `score`/`status`/`winner`
+  // above are the only fields scoring ever reads — these never feed points.
+  // Optional because a fixture has no overlay until it first appears on
+  // ESPN's scoreboard (around kickoff), and `fixtureChanged` intentionally
+  // ignores them (it diffs authoritative fields only).
+  /** ESPN's event id, resolved once via natural key then reused for direct
+   *  lookups on later polls. */
+  espnEventId?: string | null;
+  /** Live score per ESPN; null before kickoff. Display-only. */
+  liveScore?: { home: number; away: number } | null;
+  /** ESPN match state: 'pre' | 'in' | 'post'. */
+  liveState?: 'pre' | 'in' | 'post' | null;
+  /** Display clock, e.g. "67'". Null when not in play. */
+  liveClock?: string | null;
+  /** Short status label, e.g. 'HT', 'Final'. */
+  liveDetail?: string | null;
+  /** When the overlay was last refreshed from ESPN. */
+  liveSyncedAt?: Timestamp;
 }
 
 /** Context the polling loop passes to mapFixture so the produced doc
