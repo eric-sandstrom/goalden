@@ -112,3 +112,34 @@ app-root {
 .mat-mdc-snack-bar-container {
   margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
 }
+
+// =============================================================================
+// Create-league bottom sheet
+// =============================================================================
+//
+// The bottom sheet defaults to full-viewport width (min-width: 100vw). Cap it
+// to the app's .page content width so it lines up with the rest of the UI:
+// full-bleed on phones, 720px centered on wider screens. `panelClass` lands on
+// the CDK overlay pane, which sits outside component style encapsulation — so
+// this override has to be global.
+
+// The `.cdk-overlay-pane` base rule sets max-width:100% at the same specificity,
+// so qualify with `.cdk-overlay-pane` to win on source order.
+.create-league-sheet.cdk-overlay-pane {
+  max-width: 720px;
+}
+.create-league-sheet mat-bottom-sheet-container {
+  min-width: 0;
+  // Float 16px clear of the viewport's side edges on phones (the flex overlay
+  // wrapper centers it); capped at 720px to line up with .page on wider screens.
+  width: calc(100vw - 32px);
+  max-width: 720px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  // Drop Material's default 8px/16px container padding — the component owns its
+  // own spacing — and round the top corners for the standard bottom-sheet look
+  // (overflow already clips to the rounded rect).
+  padding: 0;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}

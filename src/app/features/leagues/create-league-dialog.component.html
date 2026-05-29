@@ -1,128 +1,131 @@
-    <h2 mat-dialog-title>
-      <mat-icon class="title-icon">groups</mat-icon>
-      Create a league
-    </h2>
-    <mat-dialog-content>
-      <form [formGroup]="form">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>League name</mat-label>
-          <input
-            matInput
-            formControlName="name"
-            maxlength="40"
-            cdkFocusInitial
-            autocomplete="off"
-          />
-          <mat-hint align="end">{{ form.controls.name.value.length }}/40</mat-hint>
-          @if (form.controls.name.touched && form.controls.name.hasError('minlength')) {
-            <mat-error>At least 2 characters</mat-error>
-          }
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="comp-field">
-          <mat-label>Competition</mat-label>
-          <mat-select
-            formControlName="competitionId"
-            [disabled]="noSelectableComps()"
-            panelClass="comp-picker-panel"
-          >
-            @if (groupedComps().cups.length > 0) {
-              <mat-optgroup label="Tournaments">
-                @for (comp of groupedComps().cups; track comp.id) {
-                  <mat-option [value]="comp.id">
-                    <span class="opt">
-                      @if (comp.emblem) {
-                        <img
-                          class="opt-crest"
-                          [src]="comp.emblem"
-                          [alt]="comp.name + ' emblem'"
-                          width="20"
-                          height="20"
-                        />
-                      } @else {
-                        <span class="opt-crest placeholder" aria-hidden="true"></span>
-                      }
-                      <span class="opt-name">{{ comp.name }}</span>
-                      @if (remainingForOption(comp); as remaining) {
-                        <span class="opt-count" [class.zero]="remaining === 0">
-                          {{ remaining }} to predict
-                        </span>
-                      }
-                    </span>
-                  </mat-option>
-                }
-              </mat-optgroup>
-            }
-            @if (groupedComps().leagues.length > 0) {
-              <mat-optgroup label="Domestic leagues">
-                @for (comp of groupedComps().leagues; track comp.id) {
-                  <mat-option [value]="comp.id">
-                    <span class="opt">
-                      @if (comp.emblem) {
-                        <img
-                          class="opt-crest"
-                          [src]="comp.emblem"
-                          [alt]="comp.name + ' emblem'"
-                          width="20"
-                          height="20"
-                        />
-                      } @else {
-                        <span class="opt-crest placeholder" aria-hidden="true"></span>
-                      }
-                      <span class="opt-name">{{ comp.name }}</span>
-                      @if (remainingForOption(comp); as remaining) {
-                        <span class="opt-count" [class.zero]="remaining === 0">
-                          {{ remaining }} to predict
-                        </span>
-                      }
-                    </span>
-                  </mat-option>
-                }
-              </mat-optgroup>
-            }
-          </mat-select>
-          @if (noSelectableComps()) {
-            <mat-hint>
-              No upcoming or in-progress competitions found — an admin
-              needs to sync the catalogue from football-data first.
-            </mat-hint>
-          }
-        </mat-form-field>
-
-        <div class="type-row">
-          <span class="type-label">Visibility</span>
-          <mat-button-toggle-group formControlName="type" hideSingleSelectionIndicator>
-            <mat-button-toggle value="private">
-              <mat-icon>lock</mat-icon>
-              Private
-            </mat-button-toggle>
-            <mat-button-toggle value="public">
-              <mat-icon>public</mat-icon>
-              Public
-            </mat-button-toggle>
-          </mat-button-toggle-group>
-          <p class="type-hint">
-            @if (form.controls.type.value === 'private') {
-              Invite-only — share the code or link.
-            } @else {
-              Anyone can find and join — no invite needed.
-            }
-          </p>
-        </div>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="cancel()" [disabled]="creating()">Cancel</button>
-      <button
-        mat-flat-button
-        color="primary"
-        (click)="submit()"
-        [disabled]="form.invalid || creating() || noSelectableComps()"
-      >
-        @if (creating()) {
-          <mat-progress-spinner mode="indeterminate" diameter="20" />
-        } @else {
-          Create
+<div class="sheet">
+  <span class="grabber" aria-hidden="true"></span>
+  <h2 class="sheet-title">
+    <mat-icon class="title-icon">groups</mat-icon>
+    Create a league
+  </h2>
+  <div class="sheet-content">
+    <form [formGroup]="form">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="name-field">
+        <mat-label>League name</mat-label>
+        <input
+          matInput
+          formControlName="name"
+          maxlength="40"
+          cdkFocusInitial
+          autocomplete="off"
+        />
+        <mat-hint align="end">{{ form.controls.name.value.length }}/40</mat-hint>
+        @if (form.controls.name.touched && form.controls.name.hasError('minlength')) {
+          <mat-error>At least 2 characters</mat-error>
         }
-      </button>
-    </mat-dialog-actions>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="comp-field">
+        <mat-label>Competition</mat-label>
+        <mat-select
+          formControlName="competitionId"
+          [disabled]="noSelectableComps()"
+          panelClass="comp-picker-panel"
+        >
+          @if (groupedComps().cups.length > 0) {
+            <mat-optgroup label="Tournaments">
+              @for (comp of groupedComps().cups; track comp.id) {
+                <mat-option [value]="comp.id">
+                  <span class="opt">
+                    @if (comp.emblem) {
+                      <img
+                        class="opt-crest"
+                        [src]="comp.emblem"
+                        [alt]="comp.name + ' emblem'"
+                        width="20"
+                        height="20"
+                      />
+                    } @else {
+                      <span class="opt-crest placeholder" aria-hidden="true"></span>
+                    }
+                    <span class="opt-name">{{ comp.name }}</span>
+                    @if (remainingForOption(comp); as remaining) {
+                      <span class="opt-count" [class.zero]="remaining === 0">
+                        {{ remaining }} to predict
+                      </span>
+                    }
+                  </span>
+                </mat-option>
+              }
+            </mat-optgroup>
+          }
+          @if (groupedComps().leagues.length > 0) {
+            <mat-optgroup label="Domestic leagues">
+              @for (comp of groupedComps().leagues; track comp.id) {
+                <mat-option [value]="comp.id">
+                  <span class="opt">
+                    @if (comp.emblem) {
+                      <img
+                        class="opt-crest"
+                        [src]="comp.emblem"
+                        [alt]="comp.name + ' emblem'"
+                        width="20"
+                        height="20"
+                      />
+                    } @else {
+                      <span class="opt-crest placeholder" aria-hidden="true"></span>
+                    }
+                    <span class="opt-name">{{ comp.name }}</span>
+                    @if (remainingForOption(comp); as remaining) {
+                      <span class="opt-count" [class.zero]="remaining === 0">
+                        {{ remaining }} to predict
+                      </span>
+                    }
+                  </span>
+                </mat-option>
+              }
+            </mat-optgroup>
+          }
+        </mat-select>
+        @if (noSelectableComps()) {
+          <mat-hint>
+            No upcoming or in-progress competitions found — an admin
+            needs to sync the catalogue from football-data first.
+          </mat-hint>
+        }
+      </mat-form-field>
+
+      <div class="type-row">
+        <span class="type-label">Visibility</span>
+        <mat-button-toggle-group formControlName="type" hideSingleSelectionIndicator>
+          <mat-button-toggle value="private">
+            <mat-icon>lock</mat-icon>
+            Private
+          </mat-button-toggle>
+          <mat-button-toggle value="public">
+            <mat-icon>public</mat-icon>
+            Public
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+        <p class="type-hint">
+          @if (form.controls.type.value === 'private') {
+            Invite-only — share the code or link.
+          } @else {
+            Anyone can find and join — no invite needed.
+          }
+        </p>
+      </div>
+    </form>
+  </div>
+  <div class="sheet-actions">
+    <button mat-button (click)="cancel()" [disabled]="creating()">Cancel</button>
+    <button
+      mat-flat-button
+      color="primary"
+      (click)="submit()"
+      [disabled]="form.invalid || creating() || noSelectableComps()"
+    >
+      @if (creating()) {
+        <mat-progress-spinner mode="indeterminate" diameter="20" />
+      } @else {
+        Create
+      }
+    </button>
+  </div>
+</div>

@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -25,7 +25,6 @@ const PREFERRED_DEFAULT_COMP_ID = 'WC';
     ReactiveFormsModule,
     MatButtonModule,
     MatButtonToggleModule,
-    MatDialogModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -41,7 +40,7 @@ export class CreateLeagueDialogComponent {
   private readonly competitionsService = inject(CompetitionsService);
   private readonly fixtures = inject(FixturesService);
   private readonly snackBar = inject(MatSnackBar);
-  private readonly dialogRef = inject(MatDialogRef<CreateLeagueDialogComponent, string>);
+  private readonly sheetRef = inject(MatBottomSheetRef<CreateLeagueDialogComponent, string>);
   private readonly fb = inject(FormBuilder);
 
   protected readonly creating = signal(false);
@@ -137,7 +136,7 @@ export class CreateLeagueDialogComponent {
   });
 
   protected cancel(): void {
-    this.dialogRef.close();
+    this.sheetRef.dismiss();
   }
 
   protected async submit(): Promise<void> {
@@ -152,7 +151,7 @@ export class CreateLeagueDialogComponent {
         value.competitionId,
         season,
       );
-      this.dialogRef.close(leagueId);
+      this.sheetRef.dismiss(leagueId);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Could not create league';
       this.snackBar.open(msg, 'Dismiss', { duration: 4000 });

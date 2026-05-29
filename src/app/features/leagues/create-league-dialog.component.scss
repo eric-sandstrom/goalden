@@ -1,75 +1,125 @@
-    h2 {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0;
-    }
-    .title-icon {
-      color: var(--mat-sys-primary);
-    }
-    mat-form-field {
-      width: 100%;
-      min-width: 320px;
-    }
-    .type-row {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      margin-top: 0.75rem;
-    }
-    .type-label {
-      font-size: 0.85rem;
-      color: var(--mat-sys-on-surface-variant);
-    }
-    .type-row mat-button-toggle-group {
-      align-self: stretch;
-    }
-    .type-hint {
-      margin: 0;
-      font-size: 0.78rem;
-      color: var(--mat-sys-on-surface-variant);
-    }
-    .comp-field {
-      margin-top: 0.5rem;
-    }
-    /* Option layout — crest + name in a row. Used for both optgroup
-       sections; the placeholder span keeps the name aligned across rows
-       where the crest is missing. */
-    .opt {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .opt-crest {
-      width: 20px;
-      height: 20px;
-      object-fit: contain;
-      flex-shrink: 0;
-      border-radius: 3px;
-    }
-    .opt-crest.placeholder {
-      background: var(--mat-sys-surface-container);
-    }
-    .opt-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    /* Trailing fixture-count chip. Pushed to the far right via margin-
-       left:auto so the comp name owns the natural width and the count
-       hugs the option edge — easy scan when comparing options. */
-    .opt-count {
-      margin-left: auto;
-      padding-left: 12px;
-      font-size: 0.78rem;
-      color: var(--mat-sys-on-surface-variant);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-    /* When a comp has zero matches left to predict (post-season but the
-       season hasn't ended yet, e.g. CL just before currentSeason flips),
-       dim further so the user knows nothing's actionable. */
-    .opt-count.zero {
-      opacity: 0.6;
-      font-style: italic;
-    }
+:host {
+  display: block;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  /* Own the sheet's spacing now the container padding is removed: tighter
+     sides than Material's default 16px, and clear of the iOS home indicator
+     at the bottom. */
+  padding: 0.5rem 0.75rem max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Drag-handle affordance — signals the panel can be dismissed downward. */
+.grabber {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--mat-sys-outline-variant);
+  margin: 0 0 0.5rem;
+}
+
+.sheet-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0.25rem;
+  font: var(--mat-sys-title-large);
+}
+.title-icon {
+  color: var(--mat-sys-primary);
+}
+
+/* Body scrolls internally so a long competition list never pushes the
+   action buttons off the bottom of the sheet. */
+.sheet-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+mat-form-field {
+  width: 100%;
+}
+/* Breathing room above the first field so its floating outline label
+   isn't clipped by / crowded against the sheet title. */
+.name-field {
+  margin-top: 0.5rem;
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 0.75rem;
+}
+
+.type-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+.type-label {
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.type-row mat-button-toggle-group {
+  align-self: stretch;
+}
+.type-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.comp-field {
+  margin-top: 0.5rem;
+}
+/* Option layout — crest + name in a row. Used for both optgroup
+   sections; the placeholder span keeps the name aligned across rows
+   where the crest is missing. */
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.opt-crest {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.opt-crest.placeholder {
+  background: var(--mat-sys-surface-container);
+}
+.opt-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Trailing fixture-count chip. Pushed to the far right via margin-
+   left:auto so the comp name owns the natural width and the count
+   hugs the option edge — easy scan when comparing options. */
+.opt-count {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* When a comp has zero matches left to predict (post-season but the
+   season hasn't ended yet, e.g. CL just before currentSeason flips),
+   dim further so the user knows nothing's actionable. */
+.opt-count.zero {
+  opacity: 0.6;
+  font-style: italic;
+}

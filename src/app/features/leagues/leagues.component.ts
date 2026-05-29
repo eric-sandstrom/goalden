@@ -9,10 +9,11 @@ import {
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -40,7 +41,6 @@ interface LeagueStanding {
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
-    MatDialogModule,
     MatDividerModule,
     MatFormFieldModule,
     MatIconModule,
@@ -56,7 +56,7 @@ interface LeagueStanding {
 export class LeaguesComponent {
   private readonly leagues = inject(LeaguesService);
   private readonly auth = inject(AuthService);
-  private readonly dialog = inject(MatDialog);
+  private readonly bottomSheet = inject(MatBottomSheet);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
@@ -206,10 +206,11 @@ export class LeaguesComponent {
   }
 
   protected async openCreate(): Promise<void> {
-    const ref = this.dialog.open<CreateLeagueDialogComponent, void, string>(
+    const ref = this.bottomSheet.open<CreateLeagueDialogComponent, void, string>(
       CreateLeagueDialogComponent,
+      { panelClass: 'create-league-sheet' },
     );
-    const leagueId = await ref.afterClosed().toPromise();
+    const leagueId = await firstValueFrom(ref.afterDismissed());
     if (leagueId) {
       await this.router.navigate(['/leagues', leagueId]);
     }
