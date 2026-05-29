@@ -1,7 +1,7 @@
 import { defineSecret } from 'firebase-functions/params';
 import * as logger from 'firebase-functions/logger';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import {
   FixtureDoc,
   FootballDataMatch,
@@ -9,6 +9,11 @@ import {
   fixtureChanged,
   mapFixture,
 } from './lib/fixture-mapper';
+import {
+  CompetitionContext,
+  resolveCompetitionContexts,
+  sleep,
+} from './lib/competition-contexts';
 
 export const FOOTBALL_DATA_TOKEN = defineSecret('FOOTBALL_DATA_TOKEN');
 
@@ -16,11 +21,6 @@ export const FOOTBALL_DATA_TOKEN = defineSecret('FOOTBALL_DATA_TOKEN');
  *  10 req/min — at 12 comps every 10 min we stay well under, but the
  *  delay keeps us polite and avoids burst-rate-limit edge cases. */
 const INTER_REQUEST_DELAY_MS = 200;
-
-interface CompetitionContext {
-  readonly id: string;
-  readonly season: string;
-}
 
 interface CompetitionPollResult {
   readonly compId: string;
@@ -58,7 +58,7 @@ export async function runPollFootballData(
   compId?: string,
 ): Promise<PollSummary> {
   const db = getFirestore();
-  const contexts = await resolveContexts(db, compId);
+  const contexts = await resolveCompetitionContexts(db, compId);
 
   if (contexts.length === 0) {
     const message = compId
@@ -102,7 +102,14 @@ export async function runPollFootballData(
   // keep it populated with WC contents during the dual-running window
   // until task #71 swaps the service to per-comp rollups. Once that
   // lands this block can go.
-  await writeLegacyRollup(db);
+  //
+  // Only when something changed this run — otherwise `cache/fixtures`
+  // already matches the canonical docs. Gating on totalWritten (not just
+  // WC's count) means a non-WC-only change does one redundant rewrite, but
+  // we never miss a WC change: any WC write makes totalWritten > 0.
+  if (totalWritten > 0) {
+    await writeLegacyRollup(db);
+  }
 
   logger.info(
     `Polled ${contexts.length} competition(s) — fetched ${totalFetched}, wrote ${totalWritten}`,
@@ -115,46 +122,6 @@ export async function runPollFootballData(
     written: totalWritten,
     competitions: perComp,
   };
-}
-
-/**
- * Resolves the list of (compId, season) contexts to poll. Two paths:
- *   - explicit `compId`: read that single doc; if missing or no
- *     currentSeason, return empty so the caller surfaces the warning.
- *   - implicit: list `competitions/` where `active == true`.
- *
- * Comps without a `currentSeason` are filtered out — football-data
- * returns null for these during the between-seasons window and there's
- * nothing to poll until the next season starts.
- */
-async function resolveContexts(
-  db: FirebaseFirestore.Firestore,
-  compId: string | undefined,
-): Promise<readonly CompetitionContext[]> {
-  const snap = compId
-    ? await db.collection('competitions').doc(compId).get().then((d) => (d.exists ? [d] : []))
-    : (await db.collection('competitions').where('active', '==', true).get()).docs;
-
-  const contexts: CompetitionContext[] = [];
-  for (const doc of snap) {
-    const data = doc.data() ?? {};
-    const season = extractSeason(data['currentSeason']);
-    if (!season) {
-      logger.info(`[${doc.id}] skipped — no current season`);
-      continue;
-    }
-    contexts.push({ id: doc.id, season });
-  }
-  return contexts;
-}
-
-/** Pulls the season starting calendar year out of the API's date format.
- *  e.g. `currentSeason.startDate = '2025-08-16'` → `'2025'`. */
-function extractSeason(currentSeason: unknown): string | null {
-  if (!currentSeason || typeof currentSeason !== 'object') return null;
-  const startDate = (currentSeason as { startDate?: unknown })['startDate'];
-  if (typeof startDate !== 'string' || startDate.length < 4) return null;
-  return startDate.slice(0, 4);
 }
 
 /** Fetches one competition's matches, writes changes, refreshes its
@@ -210,28 +177,29 @@ async function pollOneCompetition(
     }
   }
 
+  // Per-comp rollup, refreshed only when a fixture actually changed. With
+  // writes === 0 the stored rollup already matches the canonical docs, so
+  // rewriting it would be a pure waste; any future change rebuilds it in
+  // full from the API response below.
   if (writes > 0) {
     await batch.commit();
     logger.info(`[${ctx.id}] updated ${writes} fixtures`);
-  }
 
-  // Per-comp rollup. Rewritten on every poll so it can't drift from
-  // the canonical per-fixture docs — cheaper than detecting any change
-  // across the comp's matches.
-  const rollup = matches.map((m) => ({
-    id: `fd-${m.id}`,
-    ...mapFixture(m as FootballDataMatch, {
+    const rollup = matches.map((m) => ({
+      id: `fd-${m.id}`,
+      ...mapFixture(m as FootballDataMatch, {
+        competitionId: ctx.id,
+        season: ctx.season,
+      }),
+    }));
+    await db.collection('cache').doc(`fixtures-${ctx.id}`).set({
       competitionId: ctx.id,
       season: ctx.season,
-    }),
-  }));
-  await db.collection('cache').doc(`fixtures-${ctx.id}`).set({
-    competitionId: ctx.id,
-    season: ctx.season,
-    fixtures: rollup,
-    count: rollup.length,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+      fixtures: rollup,
+      count: rollup.length,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
 
   return {
     compId: ctx.id,
@@ -273,13 +241,61 @@ async function writeLegacyRollup(db: FirebaseFirestore.Firestore): Promise<void>
   });
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** How far ahead of kickoff the live cadence kicks in, so we catch the
+ *  TIMED→IN_PLAY transition (and have fresh data on screen) right around
+ *  kickoff rather than up to a poll-interval late. */
+const MATCH_LOOKAHEAD_MS = 15 * 60 * 1000;
+
+/** Upper bound on how long after kickoff a match could still be running
+ *  (90' + stoppage + extra time + penalties + provider lag before it
+ *  flips to FINISHED). Past this, a still-non-terminal fixture is treated
+ *  as stale rather than live, so a stuck doc can't pin us in fast cadence
+ *  forever. */
+const MAX_MATCH_DURATION_MS = 3 * 60 * 60 * 1000;
+
+/** Statuses meaning a fixture won't change again — they don't keep the
+ *  poller in its live cadence. */
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
+  'FINISHED',
+  'CANCELLED',
+  'AWARDED',
+  'POSTPONED',
+]);
+
+/**
+ * Cheap gate for the scheduled poller: is any match live or kicking off
+ * soon? The scheduler wakes every couple of minutes but only runs the full
+ * fetch/diff/rollup pipeline when this returns true — so idle hours (and
+ * the entire off-season) cost one small bounded query per wake instead of
+ * a fleet-wide read/write pass.
+ *
+ * "In window" = a non-terminal fixture whose kickoff falls in
+ * [now - MAX_MATCH_DURATION, now + LOOKAHEAD]. Keyed off kickoff time, not
+ * status, deliberately: our own polling is what advances status, so gating
+ * on IN_PLAY would deadlock (we'd never poll, so nothing would ever flip to
+ * IN_PLAY). The range is on a single field, so the automatic index covers
+ * it; status is filtered in code to avoid a composite index.
+ */
+async function isMatchWindow(
+  db: FirebaseFirestore.Firestore,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const lower = Timestamp.fromDate(new Date(now.getTime() - MAX_MATCH_DURATION_MS));
+  const upper = Timestamp.fromDate(new Date(now.getTime() + MATCH_LOOKAHEAD_MS));
+  const snap = await db
+    .collection('fixtures')
+    .where('utcKickoff', '>=', lower)
+    .where('utcKickoff', '<=', upper)
+    .limit(50)
+    .get();
+  return snap.docs.some((d) => !TERMINAL_STATUSES.has((d.data() as FixtureDoc).status));
 }
 
 export const pollFootballData = onSchedule(
   {
-    schedule: 'every 10 minutes',
+    // Wake often, but the isMatchWindow gate below means we only do real
+    // work when a match is live or imminent — see runPollFootballData.
+    schedule: 'every 2 minutes',
     region: 'europe-west1',
     secrets: [FOOTBALL_DATA_TOKEN],
     maxInstances: 1,
@@ -292,6 +308,11 @@ export const pollFootballData = onSchedule(
     const token = FOOTBALL_DATA_TOKEN.value();
     if (!token) {
       logger.error('FOOTBALL_DATA_TOKEN secret missing');
+      return;
+    }
+    const db = getFirestore();
+    if (!(await isMatchWindow(db))) {
+      logger.debug('No match live or imminent — skipping poll');
       return;
     }
     await runPollFootballData(token);

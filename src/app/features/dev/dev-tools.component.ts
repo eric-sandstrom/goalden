@@ -374,6 +374,41 @@ export class DevToolsComponent {
     }
   }
 
+  protected async pollStandingsNow(): Promise<void> {
+    this.running.set(true);
+    try {
+      // Mirrors the server's StandingsPollSummary — total table count plus
+      // a per-competition breakdown for partial-success surfaces.
+      const call = httpsCallable<
+        unknown,
+        {
+          ok: boolean;
+          tables: number;
+          written: number;
+          competitions: ReadonlyArray<{ compId: string; ok: boolean; written: number }>;
+          message?: string;
+        }
+      >(this.functions, 'devPollStandingsNow');
+      const res = await call({});
+      const { tables, written, competitions, message } = res.data;
+      if (message && competitions.length === 0) {
+        this.snackBar.open(message, 'Dismiss', { duration: 4000 });
+      } else {
+        const failed = competitions.filter((c) => !c.ok).length;
+        const summary = failed > 0
+          ? `Polled ${competitions.length} comps · ${failed} failed · wrote ${written}`
+          : `Polled ${competitions.length} comp(s) · ${tables} tables · wrote ${written}`;
+        this.snackBar.open(summary, undefined, { duration: 3000 });
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Poll failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
+      console.error('devPollStandingsNow failed', e);
+    } finally {
+      this.running.set(false);
+    }
+  }
+
   protected async pollTeamsNow(): Promise<void> {
     this.running.set(true);
     try {

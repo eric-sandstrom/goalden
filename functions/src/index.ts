@@ -9,6 +9,7 @@ setGlobalOptions({
 });
 
 export { pollFootballData } from './poll-football-data';
+export { pollStandings } from './poll-standings';
 export { pollTeams } from './poll-teams';
 export { scoreMatch } from './score-match';
 export { devFinishMatch } from './dev-finish-match';
@@ -20,6 +21,7 @@ export { devSignInAsAdmin } from './dev-sign-in-admin';
 export { grantAdminRole, revokeAdminRole } from './admin-roles';
 export { devPollTeamsNow } from './dev-poll-teams';
 export { devPollFixturesNow } from './dev-poll-fixtures';
+export { devPollStandingsNow } from './dev-poll-standings';
 export { syncCompetitionsFromApi, setCompetitionActive } from './sync-competitions';
 export { migrateToMultiComp } from './migrate-to-multi-comp';
 export {

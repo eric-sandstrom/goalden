@@ -338,6 +338,14 @@
               type="button"
               mat-stroked-button
               [disabled]="running()"
+              (click)="pollStandingsNow()"
+            >
+              <mat-icon>format_list_numbered</mat-icon> Poll standings
+            </button>
+            <button
+              type="button"
+              mat-stroked-button
+              [disabled]="running()"
               (click)="pollTeamsNow()"
             >
               <mat-icon>groups</mat-icon> Poll teams
