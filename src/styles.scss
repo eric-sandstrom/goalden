@@ -1,8 +1,14 @@
 @use '@angular/material' as mat;
 
 html {
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
+  // Kill the browser's NATIVE pull-to-refresh / overscroll bounce. The app
+  // ships its own gesture (app-pull-to-refresh) and a fixed shell, so the
+  // native one only fought it — rubber-banding the whole document and shoving
+  // the bottom nav off-screen. Must live on <html>: `overscroll-behavior` set
+  // on <body> is not propagated to the viewport.
+  overscroll-behavior: none;
 
   // Default color-scheme set on :root so descendants inherit and Material's
   // light-dark() tokens resolve correctly on first paint, before ThemeService
@@ -26,13 +32,19 @@ body {
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-body-medium);
   margin: 0;
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 app-root {
   display: block;
-  height: 100%;
+  // Pin the shell to the visible viewport. Unlike height:100dvh — which can be
+  // momentarily taller than what's actually on screen during a refresh /
+  // overscroll (and which iOS rubber-bands regardless) — a fixed, full-bleed
+  // box can't be scrolled or translated, so the bottom nav always stays put.
+  position: fixed;
+  inset: 0;
   overflow: hidden;
 }
 
