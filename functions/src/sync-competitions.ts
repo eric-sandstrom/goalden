@@ -55,6 +55,12 @@ interface FdResponse {
   readonly competitions: readonly FdCompetition[];
 }
 
+/** Upper bound on the football-data /competitions request. Sits well under
+ *  the function's 60s deadline so a stalled upstream fails fast with a clear
+ *  error, rather than consuming the whole budget and surfacing an opaque
+ *  `deadline-exceeded` (the Cloud Run 504) to the client. */
+const FETCH_TIMEOUT_MS = 20_000;
+
 export const syncCompetitionsFromApi = onCall(
   { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN] },
   async (request) => {
@@ -68,12 +74,22 @@ export const syncCompetitionsFromApi = onCall(
       );
     }
 
-    const res = await fetch('https://api.football-data.org/v4/competitions', {
-      headers: { 'X-Auth-Token': token },
-    });
+    let res: Awaited<ReturnType<typeof fetch>>;
+    try {
+      res = await fetch('https://api.football-data.org/v4/competitions', {
+        headers: { 'X-Auth-Token': token },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+    } catch (err) {
+      logger.error('football-data /competitions fetch failed', { err: String(err) });
+      throw new HttpsError(
+        'unavailable',
+        'football-data /competitions did not respond in time — try again in a moment.',
+      );
+    }
     if (!res.ok) {
       const body = await res.text();
-      logger.error('football-data /competitions fetch failed', {
+      logger.error('football-data /competitions returned non-OK', {
         status: res.status,
         body,
       });
