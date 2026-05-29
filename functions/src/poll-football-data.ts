@@ -390,7 +390,6 @@ async function pollEspnLive(
         espnEventId: ev.eventId,
         liveScore: ev.live.score,
         liveState: ev.live.state,
-        liveClock: ev.live.clock,
         liveDetail: ev.live.detail,
         liveSyncedAt: FieldValue.serverTimestamp(),
       },
@@ -406,14 +405,21 @@ async function pollEspnLive(
   );
 }
 
-/** True when ESPN's snapshot differs from what's stored, so we only write
- *  (and trigger client onSnapshot fanout) on a real change. The cosmetic
- *  `detail` string is intentionally excluded to avoid churn from minute-label
- *  rewrites that carry no new score/state information. */
+/**
+ * True when ESPN's snapshot differs from what's stored, so we only write
+ * (and trigger client onSnapshot fan-out) on a real change.
+ *
+ * Deliberately diffs ONLY score, state, and the event-id link — NOT the
+ * ticking clock or the `detail` label. The clock advances every poll, so
+ * including it would rewrite the doc ~every 2 min during a match, and every
+ * listening client pays a read per rewrite (~60/match) even with no goal.
+ * Diffing on score+state instead means writes happen only on goals and
+ * HT/FT transitions (~handful per match). The live clock is cosmetic — derive
+ * an approximate minute client-side from kickoff if you want one back.
+ */
 function liveOverlayChanged(fx: FixtureDoc, ev: MappedEspnEvent): boolean {
   if ((fx.espnEventId ?? null) !== ev.eventId) return true;
   if ((fx.liveState ?? null) !== ev.live.state) return true;
-  if ((fx.liveClock ?? null) !== (ev.live.clock ?? null)) return true;
   const ph = fx.liveScore?.home ?? null;
   const pa = fx.liveScore?.away ?? null;
   const nh = ev.live.score?.home ?? null;

@@ -181,6 +181,9 @@ service cloud.firestore {
     //                             (pollFootballData)
     //   - cache/standings-{cId} — per-competition real standings
     //                             snapshot (added in task #66)
+    //   - cache/leaderboard     — global top-100 rollup, kept current by
+    //                             rebuildLeaderboard (replaces the client's
+    //                             direct top-100 users listener)
     //
     // World-readable for signed-in users; all writes server-only.
 
