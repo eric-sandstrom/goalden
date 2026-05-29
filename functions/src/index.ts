@@ -12,6 +12,11 @@ export { pollFootballData } from './poll-football-data';
 export { pollStandings } from './poll-standings';
 export { pollTeams } from './poll-teams';
 export { scoreMatch } from './score-match';
+export {
+  rebuildLeaderboard,
+  onUserProfileChange,
+  devRebuildLeaderboardNow,
+} from './leaderboard-rollup';
 export { devFinishMatch } from './dev-finish-match';
 export { devSetFixtureState } from './dev-set-fixture-state';
 export { devSetKickoffTime } from './dev-set-kickoff';

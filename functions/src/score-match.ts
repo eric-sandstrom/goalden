@@ -3,6 +3,7 @@ import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { FixtureDoc } from './lib/fixture-mapper';
 import { scorePrediction } from './lib/scoring';
+import { markLeaderboardDirty } from './leaderboard-rollup';
 
 /**
  * Firestore allows 500 ops per batch; we cap below that for headroom.
@@ -142,6 +143,21 @@ export const scoreMatch = onDocumentUpdated(
     }
 
     if (ops > 0) await batch.commit();
+
+    // Totals changed → nudge the global leaderboard rollup. One atomic
+    // counter bump; the scheduled flush collapses a whole scoring burst
+    // (and concurrent scoreMatch runs for other matches) into a single
+    // rebuild. Best-effort: a failed mark must not fail scoring, and the
+    // next scored match would re-mark anyway.
+    if (scored > 0) {
+      try {
+        await markLeaderboardDirty(db);
+      } catch (e: unknown) {
+        logger.warn('Failed to mark leaderboard dirty (non-fatal)', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
 
     logger.info(`Scored ${scored} predictions for ${matchId}`, {
       competitionId: compId,

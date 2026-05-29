@@ -1,5 +1,5 @@
 import { DestroyRef, Injectable, Signal, computed, inject, signal } from '@angular/core';
-import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { DocumentData, doc, onSnapshot } from 'firebase/firestore';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { AuthService } from './auth.service';
 import { EMPTY_TOTALS, parseTotals, UserTotals } from './user.service';
@@ -11,8 +11,6 @@ export interface LeaderboardEntry {
   readonly photoURL: string | null;
   readonly totals: UserTotals;
 }
-
-const PAGE_SIZE = 100;
 
 @Injectable({ providedIn: 'root' })
 export class LeaderboardService {
@@ -32,30 +30,40 @@ export class LeaderboardService {
   });
 
   constructor() {
-    const q = query(
-      collection(this.db, 'users'),
-      orderBy('totals.total', 'desc'),
-      limit(PAGE_SIZE),
+    // Read the server-maintained rollup at `cache/leaderboard` — ONE doc —
+    // rather than listening to the top-100 `users` directly. Cold load goes
+    // from ~100 reads to 1, and each scoring burst from ~100 reads/client to
+    // 1. The doc is kept current by the `rebuildLeaderboard` Cloud Function.
+    const ref = doc(this.db, 'cache', 'leaderboard');
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data = snap.exists() ? snap.data() : null;
+        this._entries.set(parseEntries(data));
+        this._loaded.set(true);
+      },
+      (err) => {
+        console.error('[LeaderboardService] rollup listener failed:', err);
+        this._loaded.set(true);
+      },
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const list: LeaderboardEntry[] = [];
-      let rank = 1;
-      snap.forEach((d) => {
-        const data = d.data();
-        const totals = parseTotals(data['totals']);
-        list.push({
-          uid: d.id,
-          rank: rank++,
-          displayName: data['displayName'] ?? 'Unknown',
-          photoURL: data['photoURL'] ?? null,
-          totals,
-        });
-      });
-      this._entries.set(list);
-      this._loaded.set(true);
-    });
     inject(DestroyRef).onDestroy(() => unsub());
   }
+}
+
+/** Normalises the rollup doc's `entries` array into typed LeaderboardEntry[].
+ *  Defensive — an absent doc (before the first rebuild) or malformed entry
+ *  yields an empty/clean list rather than throwing. Falls back to array
+ *  order for `rank` if the stored value is missing. */
+function parseEntries(data: DocumentData | null): LeaderboardEntry[] {
+  const raw = data && Array.isArray(data['entries']) ? data['entries'] : [];
+  return raw.map((e: DocumentData, i: number) => ({
+    uid: typeof e['uid'] === 'string' ? e['uid'] : '',
+    rank: typeof e['rank'] === 'number' ? e['rank'] : i + 1,
+    displayName: typeof e['displayName'] === 'string' ? e['displayName'] : 'Unknown',
+    photoURL: typeof e['photoURL'] === 'string' ? e['photoURL'] : null,
+    totals: parseTotals(e['totals']),
+  }));
 }
 
 export { EMPTY_TOTALS };
