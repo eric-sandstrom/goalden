@@ -1,15 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { httpsCallable } from 'firebase/functions';
+import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { FUNCTIONS } from '../../core/firebase/firebase.providers';
 import { AuthService } from '../../core/services/auth.service';
@@ -26,6 +29,7 @@ import {
 import { UserService } from '../../core/services/user.service';
 import { LifetimeTotalsCardComponent } from './lifetime-totals-card.component';
 import { PredictorPersonalityCardComponent } from './predictor-personality-card.component';
+import { ThemePromptDialogComponent } from './theme-prompt-dialog.component';
 
 @Component({
   selector: 'app-profile',
@@ -36,6 +40,7 @@ import { PredictorPersonalityCardComponent } from './predictor-personality-card.
     MatChipsModule,
     MatFormFieldModule,
     MatIconModule,
+    MatProgressSpinnerModule,
     MatSelectModule,
     MatSliderModule,
     MatTooltipModule,
@@ -57,6 +62,10 @@ export class ProfileComponent {
   protected readonly personality = inject(PersonalityService);
   protected readonly notifications = inject(NotificationsService);
   private readonly functions = inject(FUNCTIONS);
+  private readonly dialog = inject(MatDialog);
+
+  /** True while a Gemini theme request is in flight (disables the button). */
+  protected readonly aiTheming = signal(false);
 
   // Unique IDs so the <label for> bindings address the right inputs even if
   // multiple instances of this component ever live in the DOM together.
@@ -187,6 +196,48 @@ export class ProfileComponent {
     this.themeService.setColorMode(modes[Math.floor(Math.random() * modes.length)]);
 
     this.snackBar.open('Theme randomized', undefined, { duration: 1500 });
+  }
+
+  /**
+   * AI theming — prompt for a vibe, hand it to Gemini, and apply the colours +
+   * variant it returns the same way the randomizer does (setColors + setVariant,
+   * contrast reset to neutral so the AI palette renders cleanly).
+   */
+  protected async themeWithAi(): Promise<void> {
+    const ref = this.dialog.open(ThemePromptDialogComponent, { width: '360px' });
+    const prompt = await firstValueFrom(ref.afterClosed());
+    if (!prompt) return;
+
+    this.aiTheming.set(true);
+    try {
+      const call = httpsCallable<
+        { prompt: string },
+        {
+          primary: string;
+          secondary: string;
+          tertiary: string;
+          variant: VariantName;
+          contrast: number;
+        }
+      >(this.functions, 'generateTheme');
+      const { data } = await call({ prompt });
+      this.themeService.setColors({
+        primary: data.primary,
+        secondary: data.secondary,
+        tertiary: data.tertiary,
+      });
+      if (data.variant) this.themeService.setVariant(data.variant);
+      this.themeService.setContrast(data.contrast ?? 0);
+      this.snackBar.open(`Themed: ${prompt}`, undefined, { duration: 2500 });
+    } catch (e: unknown) {
+      this.snackBar.open(
+        e instanceof Error ? e.message : 'Could not generate a theme',
+        'Dismiss',
+        { duration: 4000 },
+      );
+    } finally {
+      this.aiTheming.set(false);
+    }
   }
 
   protected setPrimaryFromEvent(event: Event): void {

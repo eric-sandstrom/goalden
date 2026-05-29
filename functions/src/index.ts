@@ -46,4 +46,5 @@ export {
   autoEnrollOnUserCreate,
 } from './global-leagues';
 export { generatePredictorPersonality } from './personality';
+export { generateTheme } from './theme-ai';
 export { sendTestNotification } from './notifications';

@@ -82,21 +82,35 @@
         <mat-card-header>
           <mat-icon matCardAvatar>palette</mat-icon>
           <mat-card-title>Theme</mat-card-title>
-          <mat-card-subtitle>Paint the app in your team's colors</mat-card-subtitle>
 
-          <!-- Theme randomizer — top-right of the header. Picks a random
-               team preset (excluding default and the currently-applied
-               one) and applies it instantly. -->
-          <button
-            type="button"
-            mat-icon-button
-            class="theme-shuffle"
-            (click)="randomizeTheme()"
-            matTooltip="Random theme"
-            aria-label="Randomize theme"
-          >
-            <mat-icon>casino</mat-icon>
-          </button>
+          <!-- Top-right actions: AI theming (Gemini) + randomizer. -->
+          <div class="theme-actions">
+            <button
+              type="button"
+              mat-icon-button
+              class="theme-ai"
+              (click)="themeWithAi()"
+              [disabled]="aiTheming()"
+              matTooltip="Theme with AI"
+              aria-label="Theme with AI"
+            >
+              @if (aiTheming()) {
+                <mat-progress-spinner mode="indeterminate" [diameter]="20" />
+              } @else {
+                <mat-icon>auto_awesome</mat-icon>
+              }
+            </button>
+            <button
+              type="button"
+              mat-icon-button
+              class="theme-shuffle"
+              (click)="randomizeTheme()"
+              matTooltip="Random theme"
+              aria-label="Randomize theme"
+            >
+              <mat-icon>casino</mat-icon>
+            </button>
+          </div>
         </mat-card-header>
 
         <mat-card-content>

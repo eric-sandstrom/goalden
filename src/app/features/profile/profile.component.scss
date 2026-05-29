@@ -13,9 +13,11 @@
     .theme-card mat-card-header {
       align-items: flex-start;
     }
-    .theme-card .theme-shuffle {
+    .theme-card .theme-actions {
       margin-left: auto;
       align-self: flex-start;
+      display: flex;
+      gap: 2px;
     }
     /* Outer scroll container is full-width so the scrollbar sits at
        the viewport edge instead of inset by the centered max-width.

@@ -1,0 +1,38 @@
+<h2 mat-dialog-title>
+  <mat-icon class="ai-icon" aria-hidden="true">auto_awesome</mat-icon>
+  Theme with AI
+</h2>
+<mat-dialog-content>
+  <p class="hint">Describe a vibe and Gemini will paint the app for you.</p>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full">
+    <mat-label>Describe a theme</mat-label>
+    <input
+      matInput
+      [formControl]="prompt"
+      maxlength="120"
+      cdkFocusInitial
+      autocomplete="off"
+      placeholder="e.g. sunset over the ocean"
+      (keydown.enter)="submit()"
+    />
+  </mat-form-field>
+  <mat-chip-set class="examples" aria-label="Example themes">
+    @for (ex of examples; track ex) {
+      <mat-chip
+        class="example"
+        role="button"
+        tabindex="0"
+        (click)="use(ex)"
+        (keydown.enter)="use(ex)"
+        (keydown.space)="use(ex); $event.preventDefault()"
+      >{{ ex }}</mat-chip>
+    }
+  </mat-chip-set>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">Cancel</button>
+  <button mat-flat-button color="primary" (click)="submit()" [disabled]="prompt.invalid">
+    <mat-icon>auto_awesome</mat-icon>
+    Theme it
+  </button>
+</mat-dialog-actions>
