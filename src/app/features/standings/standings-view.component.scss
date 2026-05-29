@@ -40,10 +40,18 @@
   object-fit: contain;
 }
 
-.view-toggle {
-  align-self: flex-start;
+/* Toggle row: Predicted/Actual always, Groups/Knockouts when the comp has a
+   knockout phase. Wraps on narrow screens so the two groups stack. */
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
   flex: 0 0 auto;
   margin-bottom: 0.75rem;
+}
+.view-toggle,
+.section-toggle {
+  flex: 0 0 auto;
 }
 
 /* Single scroll region holding the table(s). */

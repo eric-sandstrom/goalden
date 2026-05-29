@@ -1,0 +1,154 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Scroller: a persistent horizontal scrollbar, and a vertical one when the tree
+   is taller than the slot. Bounded height (fills the slot) so the round headers
+   can stick while scrolling down a tall bracket. */
+.bracket {
+  height: 100%;
+  overflow-x: scroll;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mat-sys-outline-variant) transparent;
+}
+/* Force a visible scrollbar on WebKit (opts out of auto-hiding overlay bars). */
+.bracket::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.bracket::-webkit-scrollbar-thumb {
+  background: var(--mat-sys-outline-variant);
+  border-radius: 5px;
+}
+.bracket::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Content-sized track inside the scroller: as wide as all rounds, as tall as
+   the first (tallest) round. `align-items: stretch` makes every round that
+   tall, so `space-around` vertically centers each later round's matches between
+   their children — the classic single-elimination tree shape. */
+.bracket-track {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  width: max-content;
+  padding: 0.1rem 0.1rem 0.5rem;
+}
+
+.round {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 122px;
+}
+
+/* Sticks to the top of the scroller as the bracket scrolls vertically. */
+.round-label {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 0 0.4rem;
+  padding: 0.15rem 0;
+  background: var(--mat-sys-surface);
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.round-matches {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1 1 auto;
+  gap: 0.5rem;
+}
+
+.match {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--mat-sys-surface-container-low);
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.8rem;
+}
+.slot + .slot {
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+/* The advancing side. */
+.slot.winner {
+  background: color-mix(in srgb, var(--mat-sys-primary) 14%, transparent);
+  font-weight: 700;
+}
+/* Next match up for prediction — accent the matching team. */
+.slot.hl {
+  box-shadow: inset 3px 0 0 var(--mat-sys-primary);
+}
+
+.crest {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.crest.ph {
+  background: var(--mat-sys-surface-container-highest);
+  border-radius: 3px;
+}
+.tla {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slot.tbd .tla {
+  color: var(--mat-sys-on-surface-variant);
+  font-style: italic;
+}
+.sc {
+  font-variant-numeric: tabular-nums;
+  min-width: 1ch;
+  text-align: right;
+}
+
+/* Third-place playoff sits off the main tree. */
+.third {
+  margin-left: 0.5rem;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+}
+.state p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.spin {
+  animation: bracket-spin 1s linear infinite;
+}
+@keyframes bracket-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

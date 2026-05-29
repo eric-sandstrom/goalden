@@ -32,22 +32,44 @@
 
 <!-- Picker + table layout, shared by the carded and card-less variants. -->
 <ng-template #body>
-  <mat-button-toggle-group
-    class="view-toggle"
-    [value]="view()"
-    (change)="view.set($event.value)"
-    hideSingleSelectionIndicator
-    aria-label="Choose predicted or actual standings"
-  >
-    <mat-button-toggle value="predicted">Predicted</mat-button-toggle>
-    <mat-button-toggle value="real">Actual</mat-button-toggle>
-  </mat-button-toggle-group>
+  <div class="toggles">
+    <mat-button-toggle-group
+      class="view-toggle"
+      [value]="view()"
+      (change)="view.set($event.value)"
+      hideSingleSelectionIndicator
+      aria-label="Choose predicted or actual standings"
+    >
+      <mat-button-toggle value="predicted">Predicted</mat-button-toggle>
+      <mat-button-toggle value="real">Actual</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (hasKnockout()) {
+      <mat-button-toggle-group
+        class="section-toggle"
+        [value]="section()"
+        (change)="section.set($event.value)"
+        hideSingleSelectionIndicator
+        aria-label="Choose tables or knockout bracket"
+      >
+        <mat-button-toggle value="tables">Groups</mat-button-toggle>
+        <mat-button-toggle value="bracket">Knockouts</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
+  </div>
 
   <div class="standings-scroll">
     @if (!fixturesLoaded()) {
       <div class="state">
         <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
       </div>
+    } @else if (section() === 'bracket') {
+      <app-bracket-view
+        [competitionId]="competitionId()"
+        [season]="effectiveSeason()"
+        [view]="view()"
+        [highlightTeamIds]="highlightTeamIds()"
+      />
     } @else if (isGroupMode()) {
       <div class="group-grid">
         @for (g of groups(); track g) {

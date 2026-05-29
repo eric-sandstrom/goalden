@@ -14,7 +14,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { Fixture, isKnockout } from '../../core/models/fixture.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
+import { BracketViewComponent } from './bracket-view.component';
 import { StandingsTableComponent, StandingsView } from './standings-table.component';
+
+/** Lower-section switch: the group/league tables vs the knockout bracket. */
+type StandingsSection = 'tables' | 'bracket';
 
 /**
  * Competition standings surface — the orchestrator around the reusable
@@ -35,6 +39,7 @@ import { StandingsTableComponent, StandingsView } from './standings-table.compon
     MatCardModule,
     MatIconModule,
     StandingsTableComponent,
+    BracketViewComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './standings-view.component.html',
@@ -54,6 +59,9 @@ export class StandingsViewComponent {
   readonly highlightTeamIds = input<readonly number[]>([]);
 
   protected readonly view = signal<StandingsView>('predicted');
+  /** Tables vs knockout bracket. Only relevant when the comp has knockout
+   *  fixtures; the Groups/Knockouts toggle is hidden otherwise. */
+  protected readonly section = signal<StandingsSection>('tables');
 
   constructor() {
     // Eagerly register the comp's fixtures so the group list resolves (and the
@@ -97,4 +105,10 @@ export class StandingsViewComponent {
   });
 
   protected readonly isGroupMode = computed(() => this.groups().length > 0);
+
+  /** Whether this competition has any knockout fixtures — gates the
+   *  Groups/Knockouts toggle and the bracket section. */
+  protected readonly hasKnockout = computed(() =>
+    this.compFixtures().some((f) => isKnockout(f.stage)),
+  );
 }

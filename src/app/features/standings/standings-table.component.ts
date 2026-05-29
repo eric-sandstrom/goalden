@@ -77,7 +77,9 @@ export class StandingsTableComponent {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  protected readonly highlightSet = computed(() => new Set(this.highlightTeamIds()));
+  // Coalesce to [] — the router's component-input binding can hand an
+  // unbound input `undefined`, overriding the declared default.
+  protected readonly highlightSet = computed(() => new Set(this.highlightTeamIds() ?? []));
 
   constructor() {
     // Scroll the highlighted row into view when the highlight set changes
@@ -86,7 +88,7 @@ export class StandingsTableComponent {
     // on a key so live data updates (same highlight) don't re-scroll.
     let lastKey = '';
     effect(() => {
-      const ids = this.highlightTeamIds();
+      const ids = this.highlightTeamIds() ?? [];
       void this.rows();
       const key = ids.join(',');
       if (!key || key === lastKey) return;

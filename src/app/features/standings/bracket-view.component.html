@@ -1,0 +1,82 @@
+@if (!fixturesLoaded()) {
+  <div class="state">
+    <mat-icon class="spin" aria-hidden="true">progress_activity</mat-icon>
+  </div>
+} @else if (empty()) {
+  <div class="state">
+    <mat-icon aria-hidden="true">account_tree</mat-icon>
+    <p>No knockout matches yet.</p>
+  </div>
+} @else {
+  <div class="bracket">
+    <div class="bracket-track">
+    @for (round of rounds(); track round.stage) {
+      <div class="round" [class.r-single]="round.matches.length === 1">
+        <h4 class="round-label">{{ round.label }}</h4>
+        <div class="round-matches">
+          @for (m of round.matches; track m.id) {
+            <div class="match">
+              <div
+                class="slot"
+                [class.winner]="m.winner === 'home'"
+                [class.tbd]="m.home.id === null"
+                [class.hl]="m.home.id !== null && highlightSet().has(m.home.id)"
+              >
+                @if (m.home.crest) {
+                  <img class="crest" [src]="m.home.crest" alt="" width="18" height="18" loading="lazy" />
+                } @else {
+                  <span class="crest ph" aria-hidden="true"></span>
+                }
+                <span class="tla">{{ m.home.tla ?? m.home.name ?? 'TBD' }}</span>
+                <span class="sc">{{ m.homeScore }}</span>
+              </div>
+              <div
+                class="slot"
+                [class.winner]="m.winner === 'away'"
+                [class.tbd]="m.away.id === null"
+                [class.hl]="m.away.id !== null && highlightSet().has(m.away.id)"
+              >
+                @if (m.away.crest) {
+                  <img class="crest" [src]="m.away.crest" alt="" width="18" height="18" loading="lazy" />
+                } @else {
+                  <span class="crest ph" aria-hidden="true"></span>
+                }
+                <span class="tla">{{ m.away.tla ?? m.away.name ?? 'TBD' }}</span>
+                <span class="sc">{{ m.awayScore }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (thirdPlace(); as tp) {
+      <div class="round r-single third">
+        <h4 class="round-label">3rd place</h4>
+        <div class="round-matches">
+          <div class="match">
+            <div class="slot" [class.winner]="tp.winner === 'home'" [class.tbd]="tp.home.id === null">
+              @if (tp.home.crest) {
+                <img class="crest" [src]="tp.home.crest" alt="" width="18" height="18" loading="lazy" />
+              } @else {
+                <span class="crest ph" aria-hidden="true"></span>
+              }
+              <span class="tla">{{ tp.home.tla ?? tp.home.name ?? 'TBD' }}</span>
+              <span class="sc">{{ tp.homeScore }}</span>
+            </div>
+            <div class="slot" [class.winner]="tp.winner === 'away'" [class.tbd]="tp.away.id === null">
+              @if (tp.away.crest) {
+                <img class="crest" [src]="tp.away.crest" alt="" width="18" height="18" loading="lazy" />
+              } @else {
+                <span class="crest ph" aria-hidden="true"></span>
+              }
+              <span class="tla">{{ tp.away.tla ?? tp.away.name ?? 'TBD' }}</span>
+              <span class="sc">{{ tp.awayScore }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+    </div>
+  </div>
+}
