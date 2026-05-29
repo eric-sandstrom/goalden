@@ -115,9 +115,24 @@ export class FixturesService {
    *  data itself drives the UI via `_all` / `_status`. */
   private readonly _inFlight = new Set<string>();
 
+  /**
+   * Currently-live fixtures (IN_PLAY / PAUSED) keyed by id, rebuilt
+   * wholesale from each live-overlay snapshot. Resource-based consumers
+   * (the Predict view) overlay this onto their own loaded base set so
+   * live scores propagate without routing through the shared `_all`
+   * store.
+   */
+  private readonly _liveById = signal<ReadonlyMap<string, Fixture>>(new Map());
+
   // ---------------------------------------------------------------------------
   // Cross-comp derived signals
   // ---------------------------------------------------------------------------
+
+  /** Currently-live fixtures by id (IN_PLAY / PAUSED). Empty when
+   *  nothing is in progress. Overlay onto a loaded fixture list to
+   *  reflect live scores; the map is referentially stable across
+   *  snapshots that don't change the live set. */
+  readonly liveFixturesById = this._liveById.asReadonly();
 
   /** ID → Fixture across every loaded comp. Used for one-off lookups
    *  (FixtureRow finding a fixture by id, dev-tools resolving a target). */
@@ -227,8 +242,17 @@ export class FixturesService {
 
     sig = computed(() => this._all().get(key) ?? []);
     this._fixturesSignals.set(key, sig);
-    this.markRequested(key);
-    this.hydrateFromCache(compId, season);
+    // Registration + cache hydration write signals (`_requested`, `_all`,
+    // `_status`). Callers naturally reach for `fixturesFor()` lazily from
+    // inside a `computed()` — e.g. a comp-scoped fixtures signal keyed on a
+    // component input (predict-next-card) — and a signal write during a
+    // computed's evaluation is illegal (NG0600). Defer the side effects to a
+    // microtask so they always land outside any reactive computation; the
+    // per-comp signal populates a tick later and consumers recompute normally.
+    queueMicrotask(() => {
+      this.markRequested(key);
+      this.hydrateFromCache(compId, season);
+    });
     return sig;
   }
 
@@ -252,6 +276,44 @@ export class FixturesService {
   async refresh(compId: string, season: string): Promise<void> {
     if (!this.auth.uid()) return;
     await this.fetchFor(compId, season);
+  }
+
+  /**
+   * One-shot async load of a single comp's fixtures, for use as an
+   * Angular `resource()` loader. Unlike `fixturesFor`, this neither
+   * writes to the shared `_all` store nor registers the comp as
+   * "requested" — the resource owns the loading/error lifecycle, which
+   * is what keeps it callable from inside a reactive computation
+   * without tripping NG0600.
+   *
+   * Fast path: a fresh localStorage cache is returned without touching
+   * the network. Otherwise resolution mirrors `fetchFor` (per-comp
+   * rollup → legacy WC rollup → collection scan), falling back to a
+   * stale cache if every network path fails, and only throwing when
+   * there's nothing at all to show (so the resource surfaces `.error()`).
+   */
+  async loadFixtures(compId: string, season: string): Promise<readonly Fixture[]> {
+    if (this.cacheIsFresh(compId, season)) {
+      const cached = this.readCache(compId, season);
+      if (cached && cached.fixtures.length > 0) {
+        return cached.fixtures.map(fixtureFromCache);
+      }
+    }
+    try {
+      const fixtures = await this.fetchFixtures(compId, season);
+      this.writeCache(compId, season, fixtures);
+      return fixtures;
+    } catch (err) {
+      const cached = this.readCache(compId, season);
+      if (cached && cached.fixtures.length > 0) {
+        console.warn(
+          `[FixturesService] loadFixtures(${compId}/${season}) network failed — serving cache`,
+          err,
+        );
+        return cached.fixtures.map(fixtureFromCache);
+      }
+      throw err;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -332,8 +394,23 @@ export class FixturesService {
     data: DocumentData,
   ): void {
     const key = mapKeyFor(compId, season);
+    const fixtures = this.fixturesFromRollup(compId, season, data);
+    this._all.update((m) => new Map(m).set(key, fixtures));
+    this._status.update((m) => new Map(m).set(key, 'loaded'));
+    this.writeCache(compId, season, fixtures);
+  }
+
+  /** Normalises a rollup doc payload into a sorted Fixture[]. Pure —
+   *  no signal writes — so both the shared-store path
+   *  (`populateFromRollup`) and the resource loader (`fetchFixtures`)
+   *  can reuse it. */
+  private fixturesFromRollup(
+    compId: string,
+    season: string,
+    data: DocumentData,
+  ): Fixture[] {
     const rawFixtures = Array.isArray(data['fixtures']) ? data['fixtures'] : [];
-    const fixtures: Fixture[] = rawFixtures
+    return rawFixtures
       .map((entry: DocumentData) => {
         const id = typeof entry['id'] === 'string' ? entry['id'] : null;
         if (!id) return null;
@@ -341,9 +418,38 @@ export class FixturesService {
       })
       .filter((f: Fixture | null): f is Fixture => f !== null)
       .sort((a: Fixture, b: Fixture) => a.utcKickoff.getTime() - b.utcKickoff.getTime());
-    this._all.update((m) => new Map(m).set(key, fixtures));
-    this._status.update((m) => new Map(m).set(key, 'loaded'));
-    this.writeCache(compId, season, fixtures);
+  }
+
+  /** Pure network fetch for one comp — returns fixtures without
+   *  touching any signal. Backs `loadFixtures` (the resource loader).
+   *  Resolution order mirrors `fetchFor`: per-comp rollup → legacy WC
+   *  rollup → collection scan. */
+  private async fetchFixtures(
+    compId: string,
+    season: string,
+  ): Promise<readonly Fixture[]> {
+    // 1. Per-comp rollup.
+    const compRollupSnap = await getDoc(doc(this.db, 'cache', `fixtures-${compId}`));
+    if (compRollupSnap.exists()) {
+      return this.fixturesFromRollup(compId, season, compRollupSnap.data());
+    }
+    // 2. WC cutover: legacy single rollup at `cache/fixtures`.
+    if (compId === 'WC') {
+      const legacySnap = await getDoc(doc(this.db, 'cache', 'fixtures'));
+      if (legacySnap.exists()) {
+        return this.fixturesFromRollup(compId, season, legacySnap.data());
+      }
+    }
+    // 3. Last resort: collection scan filtered by (compId, season).
+    const q = query(
+      collection(this.db, 'fixtures'),
+      where('competitionId', '==', compId),
+      where('season', '==', season),
+    );
+    const snap = await getDocs(q);
+    const fixtures: Fixture[] = [];
+    snap.forEach((d) => fixtures.push(this.parse(d.id, d.data(), compId, season)));
+    return fixtures.sort((a, b) => a.utcKickoff.getTime() - b.utcKickoff.getTime());
   }
 
   private async fetchFromCollection(compId: string, season: string): Promise<void> {
@@ -369,18 +475,25 @@ export class FixturesService {
    * latest state via their initial fetch when first requested.
    */
   private mergeLiveUpdates(snap: QuerySnapshot): void {
+    // The live query returns the COMPLETE set of in-progress matches
+    // each time it fires, so rebuild the by-id map wholesale rather
+    // than diffing — this naturally drops matches that just finished.
+    const liveById = new Map<string, Fixture>();
     const grouped = new Map<string, Map<string, Fixture>>();
     snap.forEach((d) => {
       const data = d.data();
       const compId =
         typeof data['competitionId'] === 'string' ? data['competitionId'] : 'WC';
       const season = typeof data['season'] === 'string' ? data['season'] : '2026';
+      const fixture = this.parse(d.id, data, compId, season);
+      liveById.set(d.id, fixture);
       const key = mapKeyFor(compId, season);
       if (!grouped.has(key)) grouped.set(key, new Map());
-      grouped.get(key)!.set(d.id, this.parse(d.id, data, compId, season));
+      grouped.get(key)!.set(d.id, fixture);
     });
-    if (grouped.size === 0) return;
+    this._liveById.set(liveById);
 
+    if (grouped.size === 0) return;
     this._all.update((current) => {
       const next = new Map(current);
       for (const [key, updates] of grouped) {

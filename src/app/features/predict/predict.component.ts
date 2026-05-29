@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  resource,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -105,7 +113,14 @@ export class PredictComponent {
    *     still shows something predictable
    */
   protected readonly visibleComps = computed<readonly CompTab[]>(() => {
+    // "Show all" is an explicit user toggle — honour it immediately,
+    // regardless of league-load state.
     if (this.showAll()) return this.allSelectableComps();
+    // Until memberships AND every per-league doc have settled, return an
+    // empty set so the bar starts at zero tabs and fills in once with the
+    // user's comps — rather than flashing every selectable comp and then
+    // collapsing down to "my comps" as the leagues trickle in.
+    if (!this.leagues.fullyLoaded()) return [];
     const mine = this.myComps();
     if (mine.length > 0) return mine;
     return this.allSelectableComps();
@@ -126,23 +141,77 @@ export class PredictComponent {
     return visible[0];
   });
 
-  /** Tab bar gets hidden when there's only one comp to show — no point
-   *  taking up vertical space for a tab strip with a single button. */
-  protected readonly showTabBar = computed(() => this.visibleComps().length > 1);
+  /**
+   * Competition bar visibility. Show it when there's more than one
+   * competition the user can reach:
+   *   - they're already viewing multiple (their leagues span comps, or
+   *     "show all" is on), OR
+   *   - "show all" would reveal selectable comps beyond their current set.
+   *
+   * That second clause is the important one: the show-all toggle lives
+   * *inside* this bar, so gating purely on `visibleComps().length > 1`
+   * traps a user who's in a single league (e.g. just the auto-enrolled
+   * WC global league) — they'd have no affordance to reach any other
+   * competition. Only when the catalogue genuinely has nothing else to
+   * switch to do we hide the bar entirely.
+   */
+  protected readonly showTabBar = computed(() => {
+    // Keep the bar hidden until the visible set is settled, so it never
+    // flashes empty (or half-populated) while leagues load. "Show all"
+    // resolves its set synchronously, so it's exempt from the gate.
+    if (!this.showAll() && !this.leagues.fullyLoaded()) return false;
+    if (this.visibleComps().length > 1) return true;
+    return this.allSelectableComps().length > this.visibleComps().length;
+  });
 
-  /** Per-tab fixture signal. `fixturesFor` is memoized so re-reads of
-   *  the same comp return the same signal — no churn. */
+  /**
+   * Fixtures for the selected comp, loaded via an Angular `resource`.
+   * The reactive `params` watches the selected (comp, season) and the
+   * loader maps it to that comp's fixtures; `isLoading`/`error` drive
+   * the view's loading/error states.
+   *
+   * `params` returns the stable `${compId}_${season}` key (not a fresh
+   * object) so the resource only reloads when the comp actually
+   * changes — re-resolving `selectedComp` to an equal comp (e.g. when
+   * league data refreshes) produces an identical string and is a no-op.
+   * Returning `undefined` (no comp yet) leaves the resource idle.
+   */
+  private readonly fixturesResource = resource<
+    readonly Fixture[],
+    string | undefined
+  >({
+    params: () => this.selectedComp()?.key,
+    loader: ({ params }) => {
+      const sep = params.indexOf('_');
+      const compId = params.slice(0, sep);
+      const season = params.slice(sep + 1);
+      return this.fixturesService.loadFixtures(compId, season);
+    },
+    defaultValue: [],
+  });
+
+  /** The resource's loaded set with live scores overlaid. The live map
+   *  is empty unless a match is in progress, in which case the matching
+   *  fixtures are swapped for their live versions. */
   private readonly currentFixtures = computed<readonly Fixture[]>(() => {
-    const sel = this.selectedComp();
-    if (!sel) return [];
-    return this.fixturesService.fixturesFor(sel.comp.id, sel.season)();
+    const base = this.fixturesResource.value();
+    const live = this.fixturesService.liveFixturesById();
+    if (live.size === 0) return base;
+    return base.map((f) => live.get(f.id) ?? f);
   });
 
+  /** Drives skeleton vs content. Stays "loading" while the comp set is
+   *  still resolving (so we never flash an empty state before the tabs
+   *  appear) and while the selected comp's resource is fetching. */
   protected readonly loaded = computed(() => {
-    const sel = this.selectedComp();
-    if (!sel) return false;
-    return this.fixturesService.loadedFor(sel.comp.id, sel.season)();
+    if (!this.showAll() && !this.leagues.fullyLoaded()) return false;
+    if (!this.selectedComp()) return true; // settled with no comp to load
+    return !this.fixturesResource.isLoading();
   });
+
+  /** True when the resource load failed AND there was no cache to fall
+   *  back on — the view shows a retry affordance. */
+  protected readonly loadError = computed(() => this.fixturesResource.status() === 'error');
 
   protected readonly groups = computed<readonly DateGroup[]>(() => {
     const all = this.currentFixtures();
@@ -187,6 +256,11 @@ export class PredictComponent {
 
   protected toggleShowAll(): void {
     this.showAll.update((v) => !v);
+  }
+
+  /** Re-run the fixtures resource loader after a failed load. */
+  protected retry(): void {
+    this.fixturesResource.reload();
   }
 
   protected predictionFor(matchId: string) {

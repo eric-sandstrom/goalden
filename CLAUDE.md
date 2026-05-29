@@ -70,6 +70,11 @@ Conventions:
 - Wrap Firestore listeners by calling `signal()` and updating it from inside `onSnapshot()` callbacks. Tear down listeners via `inject(DestroyRef)` + a cleanup callback registered in the constructor.
 - Use `computed()` for derived state. Never use `effect()` for derived state.
 - Use `effect()` only for side effects (localStorage sync, FCM token persistence). Clean up with `onCleanup` or `inject(DestroyRef) + takeUntilDestroyed()`.
+- Use `resource()` for async reads keyed on a reactive parameter — i.e. "when this selection changes, (re)load the data for it and expose loading/error states." Rules:
+  - `params` must return a **stable primitive key** (e.g. the `${compId}_${season}` string), not a fresh object — the resource compares params by `===`, so an object literal reloads on every recompute. Return `undefined` to leave the resource idle (no load).
+  - The `loader` is a plain `async` function that **returns** the data and must **not** write signals. Back it with a dedicated one-shot service method (e.g. `FixturesService.loadFixtures()`), not the `onSnapshot`-backed shared signals — this keeps it callable from reactive code without tripping NG0600.
+  - Always pass `defaultValue` so `value()` is never `undefined`. Drive view states off `isLoading()` / `status() === 'error'` / `value()`; expose a `retry()` that calls `resource.reload()`.
+  - Live/real-time data stays on `onSnapshot` signals. When a resource-loaded view also needs live updates, overlay a live signal onto `resource.value()` in a `computed()` rather than merging into the resource.
 - Firestore listeners cost money. Tear them down when unmounted.
 
 ### Firestore data model

@@ -40,6 +40,11 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Use `computed()` for derived state
 - Keep state transformations pure and predictable
 - Do NOT use `mutate` on signals, use `update` or `set` instead
+- Use `resource()` for async reads keyed on a reactive parameter (load-on-selection-change with built-in loading/error states):
+  - `params` returns a stable primitive key (e.g. a string), never a fresh object (compared by `===`); return `undefined` to stay idle
+  - the `loader` is a plain `async` function that returns the data and must NOT write signals — back it with a one-shot service method, not `onSnapshot`-backed shared signals
+  - always pass `defaultValue`; drive the view off `isLoading()` / `status()` / `value()`, and expose a `retry()` calling `reload()`
+  - keep live/real-time data on `onSnapshot` signals; overlay them onto `resource.value()` in a `computed()` rather than merging into the resource
 
 ## Templates
 

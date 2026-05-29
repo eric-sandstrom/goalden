@@ -58,7 +58,16 @@
 
   <mat-card appearance="outlined" class="card-grow fixtures-card">
     <div class="card-scroll">
-      @if (!loaded()) {
+      @if (loadError()) {
+        <div class="empty">
+          <mat-icon aria-hidden="true">cloud_off</mat-icon>
+          <p>Couldn't load fixtures.</p>
+          <button mat-stroked-button (click)="retry()">
+            <mat-icon>refresh</mat-icon>
+            Try again
+          </button>
+        </div>
+      } @else if (!loaded()) {
         <div class="skel-list">
           @for (i of skelRows; track i) {
             <div class="skel-row">
