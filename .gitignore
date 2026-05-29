@@ -31,6 +31,8 @@ yarn-error.log
 
 # Miscellaneous
 /.angular/cache
+# Per-worktree dev config (frontend port etc.) — see tools/new-session.ps1
+.worktree.json
 .sass-cache/
 /connect.lock
 /coverage
