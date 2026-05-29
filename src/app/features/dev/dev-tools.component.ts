@@ -78,15 +78,34 @@ export class DevToolsComponent {
   );
 
   /**
-   * Every WC fixture, labelled with its current status — used by the state
-   * and kickoff cards. Hardcoded to WC for now since dev-tools predates the
-   * multi-comp picker; task #84 generalises the fixture select to take a
-   * comp parameter so admins can manipulate matches in any comp they have
-   * loaded.
+   * Competition the fixture tools (Fixture state / Move kickoff / Scenarios)
+   * act on. Defaults to WC; the "Competition scope" selector lets an admin
+   * drive any synced comp. `fixturesFor` is safe inside a computed — its
+   * side effects are deferred — and reading it loads the comp on demand.
    */
-  private readonly _wcFixtures = this.fixtures.fixturesFor('WC', '2026');
+  protected readonly devComp = signal<string>('WC');
+
+  /** Selector choices: every synced comp with a derivable season, by name. */
+  protected readonly compChoices = computed(() =>
+    this.competitionsService
+      .competitions()
+      .map((c) => ({ id: c.id, name: c.name, season: seasonOf(c) }))
+      .filter((c): c is { id: string; name: string; season: string } => c.season !== null)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+
+  /** Season of the selected comp; falls back to '2026' so the WC default
+   *  works before the catalogue hydrates. */
+  protected readonly devCompSeason = computed(
+    () => seasonOf(this.competitionsService.byId(this.devComp())) ?? '2026',
+  );
+
+  private readonly _fixtures = computed(() =>
+    this.fixtures.fixturesFor(this.devComp(), this.devCompSeason())(),
+  );
+
   protected readonly fixtureOptions = computed(() => {
-    return this._wcFixtures().map((f) => ({
+    return this._fixtures().map((f) => ({
       matchId: f.id,
       label: `${f.homeTeam.tla ?? '?'} vs ${f.awayTeam.tla ?? '?'} · ${f.status} · ${f.utcKickoff.toLocaleString(
         undefined,
@@ -95,15 +114,17 @@ export class DevToolsComponent {
     }));
   });
 
-  /** Only fixtures the user has a prediction for — scenario buttons need a
-   *  prediction to compute exact/outcome/wrong scores against. */
+  /** Only fixtures the user has a prediction for, in the selected comp —
+   *  scenario buttons need a prediction to compute exact/outcome/wrong
+   *  scores against. */
   protected readonly predictedOptions = computed(() => {
     const preds = this.predictions.matchPredictions();
     const byId = this.fixtures.fixturesById();
+    const comp = this.devComp();
     return [...preds.values()]
       .map((p) => {
         const f = byId.get(p.matchId);
-        if (!f) return null;
+        if (!f || f.competitionId !== comp) return null;
         return {
           matchId: p.matchId,
           label: `${f.homeTeam.tla} ${p.homeScore}-${p.awayScore} ${f.awayTeam.tla} · ${f.utcKickoff.toLocaleDateString()}`,
@@ -240,6 +261,15 @@ export class DevToolsComponent {
   // --------------------------------------------------------------------------
   // Fixture state
   // --------------------------------------------------------------------------
+
+  /** Switch which competition the fixture tools target. Clears the picked
+   *  fixture in each form since those ids belong to the previous comp. */
+  protected selectDevComp(compId: string): void {
+    this.devComp.set(compId);
+    this.stateForm.controls.matchId.setValue('');
+    this.kickoffForm.controls.matchId.setValue('');
+    this.scenarioForm.controls.matchId.setValue('');
+  }
 
   protected async applyState(): Promise<void> {
     const { matchId, status, homeScore, awayScore } = this.stateForm.getRawValue();
@@ -501,5 +531,12 @@ export class DevToolsComponent {
       this.running.set(false);
     }
   }
+}
+
+/** Season starting year from a competition's currentSeason, or null when
+ *  unknown (between-seasons window / un-synced comp). */
+function seasonOf(comp: Competition | null): string | null {
+  const start = comp?.currentSeason?.startDate;
+  return start && start.length >= 4 ? start.slice(0, 4) : null;
 }
 
