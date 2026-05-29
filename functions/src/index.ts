@@ -46,3 +46,4 @@ export {
   autoEnrollOnUserCreate,
 } from './global-leagues';
 export { generatePredictorPersonality } from './personality';
+export { sendTestNotification } from './notifications';

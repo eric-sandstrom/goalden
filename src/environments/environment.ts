@@ -4,6 +4,11 @@ export const environment = {
   production: true,
   useEmulators: false,
   functionsRegion: 'europe-west1',
+  // Web Push (FCM) public VAPID key. Generate in Firebase console →
+  // Project settings → Cloud Messaging → Web configuration → "Web Push
+  // certificates" → Generate key pair, then paste the key here. Empty =
+  // FCM push disabled (local/OS notifications still work).
+  vapidKey: 'BFt_87PImCIXAOVW_cywPC6AKeec1I8b13s6EJdFAtcza2tc1M8RfI173fz5qBPOzIUXq4QHbCpi1JMciWLwCjw',
   firebase: {
     apiKey: 'AIzaSyD9egJ0Stg8wLagcDQw7YU-OU33cHMhc2Y',
     authDomain: 'goalden-693dc.firebaseapp.com',

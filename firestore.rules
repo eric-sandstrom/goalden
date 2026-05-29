@@ -132,6 +132,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ----- users/{uid}/devices/{deviceId} ----------------------------------
+    //
+    // Web-push (FCM) registration tokens, one doc per browser/device. Private
+    // to the owner: the client writes its token on notification opt-in; Cloud
+    // Functions read them via the Admin SDK (bypassing rules) to send pushes.
+
+    match /users/{uid}/devices/{deviceId} {
+      allow read, write: if isSelf(uid);
+    }
+
     // ----- fixtures --------------------------------------------------------
     //
     // World-readable (for any signed-in user). All writes server-only.

@@ -37,6 +37,45 @@
       </div>
 
       <!-- ===================================================================
+           Notifications opt-in
+      ==================================================================== -->
+      <mat-card appearance="outlined" class="notif-card">
+        <mat-card-header>
+          <mat-icon matCardAvatar aria-hidden="true">notifications</mat-icon>
+          <mat-card-title>Notifications</mat-card-title>
+          <mat-card-subtitle>App updates and match reminders, on this device</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-actions>
+          @switch (notifications.permission()) {
+            @case ('granted') {
+              <span class="notif-on">
+                <mat-icon aria-hidden="true">check_circle</mat-icon>
+                Notifications on
+              </span>
+              <button mat-button (click)="sendTestNotification()">
+                <mat-icon>send</mat-icon>
+                Send test
+              </button>
+            }
+            @case ('denied') {
+              <span class="notif-hint">
+                Blocked — turn notifications back on for this site in your browser settings.
+              </span>
+            }
+            @case ('unsupported') {
+              <span class="notif-hint">This browser doesn't support notifications.</span>
+            }
+            @default {
+              <button mat-flat-button color="primary" (click)="enableNotifications()">
+                <mat-icon>notifications_active</mat-icon>
+                Enable notifications
+              </button>
+            }
+          }
+        </mat-card-actions>
+      </mat-card>
+
+      <!-- ===================================================================
            Theme picker
       ==================================================================== -->
       <mat-card appearance="outlined" class="theme-card">

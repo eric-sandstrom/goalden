@@ -1,6 +1,7 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
+import { NotificationsService } from './notifications.service';
 
 /**
  * Surfaces in-app notifications when a new version of the app has been
@@ -32,6 +33,7 @@ export class AppUpdateService {
   private readonly updates = inject(SwUpdate);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly notifications = inject(NotificationsService);
 
   /** 30 minutes. Compromise between responsiveness and not hammering the
    *  hosting CDN. A live match window is ~2 hours; this gives us up to
@@ -116,6 +118,13 @@ export class AppUpdateService {
     ref.onAction().subscribe(() => {
       document.location.reload();
     });
+    // Also fire an OS notification (no-op unless the user enabled them) so a
+    // backgrounded tab still surfaces the update outside the app.
+    void this.notifications.showLocal(
+      'A new version is available',
+      'Reopen Goalden to update to the latest version.',
+      'app-update',
+    );
     ref.afterDismissed().subscribe((dismissed) => {
       // If the user dismisses without reloading, allow the prompt to
       // come back on the next VERSION_READY (e.g. a second deploy lands

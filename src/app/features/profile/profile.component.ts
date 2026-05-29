@@ -9,8 +9,11 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { httpsCallable } from 'firebase/functions';
 import { environment } from '../../../environments/environment';
+import { FUNCTIONS } from '../../core/firebase/firebase.providers';
 import { AuthService } from '../../core/services/auth.service';
+import { NotificationsService } from '../../core/services/notifications.service';
 import { PersonalityService } from '../../core/services/personality.service';
 import {
   ColorMode,
@@ -52,6 +55,8 @@ export class ProfileComponent {
   /** Exposed as `protected` because the template binds the personality
    *  card's inputs directly off the service signals. */
   protected readonly personality = inject(PersonalityService);
+  protected readonly notifications = inject(NotificationsService);
+  private readonly functions = inject(FUNCTIONS);
 
   // Unique IDs so the <label for> bindings address the right inputs even if
   // multiple instances of this component ever live in the DOM together.
@@ -68,6 +73,43 @@ export class ProfileComponent {
   /** Current user's uid — feeds the lifetime-totals card. */
   protected readonly uid = computed(() => this.auth.uid() ?? '');
   protected readonly isAdmin = this.userService.isAdmin;
+
+  /** Opt in to browser/OS notifications — requests permission and, on grant,
+   *  registers this device for push. */
+  protected async enableNotifications(): Promise<void> {
+    const result = await this.notifications.enable();
+    const msg =
+      result === 'granted'
+        ? 'Notifications enabled'
+        : result === 'denied'
+          ? 'Blocked — enable notifications for this site in your browser settings'
+          : result === 'unsupported'
+            ? "This browser doesn't support notifications"
+            : 'Notifications not enabled';
+    this.snackBar.open(msg, undefined, { duration: 3000 });
+  }
+
+  /** Fire a test push to this user's registered devices (proves the pipeline). */
+  protected async sendTestNotification(): Promise<void> {
+    try {
+      const call = httpsCallable<unknown, { sent: number; failed: number; devices: number }>(
+        this.functions,
+        'sendTestNotification',
+      );
+      const { data } = await call();
+      this.snackBar.open(
+        data.devices === 0
+          ? 'No registered devices yet'
+          : `Test sent to ${data.sent}/${data.devices} device(s)`,
+        undefined,
+        { duration: 3000 },
+      );
+    } catch (e: unknown) {
+      this.snackBar.open(e instanceof Error ? e.message : 'Could not send test', 'Dismiss', {
+        duration: 4000,
+      });
+    }
+  }
   /** Show the "Dev tools" link when we're in a non-production build OR
    *  the user has the admin role. Matches the `devOrAdminGuard` on the
    *  `/dev` route so the link doesn't promise access we won't grant. */

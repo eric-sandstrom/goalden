@@ -342,3 +342,18 @@
       justify-content: flex-end;
       padding-top: 0.25rem;
     }
+
+/* Notifications opt-in card */
+.notif-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mat-sys-primary);
+  font: var(--mat-sys-label-large);
+  padding-left: 8px;
+}
+.notif-hint {
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+  padding: 0 8px;
+}

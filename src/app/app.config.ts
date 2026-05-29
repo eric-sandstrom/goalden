@@ -15,6 +15,7 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { environment } from '../environments/environment';
 import { provideFirebase } from './core/firebase/firebase.providers';
 import { AppUpdateService } from './core/services/app-update.service';
+import { NotificationsService } from './core/services/notifications.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 
@@ -52,6 +53,10 @@ export const appConfig: ApplicationConfig = {
     // when a new build is deployed mid-session.
     provideAppInitializer(() => {
       inject(AppUpdateService).start();
+      // Re-arm push for users who already opted in (refreshes the token and
+      // re-binds the foreground message handler). No-op until permission is
+      // granted and a VAPID key is configured.
+      void inject(NotificationsService).syncOnStartup();
     }),
   ],
 };
