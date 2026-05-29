@@ -4,7 +4,12 @@
   <meta charset="utf-8">
   <title>Goalden</title>
   <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- interactive-widget=resizes-content: when the soft keyboard opens, shrink
+       the layout viewport (and the fixed app shell / bottom-sheet overlay) to
+       the area above it, instead of letting the keyboard overlay fixed content.
+       Keeps focused inputs — e.g. in the create-league bottom sheet — visible.
+       (Android Chrome; iOS Safari ignores it and handles the keyboard itself.) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="description" content="FIFA World Cup 2026 predictions, leaderboards, and friend leagues">
   <meta name="theme-color" content="#0F7B3A" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0a4d24" media="(prefers-color-scheme: dark)">
