@@ -1,13 +1,27 @@
+/* Full-bleed bar: the background + top border span the viewport, and the
+   safe-area inset keeps the background under the iOS home indicator. */
 .bottom-nav {
   flex: 0 0 auto;
   display: flex;
-  justify-content: space-around;
-  gap: 4px;
-  padding: 6px 8px max(6px, env(safe-area-inset-bottom, 0px));
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
   background: var(--mat-sys-surface-container);
   border-top: 1px solid var(--mat-sys-outline-variant);
   z-index: 100;
   height: auto;
+  min-height: 0;
+}
+
+/* Constrain the icons to the same 720px centered column as `.page`, so on wide
+   screens they group with the content instead of spreading the full width. */
+.nav-inner {
+  display: flex;
+  justify-content: space-around;
+  gap: 4px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 6px 8px;
+  box-sizing: border-box;
   min-height: 64px;
 }
 .nav-item {
