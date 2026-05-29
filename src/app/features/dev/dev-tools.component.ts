@@ -155,6 +155,11 @@ export class DevToolsComponent {
     uid: ['', [Validators.required, Validators.minLength(1)]],
   });
 
+  /** How many fake users to seed for leaderboard testing (1–200). */
+  protected readonly fakeUsersForm = this.fb.nonNullable.group({
+    count: [20, [Validators.required, Validators.min(1), Validators.max(200)]],
+  });
+
   // --------------------------------------------------------------------------
   // Competitions
   // --------------------------------------------------------------------------
@@ -501,6 +506,83 @@ export class DevToolsComponent {
     const { uid } = this.roleForm.getRawValue();
     if (!uid) return;
     await this.runCallable('revokeAdminRole', { uid }, `Revoked admin from ${uid}`);
+  }
+
+  // --------------------------------------------------------------------------
+  // Leaderboard & test users
+  // --------------------------------------------------------------------------
+
+  /** Force a rebuild of the cache/leaderboard rollup. Handy in the emulator
+   *  (the scheduled flush doesn't fire on a cron there) and to seed the doc
+   *  before the tournament. */
+  protected async rebuildLeaderboard(): Promise<void> {
+    this.running.set(true);
+    try {
+      const call = httpsCallable<unknown, { rebuilt: boolean; count: number }>(
+        this.functions,
+        'devRebuildLeaderboardNow',
+      );
+      const res = await call({});
+      this.snackBar.open(
+        `Leaderboard rebuilt · ${res.data.count} entries`,
+        undefined,
+        { duration: 2500 },
+      );
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Rebuild failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
+      console.error('devRebuildLeaderboardNow failed', e);
+    } finally {
+      this.running.set(false);
+    }
+  }
+
+  /** Seed N fake users (random totals) so the leaderboard has volume to
+   *  test against. They also auto-enroll into any "all" global league. */
+  protected async seedFakeUsers(): Promise<void> {
+    const count = this.fakeUsersForm.controls.count.value;
+    this.running.set(true);
+    try {
+      const call = httpsCallable<unknown, { created: number; leaderboardCount: number }>(
+        this.functions,
+        'devSeedFakeUsers',
+      );
+      const res = await call({ count });
+      this.snackBar.open(
+        `Seeded ${res.data.created} fake users · board ${res.data.leaderboardCount}`,
+        undefined,
+        { duration: 3000 },
+      );
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Seed failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
+      console.error('devSeedFakeUsers failed', e);
+    } finally {
+      this.running.set(false);
+    }
+  }
+
+  /** Delete every fake user (and their auto-enrolled global memberships). */
+  protected async clearFakeUsers(): Promise<void> {
+    this.running.set(true);
+    try {
+      const call = httpsCallable<unknown, { deleted: number; membershipsRemoved: number }>(
+        this.functions,
+        'devClearFakeUsers',
+      );
+      const res = await call({});
+      this.snackBar.open(
+        `Removed ${res.data.deleted} fake users`,
+        undefined,
+        { duration: 2500 },
+      );
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Clear failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
+      console.error('devClearFakeUsers failed', e);
+    } finally {
+      this.running.set(false);
+    }
   }
 
   // --------------------------------------------------------------------------

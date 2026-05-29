@@ -17,6 +17,7 @@ export {
   onUserProfileChange,
   devRebuildLeaderboardNow,
 } from './leaderboard-rollup';
+export { devSeedFakeUsers, devClearFakeUsers } from './dev-fake-users';
 export { devFinishMatch } from './dev-finish-match';
 export { devSetFixtureState } from './dev-set-fixture-state';
 export { devSetKickoffTime } from './dev-set-kickoff';

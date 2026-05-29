@@ -377,6 +377,74 @@
         </mat-card-content>
       </mat-card>
 
+      <!-- ===================================================================
+           Leaderboard & test users
+           Force-rebuild the cache/leaderboard rollup, and seed/clear fake
+           users to exercise the board at volume.
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>leaderboard</mat-icon>
+          <mat-card-title>Leaderboard &amp; test users</mat-card-title>
+          <mat-card-subtitle>
+            Rebuild the rollup, or seed fake users to fill the board
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="presets">
+            <button
+              type="button"
+              mat-stroked-button
+              [disabled]="running()"
+              (click)="rebuildLeaderboard()"
+            >
+              <mat-icon>refresh</mat-icon> Rebuild leaderboard
+            </button>
+          </div>
+
+          <form [formGroup]="fakeUsersForm" class="form">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="score">
+              <mat-label>Fake users</mat-label>
+              <input
+                matInput
+                type="number"
+                inputmode="numeric"
+                min="1"
+                max="200"
+                formControlName="count"
+              />
+              <mat-hint>1–200 · random totals</mat-hint>
+            </mat-form-field>
+            <div class="presets">
+              <button
+                type="button"
+                mat-flat-button
+                color="primary"
+                [disabled]="running() || fakeUsersForm.invalid"
+                (click)="seedFakeUsers()"
+              >
+                <mat-icon>group_add</mat-icon> Seed fake users
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                class="scenario miss"
+                [disabled]="running()"
+                (click)="clearFakeUsers()"
+              >
+                <mat-icon>person_off</mat-icon> Remove fake users
+              </button>
+            </div>
+          </form>
+
+          <p class="hint">
+            Fake users are written as <code>users/fake-NNN</code> with random totals
+            and auto-enroll into any “all” global league. “Remove fake users” deletes
+            them and those memberships. Both actions refresh the rollup.
+          </p>
+        </mat-card-content>
+      </mat-card>
+
       @if (isOwner()) {
         <!-- ===================================================================
              Role management (owner-only)
