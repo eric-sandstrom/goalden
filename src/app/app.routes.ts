@@ -59,12 +59,16 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'podium',
+        // Comp-scoped podium path, matching the /comp/:id/standings shape.
+        // Podium picks are a WC-only concept, so the comp segment is literal.
+        path: 'comp/WC/podium',
         loadComponent: () =>
           import('./features/podium/podium-picks.component').then(
             (m) => m.PodiumPicksComponent,
           ),
       },
+      // Legacy /podium → comp-scoped path, so existing bookmarks/links still land.
+      { path: 'podium', redirectTo: 'comp/WC/podium', pathMatch: 'full' },
       {
         // Dedicated standings view. `:competitionId` binds to the
         // component's required input via withComponentInputBinding(); the

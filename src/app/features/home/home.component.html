@@ -31,7 +31,7 @@
               <mat-card-subtitle>+50 pts available · Locks June 11</mat-card-subtitle>
             </mat-card-header>
             <mat-card-actions align="end">
-              <a mat-flat-button color="primary" routerLink="/podium">Make picks</a>
+              <a mat-flat-button color="primary" routerLink="/comp/WC/podium">Make picks</a>
             </mat-card-actions>
           </mat-card>
         } @else if (podiumLoaded() && podiumPickSubmitted() && !podiumLocked()) {
@@ -42,7 +42,7 @@
               <mat-card-subtitle>Locks June 11 — you can still change them</mat-card-subtitle>
             </mat-card-header>
             <mat-card-actions align="end">
-              <a mat-button routerLink="/podium">Edit picks</a>
+              <a mat-button routerLink="/comp/WC/podium">Edit picks</a>
             </mat-card-actions>
           </mat-card>
         }

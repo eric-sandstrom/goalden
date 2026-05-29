@@ -166,7 +166,7 @@ export class NavigationHistoryService {
     if (path === '/leagues') return 'Leagues';
     if (path === '/profile') return 'Profile';
     if (path === '/teams') return 'Teams';
-    if (path === '/podium') return 'Podium picks';
+    if (path === '/comp/WC/podium') return 'Podium picks';
     if (path === '/admin') return 'Admin';
     if (path === '/dev') return 'Dev tools';
     if (path.startsWith('/leagues/')) return 'League';
@@ -182,7 +182,7 @@ export class NavigationHistoryService {
     if (path.startsWith('/leagues/')) return '/leagues';
     if (path.startsWith('/teams/')) return '/teams';
     if (path.startsWith('/users/')) return '/leagues';
-    if (path === '/podium') return '/';
+    if (path === '/comp/WC/podium') return '/';
     if (path === '/admin' || path === '/dev') return '/profile';
     return '/';
   }
