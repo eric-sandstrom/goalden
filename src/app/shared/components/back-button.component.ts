@@ -24,6 +24,12 @@ import { NavigationHistoryService } from '../../core/services/navigation-history
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './back-button.component.html',
   styleUrl: './back-button.component.scss',
+  host: {
+    // Collapse the host entirely when there's no back button to show, so its
+    // padding doesn't reserve space (which read as a stray top margin on the
+    // bottom-nav root pages).
+    '[class.visible]': 'visible()',
+  },
 })
 export class BackButtonComponent {
   private readonly history = inject(NavigationHistoryService);

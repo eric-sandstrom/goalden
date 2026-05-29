@@ -1,7 +1,12 @@
 :host {
-  /* Mirror .page's centered column so the back button sits in the
-     same horizontal band as the content cards below it: max 720px
-     wide, centered, with 1rem horizontal padding. */
+  /* Collapsed by default — no back button, no reserved space (its padding
+     would otherwise look like a top margin on bottom-nav root pages). */
+  display: none;
+}
+/* Shown only when there's somewhere to go back to. Mirrors .page's centered
+   column so the button lines up with the content cards below it: max 720px
+   wide, centered, with 1rem horizontal padding. */
+:host.visible {
   display: block;
   flex: 0 0 auto;
   width: 100%;
