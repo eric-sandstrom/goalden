@@ -7,7 +7,16 @@ export type FixtureStatus =
   | 'CANCELLED'
   | 'AWARDED';
 
-export type FixtureStage = 'GROUP' | 'R32' | 'R16' | 'QF' | 'SF' | 'F' | 'THIRD_PLACE';
+export type FixtureStage =
+  | 'GROUP'
+  | 'REGULAR_SEASON'
+  | 'LEAGUE_STAGE'
+  | 'R32'
+  | 'R16'
+  | 'QF'
+  | 'SF'
+  | 'F'
+  | 'THIRD_PLACE';
 
 export interface Team {
   readonly id: number | null;
@@ -59,6 +68,22 @@ export function isTbd(fixture: Fixture): boolean {
   return fixture.homeTeam.id === null || fixture.awayTeam.id === null;
 }
 
+/**
+ * Single-elimination knockout stages, denylisted explicitly. Every other
+ * stage is table-forming: the WC 'GROUP', a league 'REGULAR_SEASON', the
+ * CL 'LEAGUE_STAGE', and any future league-phase label the polling mapper
+ * passes through verbatim. Do NOT reduce this to `stage !== 'GROUP'` — that
+ * mislabels every league match as a knockout.
+ */
+const KNOCKOUT_STAGES: ReadonlySet<FixtureStage> = new Set<FixtureStage>([
+  'R32',
+  'R16',
+  'QF',
+  'SF',
+  'F',
+  'THIRD_PLACE',
+]);
+
 export function isKnockout(stage: FixtureStage): boolean {
-  return stage !== 'GROUP';
+  return KNOCKOUT_STAGES.has(stage);
 }

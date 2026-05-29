@@ -135,7 +135,26 @@
           [season]="league()!.season"
         />
 
-        <mat-card appearance="outlined" class="table-wrap card-grow">
+        <!-- Switch the lower panel between the prediction leaderboard (who's
+             winning this league) and the competition standings (your predicted
+             table vs the real one). Both occupy the single fills-and-scrolls
+             slot, so they never fight for height. -->
+        <nav mat-tab-nav-bar [tabPanel]="lowerPanel" class="section-tabs">
+          <a
+            mat-tab-link
+            [active]="lowerView() === 'leaderboard'"
+            (click)="lowerView.set('leaderboard')"
+          >Leaderboard</a>
+          <a
+            mat-tab-link
+            [active]="lowerView() === 'standings'"
+            (click)="lowerView.set('standings')"
+          >Standings</a>
+        </nav>
+
+        <mat-tab-nav-panel #lowerPanel class="lower-panel">
+          @if (lowerView() === 'leaderboard') {
+            <mat-card appearance="outlined" class="table-wrap card-grow">
           <div class="card-scroll">
             <table mat-table [dataSource]="rows()">
               <ng-container matColumnDef="rank">
@@ -233,5 +252,14 @@
             </table>
           </div>
         </mat-card>
+          } @else {
+            <app-standings-view
+              class="card-grow"
+              [competitionId]="league()!.competitionId"
+              [season]="league()!.season"
+              [embedded]="true"
+            />
+          }
+        </mat-tab-nav-panel>
       }
     </section>

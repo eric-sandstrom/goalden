@@ -18,6 +18,11 @@ export interface FootballDataResponse {
   readonly matches: readonly FootballDataMatch[];
 }
 
+// Maps football-data.org's cup stage labels to our compact codes. Any stage
+// not listed here passes through verbatim (see mapFixture) — that's how the
+// league-phase labels 'REGULAR_SEASON' and the CL 'LEAGUE_STAGE' reach
+// Firestore unchanged. Keep the client's `FixtureStage` union in sync with
+// these compact codes plus the verbatim passthrough values.
 const STAGE_MAP: Record<string, string> = {
   GROUP_STAGE: 'GROUP',
   LAST_32: 'R32',

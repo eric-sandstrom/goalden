@@ -9,6 +9,20 @@
     .grow { flex: 1; }
     mat-card-header { align-items: center; }
 
+    /* Leaderboard / Standings tabs + the panel they switch between. The nav
+       bar is header-only, so the panel keeps the app's fill-and-scroll model:
+       it fills the remaining height and its `.card-grow` child owns the
+       scroll (no nested tab-body scroller to fight). */
+    .section-tabs {
+      flex: 0 0 auto;
+    }
+    .lower-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
     /* Header title with optional type chip alongside the league name. */
     .title-row {
       display: inline-flex;

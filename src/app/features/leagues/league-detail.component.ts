@@ -21,6 +21,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { AuthService } from '../../core/services/auth.service';
@@ -29,6 +30,7 @@ import { LeaguesService } from '../../core/services/leagues.service';
 import { parseTotals } from '../../core/services/user.service';
 import { League, LeagueMember } from '../../core/models/league.model';
 import { PredictNextCardComponent } from '../predict/predict-next-card.component';
+import { StandingsViewComponent } from '../standings/standings-view.component';
 
 interface LeagueRow {
   readonly uid: string;
@@ -54,9 +56,11 @@ interface LeagueRow {
     MatMenuModule,
     MatProgressSpinnerModule,
     MatTableModule,
+    MatTabsModule,
     MatTooltipModule,
     SkelComponent,
     PredictNextCardComponent,
+    StandingsViewComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './league-detail.component.html',
@@ -165,6 +169,10 @@ export class LeagueDetailComponent {
 
   protected readonly columns = ['rank', 'player', 'exact', 'outcome', 'points', 'actions'];
   protected readonly skelRows = [0, 1, 2, 3, 4];
+
+  /** Lower-panel switch: the prediction leaderboard vs the competition
+   *  standings (predicted vs real). */
+  protected readonly lowerView = signal<'leaderboard' | 'standings'>('leaderboard');
 
   protected readonly inviteUrl = computed(() => {
     const code = this.league()?.inviteCode;

@@ -66,6 +66,16 @@ export const routes: Routes = [
           ),
       },
       {
+        // Dedicated standings view. `:competitionId` binds to the
+        // component's required input via withComponentInputBinding(); the
+        // season is derived from the competition catalogue.
+        path: 'comp/:competitionId/standings',
+        loadComponent: () =>
+          import('./features/standings/standings-view.component').then(
+            (m) => m.StandingsViewComponent,
+          ),
+      },
+      {
         path: 'teams',
         loadComponent: () =>
           import('./features/teams/teams.component').then((m) => m.TeamsComponent),
