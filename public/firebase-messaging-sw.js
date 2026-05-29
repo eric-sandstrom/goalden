@@ -30,7 +30,8 @@ messaging.onBackgroundMessage((payload) => {
   self.registration.showNotification(n.title || 'Goalden', {
     body: n.body || '',
     icon: 'icons/icon-192x192.png',
-    badge: 'icons/icon-192x192.png',
+    // Monochrome silhouette for the Android status bar (alpha-masked to white).
+    badge: 'icons/badge-96x96.png',
     data: payload.data || {},
   });
 });

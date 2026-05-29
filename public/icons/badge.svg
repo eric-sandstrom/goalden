@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Android notification status-bar badge — monochrome source.
+
+  Android renders the notification small/badge icon as a SILHOUETTE using only
+  the alpha channel: it ignores colour and fills the opaque pixels with white.
+  So this must be a transparent PNG with the logo as solid (here white) shape
+  and NO background — otherwise the whole opaque square gets masked to a plain
+  white block in the status bar.
+
+  Same "G" geometry as icon.svg, minus the green rounded-square background, with
+  a slightly heavier stroke so it stays legible at ~24dp.
+
+  Generated to public/icons/badge-96x96.png by `tools/generate-icons.mjs`.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Goalden">
+  <path
+    d="M 370 184
+       A 144 144 0 1 0 370 328
+       L 370 256
+       L 286 256"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="74"
+    stroke-linecap="butt"
+    stroke-linejoin="round"/>
+</svg>

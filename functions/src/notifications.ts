@@ -43,7 +43,11 @@ export const sendTestNotification = onCall(async (req) => {
       body: 'Push notifications are working 🎉',
     },
     webpush: {
-      notification: { icon: '/icons/icon-192x192.png' },
+      notification: {
+        icon: '/icons/icon-192x192.png',
+        // Monochrome status-bar silhouette on Android (alpha-masked to white).
+        badge: '/icons/badge-96x96.png',
+      },
       fcmOptions: { link: '/' },
     },
   });

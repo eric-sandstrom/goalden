@@ -33,4 +33,14 @@ for (const size of SIZES) {
   console.log(`  ${size.toString().padStart(3)}×${size}  →  ${out.replace(ROOT, '.')}`);
 }
 
+// Android notification status-bar badge — monochrome silhouette from badge.svg
+// (white shape on transparent; Android fills the alpha with white).
+const badgeSvg = await readFile(join(OUT_DIR, 'badge.svg'));
+const badgeOut = join(OUT_DIR, 'badge-96x96.png');
+await sharp(badgeSvg, { density: 512 })
+  .resize(96, 96, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .png()
+  .toFile(badgeOut);
+console.log(`   96×96  →  ${badgeOut.replace(ROOT, '.')}  (notification badge)`);
+
 console.log(`\nDone — regenerated ${SIZES.length} PNG icons from icon.svg.`);

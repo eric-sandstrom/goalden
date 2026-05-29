@@ -81,7 +81,9 @@ export class NotificationsService {
     const options: NotificationOptions = {
       body,
       icon: 'icons/icon-192x192.png',
-      badge: 'icons/icon-192x192.png',
+      // Monochrome silhouette for the Android status bar (alpha-masked to white);
+      // the full-colour icon above is the large image in the notification body.
+      badge: 'icons/badge-96x96.png',
       tag,
     };
     try {
