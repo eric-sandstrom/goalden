@@ -125,6 +125,16 @@ export const routes: Routes = [
           ),
       },
       {
+        // Per-match detail. `:fdid` is the football-data match id (the bare
+        // numeric id behind our `fd-{id}` fixture doc); binds to the
+        // component's required input via withComponentInputBinding().
+        path: 'match/:fdid',
+        loadComponent: () =>
+          import('./features/fixture-detail/fixture-detail.component').then(
+            (m) => m.FixtureDetailComponent,
+          ),
+      },
+      {
         // Componentless parent so /profile/admin nests under Profile while
         // both children still render in the shell's router-outlet.
         path: 'profile',

@@ -85,6 +85,10 @@ export class FixtureRowComponent {
    *  the same widget styling. */
   protected readonly editDisabled = computed(() => this.locked() || this.tbd());
 
+  /** The bare football-data id (our doc id minus the `fd-` prefix) — the
+   *  segment the `/match/:fdid` detail route expects. */
+  protected readonly detailFdid = computed(() => this.fixture().id.replace(/^fd-/, ''));
+
   protected readonly kickoffLabel = computed(() =>
     this.fixture().utcKickoff.toLocaleString(undefined, {
       weekday: 'short',
