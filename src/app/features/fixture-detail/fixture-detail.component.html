@@ -9,26 +9,22 @@
     </mat-card>
   } @else if (fixture(); as f) {
     <mat-card appearance="outlined" class="match-card">
-      <!-- ===== Pinned header: date + venue + competition + scoreboard ===== -->
+      <!-- ===== Pinned header: meta line + scoreboard ===== -->
       <div class="header">
-        <span class="date-line">
-          <mat-icon aria-hidden="true">event</mat-icon>
-          {{ kickoffLabel() }}
-        </span>
-
-        @if (detail()?.venue; as venue) {
-          <span class="venue-line">
-            <mat-icon aria-hidden="true">stadium</mat-icon>
-            {{ venue }}
-          </span>
-        }
-
-        <span class="comp-chip">
-          @if (competitionEmblem(); as emblem) {
-            <img class="comp-logo" [src]="emblem" alt="" (error)="hideBrokenEmblem($event)" />
+        <div class="meta-line">
+          <span>{{ kickoffLabel() }}</span>
+          @if (detail()?.venue; as venue) {
+            <span class="sep" aria-hidden="true">·</span>
+            <span>{{ venue }}</span>
           }
-          {{ competitionName() }}
-        </span>
+          <span class="sep" aria-hidden="true">·</span>
+          <span class="comp">
+            @if (competitionEmblem(); as emblem) {
+              <img class="comp-logo" [src]="emblem" alt="" (error)="hideBrokenEmblem($event)" />
+            }
+            {{ competitionName() }}
+          </span>
+        </div>
 
         <div class="scoreboard">
           <div class="team home">
@@ -84,32 +80,15 @@
         }
       </div>
 
-      <!-- ===== Vertical icon-rail tabs (fills remaining height, scrolls) ===== -->
-      <div class="tabs">
-        <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Match sections">
-          @for (t of availableTabs(); track t.id) {
-            <button
-              mat-icon-button
-              type="button"
-              role="tab"
-              class="rail-tab"
-              [class.active]="t.id === activeId()"
-              [attr.aria-selected]="t.id === activeId()"
-              [attr.aria-label]="t.label"
-              [matTooltip]="t.label"
-              matTooltipPosition="right"
-              (click)="selectTab(t.id)"
-            >
-              <mat-icon aria-hidden="true">{{ t.icon }}</mat-icon>
-            </button>
-          }
-        </div>
-
-        <div class="panel" role="tabpanel" [attr.data-dir]="slideDir()">
-          @switch (activeId()) {
-            <!-- ===== Events + meta ===== -->
-            @case ('info') {
-              <div class="panel-inner">
+      <!-- ===== Centered horizontal tabs, below the scoreboard ===== -->
+      <mat-tab-group
+        class="detail-tabs"
+        mat-align-tabs="center"
+        [mat-stretch-tabs]="false"
+        animationDuration="220ms"
+      >
+        <mat-tab label="Events">
+          <div class="tab-content">
                 @if (hasTimeline()) {
                   <ul class="timeline">
                     @for (item of timeline(); track item.key) {
@@ -194,12 +173,12 @@
                     }
                   </mat-list>
                 }
-              </div>
-            }
+          </div>
+        </mat-tab>
 
-            <!-- ===== Line-ups (pitch) + substitutions + bench ===== -->
-            @case ('lineups') {
-              <div class="panel-inner lineups-tab">
+        @if (hasLineups()) {
+          <mat-tab label="Line-ups">
+            <div class="tab-content lineups-tab">
                 @if (pitch().markers.length > 0) {
                   <!-- Away bar (above pitch): manager left, formation right. -->
                   <div class="team-bar">
@@ -328,12 +307,13 @@
                     }
                   }
                 </div>
-              </div>
-            }
+            </div>
+          </mat-tab>
+        }
 
-            <!-- ===== Officials ===== -->
-            @case ('officials') {
-              <div class="panel-inner">
+        @if (hasReferees()) {
+          <mat-tab label="Officials">
+            <div class="tab-content">
                 <mat-list>
                   @for (r of detail()!.referees; track $index) {
                     <mat-list-item>
@@ -345,11 +325,10 @@
                     </mat-list-item>
                   }
                 </mat-list>
-              </div>
-            }
-          }
-        </div>
-      </div>
+            </div>
+          </mat-tab>
+        }
+      </mat-tab-group>
     </mat-card>
   } @else {
     <mat-card appearance="outlined" class="empty">

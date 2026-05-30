@@ -34,11 +34,6 @@
 // ===== Card shell: fills the page, scrolls internally =====
 
 .match-card {
-  // Rail geometry, shared so the header can reserve matching space on the
-  // left and stay aligned with the tab panel below.
-  --rail-w: 48px;
-  --rail-gap: 8px;
-
   flex: 1;
   min-height: 0;
   display: flex;
@@ -51,54 +46,35 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  // Offset by the rail so the chip + scoreboard centre over the panel, not
-  // the whole card (the rail eats the left edge of everything below).
-  padding-left: calc(var(--rail-w) + var(--rail-gap));
 }
 
-// ===== Date + venue + competition chip =====
+// ===== Inline meta line: date · venue · competition =====
 
-.date-line,
-.venue-line {
-  align-self: center;
-  display: inline-flex;
+.meta-line {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.72rem;
   color: var(--mat-sys-on-surface-variant);
 
-  mat-icon {
-    font-size: 15px;
-    width: 15px;
-    height: 15px;
+  .sep {
+    color: var(--mat-sys-outline);
   }
-}
 
-.date-line {
-  margin-bottom: 4px;
-}
-
-.venue-line {
-  margin-bottom: 6px;
-}
-
-.comp-chip {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 12px 3px 8px;
-  margin-bottom: 12px;
-  border-radius: 999px;
-  background: var(--mat-sys-secondary-container);
-  color: var(--mat-sys-on-secondary-container);
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  .comp {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface);
+  }
 
   .comp-logo {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     object-fit: contain;
   }
 }
@@ -210,84 +186,29 @@
   }
 }
 
-// ===== Vertical icon-rail tabs =====
+// ===== Centered horizontal tabs (fills remaining height, body scrolls) =====
 
-.tabs {
+.detail-tabs {
   flex: 1;
   min-height: 0;
-  display: flex;
-  gap: var(--rail-gap);
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--mat-sys-outline-variant);
-}
-
-.rail {
-  flex: none;
-  width: var(--rail-w);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
+  margin-top: 12px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
 
-.rail-tab {
-  color: var(--mat-sys-on-surface-variant);
-  transition: background 0.15s ease, color 0.15s ease;
-
-  &.active {
-    background: var(--mat-sys-secondary-container);
-    color: var(--mat-sys-on-secondary-container);
+  // Let the tab body fill the remaining height and scroll internally, with
+  // the centered label row pinned above it.
+  ::ng-deep .mat-mdc-tab-body-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 }
 
-.panel {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+.tab-content {
+  padding: 12px 4px 16px;
 }
 
-// Vertical enter animation — direction set by the rail movement (down the
-// rail → enter from below; up → from above). The @switch recreates
-// .panel-inner each switch, so the animation re-runs.
-@keyframes fd-enter-from-below {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes fd-enter-from-above {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.panel[data-dir='down'] .panel-inner {
-  animation: fd-enter-from-below 200ms ease both;
-}
-.panel[data-dir='up'] .panel-inner {
-  animation: fd-enter-from-above 200ms ease both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .panel .panel-inner {
-    animation: none;
-  }
-}
-
-// ===== Timeline (now in the Info tab) =====
+// ===== Timeline (in the Events tab) =====
 
 .timeline {
   list-style: none;

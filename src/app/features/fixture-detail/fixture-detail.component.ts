@@ -14,7 +14,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
 import { Fixture } from '../../core/models/fixture.model';
 import { MatchDetail, MatchLineup, MatchPlayer } from '../../core/models/match-detail.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
@@ -39,15 +39,6 @@ interface InfoRow {
   readonly icon: string;
   readonly label: string;
   readonly value: string;
-}
-
-type TabId = 'info' | 'lineups' | 'officials';
-
-interface DetailTab {
-  readonly id: TabId;
-  readonly icon: string;
-  /** Tooltip + accessible name for the icon-only rail button. */
-  readonly label: string;
 }
 
 /** A starter placed on the pitch — coordinates are percentages of the pitch
@@ -81,7 +72,7 @@ interface SubItem {
     MatIconModule,
     MatListModule,
     MatProgressSpinnerModule,
-    MatTooltipModule,
+    MatTabsModule,
     SkelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -425,42 +416,6 @@ export class FixtureDetailComponent {
    *  team heading (the flat list didn't say who subbed for whom). */
   protected subsFor(side: 'home' | 'away'): readonly SubItem[] {
     return this.subs().filter((s) => s.side === side);
-  }
-
-  // --- vertical icon-rail tabs -----------------------------------------------
-
-  /** The tabs the rail shows, top to bottom. Info (events + meta) is always
-   *  present; Line-ups / Officials appear only when their data is loaded. */
-  protected readonly availableTabs = computed<readonly DetailTab[]>(() => {
-    const tabs: DetailTab[] = [{ id: 'info', icon: 'subject', label: 'Events & info' }];
-    if (this.hasLineups()) tabs.push({ id: 'lineups', icon: 'groups', label: 'Line-ups & subs' });
-    if (this.hasReferees()) tabs.push({ id: 'officials', icon: 'sports', label: 'Officials' });
-    return tabs;
-  });
-
-  /** User's explicit pick; null until they tap a tab (then `activeId` falls
-   *  back to the first available one). */
-  private readonly selectedId = signal<TabId | null>(null);
-
-  /** The resolved active tab — the user's pick when it's still available,
-   *  otherwise the first tab in the rail (Info / events). */
-  protected readonly activeId = computed<TabId>(() => {
-    const tabs = this.availableTabs();
-    const sel = this.selectedId();
-    if (sel && tabs.some((t) => t.id === sel)) return sel;
-    return tabs[0]?.id ?? 'info';
-  });
-
-  /** Direction the panel slides on the last switch — 'down' when moving to a
-   *  lower tab in the rail (content enters from below), 'up' otherwise. */
-  protected readonly slideDir = signal<'up' | 'down'>('down');
-
-  protected selectTab(id: TabId): void {
-    const tabs = this.availableTabs();
-    const from = tabs.findIndex((t) => t.id === this.activeId());
-    const to = tabs.findIndex((t) => t.id === id);
-    this.slideDir.set(to >= from ? 'down' : 'up');
-    this.selectedId.set(id);
   }
 
   /** Side ('home' badge column) for a given event team id. */
