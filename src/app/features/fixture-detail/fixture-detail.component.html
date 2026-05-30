@@ -307,24 +307,21 @@
                     }
                   }
                 </div>
-            </div>
-          </mat-tab>
-        }
 
-        @if (hasReferees()) {
-          <mat-tab label="Officials">
-            <div class="tab-content">
-                <mat-list>
-                  @for (r of detail()!.referees; track $index) {
-                    <mat-list-item>
-                      <mat-icon matListItemAvatar aria-hidden="true">sports</mat-icon>
-                      <span matListItemTitle>{{ r.name }}</span>
-                      <span matListItemLine>
-                        {{ r.type }}@if (r.nationality) { · {{ r.nationality }} }
-                      </span>
-                    </mat-list-item>
-                  }
-                </mat-list>
+                @if (hasReferees()) {
+                  <h3 class="section-h">Officials</h3>
+                  <mat-list>
+                    @for (r of detail()!.referees; track $index) {
+                      <mat-list-item>
+                        <mat-icon matListItemAvatar aria-hidden="true">sports</mat-icon>
+                        <span matListItemTitle>{{ r.name }}</span>
+                        <span matListItemLine>
+                          {{ r.type }}@if (r.nationality) { · {{ r.nationality }} }
+                        </span>
+                      </mat-list-item>
+                    }
+                  </mat-list>
+                }
             </div>
           </mat-tab>
         }

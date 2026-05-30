@@ -202,6 +202,12 @@
     flex: 1 1 auto;
     min-height: 0;
   }
+  // The body itself defaults to overflow:auto AND wraps a content div that's
+  // also overflow:auto — which renders two nested scrollbars. Clip the outer
+  // body so only the inner content scrolls.
+  ::ng-deep .mat-mdc-tab-body {
+    overflow: hidden;
+  }
 }
 
 .tab-content {
