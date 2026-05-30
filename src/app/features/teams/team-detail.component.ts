@@ -1,5 +1,12 @@
 import { NgOptimizedImage } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  resource,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -41,10 +48,31 @@ export class TeamDetailComponent {
   // :teamId from the route and pushes it into this signal input automatically.
   readonly teamId = input.required<string>();
 
-  protected readonly loaded = this.teamsService.loaded;
+  /**
+   * Canonical-doc read for this team, keyed on the route id. Resolves any
+   * team regardless of whether its competition is in the shared service's
+   * active-comp merge (which is also localStorage-cached) — the source of the
+   * old "Team not found" on non-WC teams. The in-memory `byId` below is
+   * preferred for instant paint when the shared list already has it, so this
+   * only does a network read on a cache miss.
+   */
+  private readonly teamResource = resource<Team | null, string>({
+    params: () => this.teamId(),
+    loader: ({ params }) => this.teamsService.loadTeam(params),
+    defaultValue: null,
+  });
 
-  protected readonly team = computed<Team | null>(() =>
-    this.teamsService.byId(this.teamId()),
+  protected readonly team = computed<Team | null>(
+    () => this.teamsService.byId(this.teamId()) ?? this.teamResource.value(),
+  );
+
+  /** Loaded once we have a team from either source, or the canonical read
+   *  has settled (so a genuine miss falls through to "not found" instead of
+   *  spinning forever). */
+  protected readonly loaded = computed<boolean>(
+    () =>
+      this.teamsService.byId(this.teamId()) !== null ||
+      !this.teamResource.isLoading(),
   );
 
   protected readonly squadSections = computed<readonly SquadSection[]>(() => {

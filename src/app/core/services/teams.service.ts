@@ -167,6 +167,26 @@ export class TeamsService {
     return teams.sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  /**
+   * One-shot read of a single canonical team doc at `teams/{teamId}`. Pure
+   * read, no signal writes — designed to back the team-detail `resource()`.
+   *
+   * Resolves a team independent of the shared `teams()` signal, which only
+   * holds the *active*-competition merge (and is localStorage-cached). A team
+   * is reachable from comp-scoped browse / fixture links for ANY competition
+   * with a rollup, so the detail page must be able to resolve ANY team — not
+   * just ones whose competition is currently in the active merge. Reading the
+   * canonical doc directly (one read; rules allow signed-in reads on
+   * `teams/{id}`) makes detail robust to active-flag and cache state.
+   *
+   * Returns `null` when the doc doesn't exist (genuine not-found).
+   */
+  async loadTeam(teamId: string): Promise<Team | null> {
+    const snap = await getDoc(doc(this.db, 'teams', teamId));
+    if (!snap.exists()) return null;
+    return this.parse(snap.id, snap.data());
+  }
+
   // ---------------------------------------------------------------------------
   // Cache I/O
   // ---------------------------------------------------------------------------
