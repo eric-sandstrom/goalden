@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/eric-sandstrom/goalden/compare/v1.1.0...v1.1.1) (2026-05-30)
+
+
+### Bug Fixes
+
+* **fixtures:** reconcile live matches stuck past the poll window ([#22](https://github.com/eric-sandstrom/goalden/issues/22)) ([5645268](https://github.com/eric-sandstrom/goalden/commit/5645268135c154230b125bcbb14f587a1d69d766))
+
 ## [1.1.0](https://github.com/eric-sandstrom/goalden/compare/v1.0.2...v1.1.0) (2026-05-30)
 
 
