@@ -33,11 +33,11 @@
             } @else {
               <div class="score vs"><span class="dash">vs</span></div>
             }
-            <span class="status">{{ statusLabel() }}</span>
-            <span class="kickoff">{{ kickoffLabel() }}</span>
             @if (resultNote(); as note) {
               <span class="result-note">{{ note }}</span>
             }
+            <span class="status">{{ statusLabel() }}</span>
+            <span class="kickoff">{{ kickoffLabel() }}</span>
           </div>
 
           <div class="team away">
@@ -194,21 +194,30 @@
 
                 @if (subs().length > 0) {
                   <h3 class="section-h">Substitutions</h3>
-                  <ul class="subs">
-                    @for (s of subs(); track s.key) {
-                      <li class="sub-item" [class.home]="s.side === 'home'" [class.away]="s.side === 'away'">
-                        <span class="sub-min">{{ s.minute }}'</span>
-                        <span class="sub-names">
-                          <span class="sub-in">
-                            <mat-icon aria-hidden="true">arrow_upward</mat-icon>{{ s.inName }}
-                          </span>
-                          <span class="sub-out">
-                            <mat-icon aria-hidden="true">arrow_downward</mat-icon>{{ s.outName }}
-                          </span>
-                        </span>
-                      </li>
+                  <div class="subs-grid">
+                    @for (side of ['home', 'away']; track side) {
+                      @if (subsFor($any(side)).length > 0) {
+                        <section class="subs-col" [class.home]="side === 'home'" [class.away]="side === 'away'">
+                          <h4 class="subs-team">{{ teamName($any(side)) }}</h4>
+                          <ul class="subs">
+                            @for (s of subsFor($any(side)); track s.key) {
+                              <li class="sub-item">
+                                <span class="sub-min">{{ s.minute }}'</span>
+                                <span class="sub-names">
+                                  <span class="sub-in">
+                                    <mat-icon aria-hidden="true">arrow_upward</mat-icon>{{ s.inName }}
+                                  </span>
+                                  <span class="sub-out">
+                                    <mat-icon aria-hidden="true">arrow_downward</mat-icon>{{ s.outName }}
+                                  </span>
+                                </span>
+                              </li>
+                            }
+                          </ul>
+                        </section>
+                      }
                     }
-                  </ul>
+                  </div>
                 }
 
                 <div class="benches">

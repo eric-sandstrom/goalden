@@ -34,6 +34,11 @@
 // ===== Card shell: fills the page, scrolls internally =====
 
 .match-card {
+  // Rail geometry, shared so the header can reserve matching space on the
+  // left and stay aligned with the tab panel below.
+  --rail-w: 48px;
+  --rail-gap: 8px;
+
   flex: 1;
   min-height: 0;
   display: flex;
@@ -46,6 +51,9 @@
   flex: none;
   display: flex;
   flex-direction: column;
+  // Offset by the rail so the chip + scoreboard centre over the panel, not
+  // the whole card (the rail eats the left edge of everything below).
+  padding-left: calc(var(--rail-w) + var(--rail-gap));
 }
 
 // ===== Competition chip =====
@@ -176,7 +184,7 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 8px;
+  gap: var(--rail-gap);
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--mat-sys-outline-variant);
@@ -184,8 +192,10 @@
 
 .rail {
   flex: none;
+  width: var(--rail-w);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
@@ -357,6 +367,9 @@
 .pitch {
   position: relative;
   width: 100%;
+  // Cap it so the field doesn't blow up to panel width on wide screens.
+  max-width: 340px;
+  margin: 0 auto;
   aspect-ratio: 3 / 4;
   border-radius: 10px;
   overflow: hidden;
@@ -448,6 +461,34 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
+.subs-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+
+  @media (min-width: 600px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.subs-col {
+  border-left: 3px solid transparent;
+  padding-left: 10px;
+
+  &.home {
+    border-left-color: var(--mat-sys-primary);
+  }
+  &.away {
+    border-left-color: var(--mat-sys-tertiary);
+  }
+}
+
+.subs-team {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .subs {
   list-style: none;
   margin: 0;
@@ -462,16 +503,8 @@
   align-items: center;
   gap: 10px;
   padding: 6px 8px;
-  border-left: 3px solid transparent;
   border-radius: 4px;
   background: var(--mat-sys-surface-container-low);
-
-  &.home {
-    border-left-color: var(--mat-sys-primary);
-  }
-  &.away {
-    border-left-color: var(--mat-sys-tertiary);
-  }
 
   .sub-min {
     font-size: 0.8rem;

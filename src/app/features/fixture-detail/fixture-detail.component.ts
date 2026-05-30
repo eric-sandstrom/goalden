@@ -246,19 +246,14 @@ export class FixtureDetailComponent {
   protected readonly hasTimeline = computed(() => this.timeline().length > 0);
 
   /**
-   * True when the match is finished but the detail we hold is missing or
-   * incomplete — the cue to offer a refresh. "Incomplete" = fewer recorded
-   * goal events than the scoreline implies (e.g. a 2–1 with no scorers yet),
-   * which also covers a fixture that's never been fetched at all.
+   * True when we've never fetched the detail doc for this match — the cue to
+   * offer a refresh. Once fetched, we DON'T re-prompt even if the event list
+   * looks sparse: football-data simply doesn't carry goal/card events for
+   * some competitions (e.g. parts of the Champions League on the free tier),
+   * and a refetch wouldn't add anything — it would just leave the button
+   * showing forever on an already-loaded match.
    */
-  protected readonly detailMissing = computed<boolean>(() => {
-    const d = this.detail();
-    if (!d) return true;
-    const sc = this.fixture()?.score;
-    const ft = sc?.regularTime ?? sc?.fullTime ?? null;
-    const expectedGoals = ft ? ft.home + ft.away : 0;
-    return d.goals.length < expectedGoals;
-  });
+  protected readonly detailMissing = computed<boolean>(() => this.detail() === null);
 
   protected readonly showRefresh = computed<boolean>(
     () =>
@@ -320,6 +315,12 @@ export class FixtureDetailComponent {
       outName: s.playerOut?.name ?? '—',
     }));
   });
+
+  /** Substitutions for one team, so the Line-ups tab can group them under a
+   *  team heading (the flat list didn't say who subbed for whom). */
+  protected subsFor(side: 'home' | 'away'): readonly SubItem[] {
+    return this.subs().filter((s) => s.side === side);
+  }
 
   // --- vertical icon-rail tabs -----------------------------------------------
 
