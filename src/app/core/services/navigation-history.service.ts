@@ -166,6 +166,7 @@ export class NavigationHistoryService {
     if (path === '/leagues') return 'Leagues';
     if (path === '/profile') return 'Profile';
     if (path === '/teams') return 'Teams';
+    if (path.startsWith('/comp/') && path.endsWith('/teams')) return 'Teams';
     if (path === '/comp/WC/podium') return 'Podium picks';
     if (path === '/admin') return 'Admin';
     if (path === '/dev') return 'Dev tools';
@@ -180,6 +181,7 @@ export class NavigationHistoryService {
   private fallbackParent(url: string): string {
     const path = this.pathOf(url);
     if (path.startsWith('/leagues/')) return '/leagues';
+    if (path.startsWith('/comp/') && path.endsWith('/teams')) return '/leagues';
     if (path.startsWith('/teams/')) return '/teams';
     if (path.startsWith('/users/')) return '/leagues';
     if (path === '/comp/WC/podium') return '/';

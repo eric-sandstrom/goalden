@@ -141,6 +141,32 @@ export class TeamsService {
     await this.fetchTeams(this.activeCompIds());
   }
 
+  /**
+   * One-shot read of a single competition's team rollup at
+   * `cache/teams-{compId}`, returning the parsed, name-sorted list. Pure
+   * read with no signal writes — designed to back an Angular `resource()`
+   * for the comp-scoped browse view, so the Teams page shows only the
+   * teams in that competition rather than the merged all-active set the
+   * shared `teams()` signal exposes. Returns `[]` when the rollup doesn't
+   * exist yet (e.g. before the first pollTeams cycle); the view's empty
+   * state covers that.
+   */
+  async loadTeamsForComp(compId: string): Promise<readonly Team[]> {
+    const snap = await getDoc(doc(this.db, 'cache', `teams-${compId}`));
+    if (!snap.exists()) {
+      console.warn(`[TeamsService] no cache/teams-${compId} rollup yet`);
+      return [];
+    }
+    const raw = Array.isArray(snap.data()['teams']) ? snap.data()['teams'] : [];
+    const teams: Team[] = [];
+    for (const entry of raw as DocumentData[]) {
+      const id = typeof entry['id'] === 'string' ? entry['id'] : null;
+      if (!id) continue;
+      teams.push(this.parse(id, entry));
+    }
+    return teams.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   // ---------------------------------------------------------------------------
   // Cache I/O
   // ---------------------------------------------------------------------------

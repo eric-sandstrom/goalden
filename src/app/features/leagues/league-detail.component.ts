@@ -285,11 +285,14 @@ export class LeagueDetailComponent {
     });
   }
 
-  /** Jumps to the global teams browser. Lives in this component's menu
-   *  rather than the profile page because the league detail is the
-   *  natural surface for "tell me about the competing teams". */
+  /** Jumps to the teams browser scoped to this league's competition.
+   *  Lives in this component's menu rather than the profile page because
+   *  the league detail is the natural surface for "tell me about the
+   *  competing teams" — and the league already pins the competition. */
   protected browseTeams(): void {
-    void this.router.navigate(['/teams']);
+    const l = this.league();
+    if (!l) return;
+    void this.router.navigate(['/comp', l.competitionId, 'teams']);
   }
 
   protected async copyLink(): Promise<void> {
