@@ -182,17 +182,17 @@
           <mat-tab label="Line-ups">
             <div class="tab-content lineups-tab">
                 @if (pitch().markers.length > 0) {
-                  <!-- Away bar (above pitch): mirrored — formation left, manager right. -->
-                  <div class="team-bar away">
+                  <!-- Home bar (above pitch): manager left, formation right. -->
+                  <div class="team-bar">
                     <span class="mgr">
                       <span
                         class="team-dot"
-                        [style.background-color]="fill('away')"
-                        [style.border-color]="ring('away')"
+                        [style.background-color]="fill('home')"
+                        [style.border-color]="ring('home')"
                       ></span>
-                      {{ coachName('away') ?? teamName('away') }}
+                      {{ coachName('home') ?? teamName('home') }}
                     </span>
-                    @if (formationOf('away'); as form) {
+                    @if (formationOf('home'); as form) {
                       <span class="form">{{ form }}</span>
                     }
                   </div>
@@ -231,17 +231,17 @@
                     }
                   </div>
 
-                  <!-- Home bar (below pitch): manager left, formation right. -->
-                  <div class="team-bar">
+                  <!-- Away bar (below pitch): mirrored — formation left, manager right. -->
+                  <div class="team-bar away">
                     <span class="mgr">
                       <span
                         class="team-dot"
-                        [style.background-color]="fill('home')"
-                        [style.border-color]="ring('home')"
+                        [style.background-color]="fill('away')"
+                        [style.border-color]="ring('away')"
                       ></span>
-                      {{ coachName('home') ?? teamName('home') }}
+                      {{ coachName('away') ?? teamName('away') }}
                     </span>
-                    @if (formationOf('home'); as form) {
+                    @if (formationOf('away'); as form) {
                       <span class="form">{{ form }}</span>
                     }
                   </div>

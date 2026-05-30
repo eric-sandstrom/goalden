@@ -679,8 +679,8 @@ function buildRows(lu: MatchLineup): MatchPlayer[][] {
 
 /**
  * Place a team's rows on the pitch as percentage coordinates. Home occupies
- * the bottom half (GK deepest at y≈95, attackers near the halfway line);
- * away mirrors into the top half (GK at y≈5). Players in a row spread evenly
+ * the top half (GK at y≈5, attackers near the halfway line); away mirrors
+ * into the bottom half (GK deepest at y≈95). Players in a row spread evenly
  * across the width. `offMap` tags starters who were later subbed off.
  */
 function markersForTeam(
@@ -692,7 +692,7 @@ function markersForTeam(
   const rowCount = rows.length;
   rows.forEach((row, ri) => {
     const t = rowCount > 1 ? ri / (rowCount - 1) : 0; // 0 = GK row … 1 = most attacking
-    const y = side === 'home' ? 95 - t * 39 : 5 + t * 39;
+    const y = side === 'home' ? 5 + t * 39 : 95 - t * 39;
     const k = row.length;
     row.forEach((p, j) => {
       const subbed = p.id != null && offMap.has(p.id);

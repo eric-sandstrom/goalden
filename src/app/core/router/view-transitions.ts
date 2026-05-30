@@ -50,7 +50,19 @@ function directionFor(from: string[], to: string[]): RouteDirection | null {
 
 export function onRouteViewTransition({ transition, from, to }: ViewTransitionInfo): void {
   const root = document.documentElement;
-  const direction = directionFor(segmentsOf(from), segmentsOf(to));
+  const fromSegs = segmentsOf(from);
+  const toSegs = segmentsOf(to);
+
+  // Query-param-only navigation (same path segments) — e.g. switching the
+  // fixture-detail tab or the Matches comp/filter. Don't run a transition; the
+  // page didn't change, only its in-view state did.
+  if (fromSegs.length === toSegs.length && fromSegs.every((s, i) => s === toSegs[i])) {
+    transition.skipTransition();
+    root.removeAttribute('data-route-direction');
+    return;
+  }
+
+  const direction = directionFor(fromSegs, toSegs);
 
   if (direction) {
     root.setAttribute('data-route-direction', direction);
