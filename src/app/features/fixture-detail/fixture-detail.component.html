@@ -251,7 +251,7 @@
                 <div class="benches">
                   @for (side of ['home', 'away']; track side) {
                     @if (lineupFor($any(side)); as lu) {
-                      <section class="bench-col" [class.away]="side === 'away'">
+                      <section class="bench-col" [class.home]="side === 'home'" [class.away]="side === 'away'">
                         @if (benchFor($any(side)).length > 0) {
                           <ul class="bench">
                             @for (b of benchFor($any(side)); track $index) {

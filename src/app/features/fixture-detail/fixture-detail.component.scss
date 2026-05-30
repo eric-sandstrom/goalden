@@ -487,6 +487,7 @@
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  text-align: center;
   color: var(--mat-sys-on-surface-variant);
 }
 
@@ -507,12 +508,23 @@
   display: grid;
   // Home left, away right at every width.
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 0;
 }
 
-// Away bench mirrors the home one: shirt number on the right, names + heading
-// right-aligned, so the two columns read outward like a team sheet.
+.bench-col {
+  padding: 0 12px;
+}
+
+// Vertical divider down the middle, between the two columns.
 .bench-col.away {
+  border-left: 1px solid var(--mat-sys-outline-variant);
+}
+
+// Both columns grow OUTWARD from the centre line, discs (numbers) nearest it:
+// the home column hugs the line on its right (disc on the right, content
+// right-aligned); the away column hugs the line on its left and keeps the
+// default order (disc on the left).
+.bench-col.home {
   text-align: right;
 
   .bench-row {
@@ -647,18 +659,29 @@
 // ===== Small screens: bench/subs become compact vertical chips =====
 
 @media (max-width: 599.98px) {
+  .bench-col {
+    padding: 0 8px;
+  }
+
   .bench {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 10px 8px;
   }
+  // Cluster each team's chips toward the centre divider.
+  .bench-col.home .bench {
+    justify-content: flex-end;
+  }
+  .bench-col.away .bench {
+    justify-content: flex-start;
+  }
 
-  .bench-row,
+  .bench-col.home .bench-row,
   .bench-col.away .bench-row {
     flex-direction: column;
     align-items: center;
     gap: 3px;
-    width: 64px;
+    width: 60px;
     text-align: center;
   }
 
@@ -671,17 +694,16 @@
     display: inline-flex;
   }
 
-  .bench-text,
+  .bench-col.home .bench-text,
   .bench-col.away .bench-text {
     align-items: center;
     flex: none;
     min-width: 0;
-    max-width: 64px;
+    max-width: 60px;
   }
 
-  // Stack last name over position in the chip (override the wide row / the
-  // away row-reverse).
-  .bench-line,
+  // Stack last name over position in the chip (override the wide row).
+  .bench-col.home .bench-line,
   .bench-col.away .bench-line {
     flex-direction: column;
     align-items: center;
@@ -695,7 +717,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 64px;
+    max-width: 60px;
   }
 
   .came-on .bench-last {
