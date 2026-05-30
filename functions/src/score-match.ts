@@ -5,9 +5,9 @@ import { applyMatchScoring } from './lib/match-scoring';
 
 /**
  * Scores every prediction for a match the moment it reaches a final result.
- * The actual scoring (points calc + per-comp totals shard writes + legacy WC
- * mirror + leaderboard mark) lives in `applyMatchScoring`, shared with the
- * admin `correctFixtureScore` callable. This trigger gates on the transition
+ * The actual scoring (points calc + per-comp totals shard writes + combined
+ * user-doc total + leaderboard mark) lives in `applyMatchScoring`, shared with
+ * the admin `correctFixtureScore` callable. This trigger gates on the transition
  * INTO a terminal status and delegates with `force: false` so only unscored
  * predictions are touched.
  *

@@ -48,4 +48,4 @@ export {
 export { generatePredictorPersonality } from './personality';
 export { generateTheme } from './theme-ai';
 export { sendTestNotification, broadcastNotification } from './notifications';
-export { correctFixtureScore, getAdminMetrics } from './admin-tools';
+export { correctFixtureScore, getAdminMetrics, scoreMissedFixtures } from './admin-tools';

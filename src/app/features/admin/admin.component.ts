@@ -61,6 +61,9 @@ export class AdminComponent {
    *  Reading `fixturesFor` keyed on this loads that comp's fixtures. */
   protected readonly correctCompId = signal<string>('');
 
+  // --- Backfill missed scoring ------------------------------------------
+  protected readonly backfilling = signal(false);
+
   // --- Broadcast ---------------------------------------------------------
   protected readonly broadcasting = signal(false);
 
@@ -307,6 +310,46 @@ export class AdminComponent {
       console.error('correctFixtureScore failed', e);
     } finally {
       this.correcting.set(false);
+    }
+  }
+
+  // ===========================================================================
+  // Backfill missed scoring
+  // ===========================================================================
+
+  /**
+   * Re-runs scoring for any terminal fixture whose predictions were never
+   * scored. Scoped to the comp picked in the score-correction selector when
+   * one is chosen, else scans every competition. Idempotent — safe to click
+   * repeatedly; already-scored predictions are left untouched.
+   */
+  protected async backfillMissed(): Promise<void> {
+    const compId = this.correctCompId();
+    const scope = compId
+      ? this.competitionsService.byId(compId)?.name ?? compId
+      : 'all competitions';
+    const ok = window.confirm(
+      `Score missed fixtures for ${scope}? This scores any finished games whose predictions never got points. It won't change already-scored predictions.`,
+    );
+    if (!ok) return;
+
+    this.backfilling.set(true);
+    try {
+      const res = await this.admin.scoreMissedFixtures(compId || undefined);
+      this.snackBar.open(
+        res.predictionsScored === 0
+          ? `No missed predictions — ${res.fixturesProcessed} finished fixture(s) checked`
+          : `Scored ${res.predictionsScored} prediction(s) across ${res.details.length} fixture(s)`,
+        undefined,
+        { duration: 4000 },
+      );
+      void this.loadMetrics();
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Backfill failed';
+      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
+      console.error('scoreMissedFixtures failed', e);
+    } finally {
+      this.backfilling.set(false);
     }
   }
 

@@ -276,6 +276,44 @@
       </mat-card>
 
       <!-- ===================================================================
+           Backfill missed scoring
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>restart_alt</mat-icon>
+          <mat-card-title>Score missed fixtures</mat-card-title>
+          <mat-card-subtitle>
+            Score finished games whose predictions never got points (e.g. a missing
+            index or a fixture created already-finished). Safe to re-run.
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p class="hint">
+            @if (correctCompId()) {
+              Scope: <strong>{{ correctCompId() }}</strong> (chosen above). Clear the
+              competition selector to scan every competition.
+            } @else {
+              Scope: <strong>all competitions</strong>. Pick a competition above to
+              narrow it.
+            }
+          </p>
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="backfilling()"
+            (click)="backfillMissed()"
+          >
+            @if (backfilling()) {
+              <mat-progress-spinner mode="indeterminate" diameter="20" />
+            } @else {
+              Score missed fixtures
+            }
+          </button>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- ===================================================================
            Broadcast notification
       ==================================================================== -->
       <mat-card appearance="outlined">

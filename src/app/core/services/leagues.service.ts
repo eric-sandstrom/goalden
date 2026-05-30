@@ -475,14 +475,24 @@ export class LeaguesService {
 
   /**
    * Computes the caller's rank inside a single league. Fetches the league's
-   * members + their `users/{uid}.totals.total` and sorts desc. One-shot,
+   * members + their points from the league's per-(comp, season) totals
+   * shard (`users/{uid}/totals/{comp}_{season}`), then sorts desc. One-shot,
    * not reactive — meant to be called on mount and refreshed on demand.
+   *
+   * Reads the per-comp shard rather than the combined `users/{uid}.totals`
+   * nested field: that field now accumulates points across ALL comps, so
+   * using it here would show a member's grand total instead of their score
+   * in this specific league's competition. The shard is the same source the
+   * full league-detail leaderboard uses, so the summary rank agrees with it.
+   *
    * Tiebreakers are intentionally skipped here; this is the summary view's
    * approximation, not the full per-league leaderboard.
    */
   async getLeagueStanding(
     leagueId: string,
     uid: string,
+    competitionId: string,
+    season: string,
   ): Promise<{ rank: number; total: number; points: number }> {
     const membersRef = collection(this.db, `leagues/${leagueId}/members`);
     const membersSnap = await getDocs(membersRef);
@@ -490,11 +500,10 @@ export class LeaguesService {
     if (memberUids.length === 0) {
       return { rank: 0, total: 0, points: 0 };
     }
-    const userDocs = await this.getMemberUserDocs(memberUids);
+    const memberTotals = await this.getMemberTotals(memberUids, competitionId, season);
     const scored = memberUids.map((memberUid) => {
-      const data = userDocs.get(memberUid);
-      const totals = (data?.['totals'] ?? {}) as Record<string, unknown>;
-      const points = typeof totals['total'] === 'number' ? totals['total'] : 0;
+      const data = memberTotals.get(memberUid);
+      const points = typeof data?.['total'] === 'number' ? (data['total'] as number) : 0;
       return { uid: memberUid, points };
     });
     scored.sort((a, b) => b.points - a.points);

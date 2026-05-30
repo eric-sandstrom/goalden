@@ -44,6 +44,29 @@ export class AdminService {
     return { rescored: res.data.rescored, winner: res.data.winner };
   }
 
+  /** Backfill scoring for terminal fixtures whose predictions never got
+   *  scored (e.g. games that finished while an index was missing, or
+   *  fixtures created already-finished). Idempotent — only predictions
+   *  still at points==null are touched. Optionally scope to one comp. */
+  async scoreMissedFixtures(
+    competitionId?: string,
+  ): Promise<{
+    fixturesProcessed: number;
+    predictionsScored: number;
+    details: readonly { matchId: string; scored: number }[];
+  }> {
+    const call = httpsCallable<
+      { competitionId?: string },
+      {
+        fixturesProcessed: number;
+        predictionsScored: number;
+        details: { matchId: string; scored: number }[];
+      }
+    >(this.functions, 'scoreMissedFixtures');
+    const res = await call(competitionId ? { competitionId } : {});
+    return res.data;
+  }
+
   /** Push a one-off announcement to every registered device. */
   async broadcastNotification(
     title: string,

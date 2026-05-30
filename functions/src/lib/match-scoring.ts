@@ -5,21 +5,18 @@ import { markLeaderboardDirty } from '../leaderboard-rollup';
 
 /**
  * Firestore allows 500 ops per batch; we cap below that for headroom.
- * Each scored prediction costs 3 ops on a WC match (prediction update +
- * per-comp totals shard + legacy nested totals write) or 2 ops on a
- * non-WC match (no legacy write). Sized for the WC worst case so a
- * single batch can hold ~150 predictions.
+ * Each scored prediction costs 3 ops (prediction update + per-comp
+ * totals shard + combined user-doc totals write). Sized so a single
+ * batch can hold ~150 predictions.
  */
 const BATCH_LIMIT = 450;
 
-/** During the multi-comp cutover window, the WC totals shard is also
- *  mirrored onto the legacy `users/{uid}.totals.*` nested field so the
- *  current Home / Profile / Leaderboard / League-Detail readers (which
- *  hit the nested field) keep showing correct numbers. Non-WC comps
- *  never get a legacy mirror — those readers will move to the new
- *  shard path before any non-WC results land. */
-const LEGACY_COMP_ID = 'WC';
-const LEGACY_SEASON = '2026';
+/** Fallback (comp, season) for fixtures that predate multi-comp and
+ *  lack the `competitionId` / `season` fields. Pre-migration the only
+ *  competition was WC 2026, so defaulting there keeps those fixtures
+ *  scoring into the right shard during the cutover gap. */
+const DEFAULT_COMP_ID = 'WC';
+const DEFAULT_SEASON = '2026';
 
 /** Minimal fixture shape `applyMatchScoring` needs — works for both the
  *  full FixtureDoc (trigger path) and a hand-built object (admin path). */
@@ -69,10 +66,9 @@ export async function applyMatchScoring(
   // Resolve the fixture's (comp, season). Pre-migration WC fixtures may
   // lack these fields; default to ('WC', '2026') so scoring still
   // produces the right totals shard during the cutover gap.
-  const compId = typeof fixture.competitionId === 'string' ? fixture.competitionId : LEGACY_COMP_ID;
-  const season = typeof fixture.season === 'string' ? fixture.season : LEGACY_SEASON;
+  const compId = typeof fixture.competitionId === 'string' ? fixture.competitionId : DEFAULT_COMP_ID;
+  const season = typeof fixture.season === 'string' ? fixture.season : DEFAULT_SEASON;
   const totalsShardId = `${compId}_${season}`;
-  const isLegacyComp = compId === LEGACY_COMP_ID && season === LEGACY_SEASON;
 
   const predictionsSnap = await db
     .collectionGroup('matches')
@@ -139,21 +135,26 @@ export async function applyMatchScoring(
     batch.set(totalsRef, shardUpdate, { merge: true });
     ops++;
 
-    // 3) Legacy nested-field mirror — only for WC 2026. Keeps the
-    //    pre-migration readers (Home, Profile, Leaderboard, League
-    //    detail) seeing correct numbers during the cutover window.
-    if (isLegacyComp) {
-      const userRef = db.doc(`users/${uid}`);
-      const legacyUpdate: Record<string, FirebaseFirestore.FieldValue> = {
-        total: FieldValue.increment(pointsDelta),
-        match: FieldValue.increment(pointsDelta),
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-      if (exactDelta !== 0) legacyUpdate['exactScoreHits'] = FieldValue.increment(exactDelta);
-      if (outcomeDelta !== 0) legacyUpdate['correctOutcomeHits'] = FieldValue.increment(outcomeDelta);
-      batch.set(userRef, { totals: legacyUpdate }, { merge: true });
-      ops++;
-    }
+    // 3) Combined cross-comp total on the user doc. Every competition's
+    //    points accumulate here (not just WC), so `users/{uid}.totals`
+    //    is the user's grand total across all comps. This is the
+    //    denormalised field the global leaderboard rollup
+    //    (`orderBy('totals.total')`), Home global-rank, and Profile read
+    //    — keeping those one-doc reads cheap. Per-league views read the
+    //    per-comp shard above instead, so league standings stay scoped
+    //    to their own competition. Because we move by `pointsDelta`, a
+    //    re-score (force) adjusts the combined total by exactly the
+    //    change without double-counting across comps.
+    const userRef = db.doc(`users/${uid}`);
+    const combinedUpdate: Record<string, FirebaseFirestore.FieldValue> = {
+      total: FieldValue.increment(pointsDelta),
+      match: FieldValue.increment(pointsDelta),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (exactDelta !== 0) combinedUpdate['exactScoreHits'] = FieldValue.increment(exactDelta);
+    if (outcomeDelta !== 0) combinedUpdate['correctOutcomeHits'] = FieldValue.increment(outcomeDelta);
+    batch.set(userRef, { totals: combinedUpdate }, { merge: true });
+    ops++;
 
     scored++;
 
