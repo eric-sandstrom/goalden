@@ -26,7 +26,13 @@ export interface Team {
 }
 
 export interface FixtureScore {
+  /** Final result incl. extra time + penalties (and the live running score).
+   *  The game does NOT grade on this — see `regularTime`. */
   readonly fullTime: { readonly home: number; readonly away: number } | null;
+  /** Score after 90 minutes — what predictions are graded against. Present
+   *  only when the match went to extra time; otherwise `fullTime` is the
+   *  90-minute score. */
+  readonly regularTime?: { readonly home: number; readonly away: number } | null;
   readonly winner: 'HOME' | 'AWAY' | 'DRAW' | null;
 }
 
@@ -54,6 +60,20 @@ export interface Fixture {
   readonly stage: FixtureStage;
   readonly group: string | null;
   readonly score: FixtureScore | null;
+
+  // --- Live match clock (authoritative, from football-data) ----------------
+  // Refreshed every poll while live. The UI anchors `minute`/`injuryTime` to
+  // `lastSyncedAt` and ticks forward in real time for an accurate live clock
+  // (incl. stoppage/extra time) across every competition. Display-only.
+  /** Current match minute while live (caps at 45/90/120; stoppage in
+   *  `injuryTime`). Null outside live play. */
+  readonly minute?: number | null;
+  /** Added (stoppage) minutes on top of `minute`, e.g. 90 + 4. Null when not
+   *  in stoppage. */
+  readonly injuryTime?: number | null;
+  /** When the fixture was last written by the poller — the anchor the live
+   *  clock ticks from. Null on docs/rollups without it. */
+  readonly lastSyncedAt?: Date | null;
 
   // --- ESPN live overlay (display-only) ------------------------------------
   // Written server-side by the poller's ESPN pass, never by the

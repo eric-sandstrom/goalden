@@ -158,14 +158,31 @@
         Teams TBD · {{ kickoffLabel() }}
       </span>
     } @else if (liveStatus(); as live) {
-      <span class="status" [class.live]="live.tone === 'live'" [class.final]="live.tone === 'final'">
-        @if (live.tone === 'live') {
-          <span class="live-dot" aria-hidden="true"></span>
-        } @else {
-          <mat-icon class="status-icon" aria-hidden="true">{{ live.icon }}</mat-icon>
+      @switch (live.tone) {
+        @case ('live') {
+          <span class="status live">
+            <span class="live-dot" aria-hidden="true"></span>
+            @if (liveProgress(); as lp) {
+              <span class="live-half">{{ lp.half }}</span>
+              <span class="live-minute">{{ lp.minute }}</span>
+            } @else {
+              Live
+            }
+          </span>
         }
-        {{ live.label }} · {{ kickoffLabel() }}
-      </span>
+        @case ('pause') {
+          <span class="status pause">
+            <mat-icon class="status-icon" aria-hidden="true">pause_circle</mat-icon>
+            Half-time
+          </span>
+        }
+        @case ('final') {
+          <span class="status final">
+            <mat-icon class="status-icon" aria-hidden="true">sports_soccer</mat-icon>
+            FT · {{ kickoffLabel() }}
+          </span>
+        }
+      }
     } @else if (lockChip(); as chip) {
       @if (chip.tone === 'warn') {
         <span class="status warn">

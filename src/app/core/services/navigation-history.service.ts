@@ -52,6 +52,14 @@ export class NavigationHistoryService {
    *  time so we don't carry a stale popstate flag across navigations. */
   private lastTrigger: 'imperative' | 'popstate' | 'hashchange' = 'imperative';
 
+  /** Whether the latest navigation was a `replaceUrl` navigation. Captured
+   *  from the in-flight Navigation at NavigationStart. A replace swaps the
+   *  current history entry rather than pushing a new one (matching
+   *  `history.replaceState`), so the back button ignores it — used for
+   *  in-view URL changes like the Predict comp/filter selection that never
+   *  actually leave the page. */
+  private lastReplaceUrl = false;
+
   /** Read-only view of the current stack — exposed for diagnostics. */
   readonly stack = this._stack.asReadonly();
 
@@ -70,7 +78,7 @@ export class NavigationHistoryService {
     const s = this._stack();
     if (s.length < 2) return false;
     const current = s[s.length - 1];
-    return !this.bottomNavPaths.has(this.pathOf(current.url));
+    return !this.isTabRoot(this.pathOf(current.url));
   });
 
   constructor() {
@@ -79,11 +87,15 @@ export class NavigationHistoryService {
         // navigationTrigger is typed as optional but Angular always sets
         // it in practice. Default to 'imperative' if missing.
         this.lastTrigger = event.navigationTrigger ?? 'imperative';
+        // extras isn't on the event; read it off the in-flight Navigation.
+        this.lastReplaceUrl =
+          this.router.getCurrentNavigation()?.extras.replaceUrl ?? false;
       } else if (event instanceof NavigationEnd) {
-        this.record(event.urlAfterRedirects, this.lastTrigger);
+        this.record(event.urlAfterRedirects, this.lastTrigger, this.lastReplaceUrl);
         // Reset for the next navigation so a missed NavigationStart
-        // (shouldn't happen, but defensive) defaults to 'imperative'.
+        // (shouldn't happen, but defensive) defaults to imperative/push.
         this.lastTrigger = 'imperative';
+        this.lastReplaceUrl = false;
       }
     });
   }
@@ -111,6 +123,7 @@ export class NavigationHistoryService {
   private record(
     url: string,
     trigger: 'imperative' | 'popstate' | 'hashchange',
+    replaceUrl: boolean,
   ): void {
     const stack = this._stack();
     const top = stack[stack.length - 1];
@@ -118,6 +131,28 @@ export class NavigationHistoryService {
     // Same URL fired twice — typically a router redirect resolving. No-op
     // so we don't double-push.
     if (top?.url === url) return;
+
+    // Landing on a bottom-nav tab root is always a fresh start — clear the
+    // back-stack. Checked before the replace/popstate handling so it wins
+    // even when we arrive via a guard's replaceUrl redirect: tapping Predict
+    // navigates to the bare /predict, which the guard immediately rewrites
+    // to /predict/:comp/:tab, so the committed URL is a sub-route (see
+    // isTabRoot). Without this, switching to the Predict tab from a
+    // drill-down (e.g. a league) left a stale "Back to League" button.
+    if (trigger === 'imperative' && this.isTabRoot(this.pathOf(url))) {
+      this._stack.set([{ url, label: this.labelFor(url) }]);
+      return;
+    }
+
+    // A replaceUrl navigation swaps the current entry instead of pushing a
+    // new one — the page didn't really change. Mirror history.replaceState
+    // so the back button keeps pointing at wherever the user came from, not
+    // a sibling in-view state. popstate/hashchange never carry replaceUrl,
+    // so this is limited to imperative navigations.
+    if (replaceUrl && trigger === 'imperative' && stack.length > 0) {
+      this._stack.set([...stack.slice(0, -1), { url, label: this.labelFor(url) }]);
+      return;
+    }
 
     if (trigger === 'popstate' || trigger === 'hashchange') {
       // Browser back/forward. If the new URL matches the second-from-top,
@@ -132,14 +167,21 @@ export class NavigationHistoryService {
       return;
     }
 
-    // Imperative navigation. If we just landed on a bottom-nav root,
-    // reset the stack — those are fresh starts.
-    if (this.bottomNavPaths.has(this.pathOf(url))) {
-      this._stack.set([{ url, label: this.labelFor(url) }]);
-      return;
-    }
-
     this._stack.set([...stack, { url, label: this.labelFor(url) }]);
+  }
+
+  /**
+   * Whether a path is a bottom-nav tab root — a "fresh start" with no
+   * meaningful back target. Exact matches cover Home / Leagues / Profile.
+   * Predict is special: its canonical URL always carries the selected comp
+   * and filter as sub-route segments (`/predict/:comp/:tab`); the bare
+   * `/predict` only exists for the instant before `predictLastLocationGuard`
+   * redirects, so we match the whole Predict tab by prefix.
+   */
+  private isTabRoot(path: string): boolean {
+    // bottomNavPaths already contains the bare '/predict'; the prefix match
+    // extends that to its always-present '/:comp/:tab' sub-routes.
+    return this.bottomNavPaths.has(path) || path.startsWith('/predict/');
   }
 
   /** Strip query/fragment so route matching ignores them. */
@@ -162,7 +204,7 @@ export class NavigationHistoryService {
   private labelFor(url: string): string {
     const path = this.pathOf(url);
     if (path === '/') return 'Home';
-    if (path === '/predict') return 'Predict';
+    if (path === '/predict' || path.startsWith('/predict/')) return 'Predict';
     if (path === '/leagues') return 'Leagues';
     if (path === '/profile') return 'Profile';
     if (path === '/teams') return 'Teams';

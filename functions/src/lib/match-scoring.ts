@@ -23,7 +23,10 @@ const DEFAULT_SEASON = '2026';
 interface ScorableFixture {
   competitionId?: unknown;
   season?: unknown;
-  score?: { fullTime?: { home: number; away: number } | null } | null;
+  score?: {
+    fullTime?: { home: number; away: number } | null;
+    regularTime?: { home: number; away: number } | null;
+  } | null;
 }
 
 export interface ApplyMatchScoringOptions {
@@ -57,9 +60,13 @@ export async function applyMatchScoring(
 ): Promise<{ scored: number }> {
   const force = options.force === true;
 
-  const actual = fixture.score?.fullTime;
+  // Grade on the 90-minute score: football-data's `fullTime` includes extra
+  // time and penalty-shootout goals, so for matches that went past 90 we use
+  // `regularTime` (the after-90 score). For matches decided in regulation
+  // `regularTime` is absent and `fullTime` already IS the 90-minute score.
+  const actual = fixture.score?.regularTime ?? fixture.score?.fullTime;
   if (!actual) {
-    logger.warn(`applyMatchScoring: ${matchId} finished but no fullTime score — skipping`);
+    logger.warn(`applyMatchScoring: ${matchId} finished but no score — skipping`);
     return { scored: 0 };
   }
 

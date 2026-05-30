@@ -33,6 +33,8 @@ import {
     // Compact variant — tighter padding + smaller score widget, for embeds
     // like the predict-next card where vertical space is at a premium.
     '[class.compact]': 'compact()',
+    // Live accent — tints the row + adds a left bar while a match is in play.
+    '[class.live]': 'isLive()',
   },
 })
 export class FixtureRowComponent {
@@ -127,48 +129,77 @@ export class FixtureRowComponent {
   });
 
   /**
-   * Score to display: ESPN's live score while the match is in progress
-   * (football-data's free tier lags the running score), otherwise the
-   * authoritative full-time score. Display-only — `predictionResult`'s
-   * points still finalise off the authoritative score at FT, and this never
-   * touches lock state.
+   * The score we display AND grade against: the 90-minute score only —
+   * extra time and penalties are ignored.
+   *
+   * Order: once a match has gone to extra time, `regularTime` holds the
+   * after-90 score, so we show that and ignore the live/ET running score.
+   * Otherwise we prefer ESPN's live score while in progress (football-data's
+   * free tier lags the running score), then fall back to `fullTime` (which is
+   * the 90-minute score for a match decided in regulation). Display-only —
+   * never touches lock state.
    */
   protected readonly displayScore = computed(() => {
     const f = this.fixture();
+    if (f.score?.regularTime) return f.score.regularTime;
     if (f.liveState === 'in' && f.liveScore) return f.liveScore;
     return f.score?.fullTime ?? null;
   });
   protected readonly hasDisplayScore = computed(() => this.displayScore() !== null);
 
   /**
-   * Live/HT/FT badge derived from fixture status. Takes precedence over the
-   * lock chip in the centered status line — if the match is in play we
-   * surface that instead of a generic "Locked" pill.
+   * Coarse live/half-time/full-time classification for the status line, by
+   * precedence. Takes over from the lock chip while a match is in play.
+   * Half-time is read from the authoritative PAUSED status OR ESPN's detail
+   * label (the free tier's status can lag a few minutes behind ESPN), so we
+   * never show a ticking minute through the interval. Display-only — never
+   * gates editing or locking. The half + minute themselves come from
+   * `liveProgress`.
    */
-  protected readonly liveStatus = computed<{
-    label: string;
-    icon: string;
-    tone: 'live' | 'pause' | 'final';
-  } | null>(() => {
+  protected readonly liveStatus = computed<{ tone: 'live' | 'pause' | 'final' } | null>(() => {
     const f = this.fixture();
-    // ESPN reports the match in progress — surface it (with ESPN's live
-    // clock) even if the authoritative status hasn't flipped yet on the
-    // free tier. Display-only; never gates editing or locking.
-    if (f.liveState === 'in') {
-      const clock = f.liveClock?.trim();
-      return { label: clock && clock.length > 0 ? clock : 'Live', icon: '', tone: 'live' };
+    if (f.status === 'FINISHED' || f.status === 'AWARDED') return { tone: 'final' };
+    const detail = (f.liveDetail ?? '').trim();
+    if (f.status === 'PAUSED' || /^ht$|half.?time/i.test(detail)) return { tone: 'pause' };
+    if (f.liveState === 'in' || f.status === 'IN_PLAY') return { tone: 'live' };
+    return null;
+  });
+
+  /** True while the match is actively playing (not pre-match, HT, or FT).
+   *  Drives the row's live accent. */
+  protected readonly isLive = computed(() => this.liveStatus()?.tone === 'live');
+
+  /**
+   * Which half + the match minute for an actively-playing match.
+   *
+   * Primary source is football-data's authoritative `minute` (+ `injuryTime`),
+   * which covers every competition. The match clock runs in real time within a
+   * half, so we anchor that value to `lastSyncedAt` and tick it forward off
+   * `nowTick` — giving a smooth clock that stays accurate through stoppage and
+   * extra time, self-correcting on each ~2-min poll. See `formatLiveMinute`.
+   *
+   * Fallback (a feed/comp without a minute, or a doc predating it): a kickoff
+   * estimate capped at each half's nominal end ("45+" / "90+"), so we never
+   * invent a precise stoppage figure we can't know (which once read "90+27"
+   * for a match at 90+4). Null unless mid-play — `liveStatus` routes half-time
+   * and full-time.
+   */
+  protected readonly liveProgress = computed<{ half: string; minute: string } | null>(() => {
+    if (this.liveStatus()?.tone !== 'live') return null;
+    const f = this.fixture();
+
+    if (typeof f.minute === 'number') {
+      const syncedAt = f.lastSyncedAt?.getTime();
+      const ticked =
+        syncedAt != null ? Math.max(0, Math.floor((this.nowTick() - syncedAt) / 60000)) : 0;
+      return formatLiveMinute(f.minute, f.injuryTime ?? 0, ticked);
     }
-    switch (f.status) {
-      case 'IN_PLAY':
-        return { label: 'Live', icon: '', tone: 'live' };
-      case 'PAUSED':
-        return { label: 'HT', icon: 'pause_circle', tone: 'pause' };
-      case 'FINISHED':
-      case 'AWARDED':
-        return { label: 'FT', icon: 'sports_soccer', tone: 'final' };
-      default:
-        return null;
-    }
+
+    const e = Math.max(0, Math.floor((this.nowTick() - f.utcKickoff.getTime()) / 60000));
+    if (e <= 45) return { half: '1st half', minute: `${Math.max(1, e)}'` };
+    if (e <= 48) return { half: '1st half', minute: `45+'` };
+    const second = e - 15; // discount the ~15-minute half-time interval
+    return { half: '2nd half', minute: second <= 90 ? `${Math.max(46, second)}'` : `90+'` };
   });
 
   /**
@@ -281,4 +312,32 @@ export class FixtureRowComponent {
       console.error('Prediction save failed', e);
     }
   }
+}
+
+/**
+ * Formats football-data's `minute`/`injuryTime` (anchored value) plus the
+ * minutes elapsed since it was synced into a half label + display minute.
+ *
+ * - `base` caps at the half's nominal end (45/90/120) with stoppage carried in
+ *   `injury`, so `base` alone picks the half.
+ * - In stoppage (`injury > 0`) the base is frozen and the added time ticks, so
+ *   we advance `injury`: 90+4 → 90+5 a minute later.
+ * - In normal play the minute itself ticks, but we never roll past the half's
+ *   nominal end — we can't know the real stoppage length, so we cap and show
+ *   "+N", which the next poll's authoritative value corrects.
+ */
+function formatLiveMinute(
+  base: number,
+  injury: number,
+  ticked: number,
+): { half: string; minute: string } {
+  const half = base <= 45 ? '1st half' : base <= 90 ? '2nd half' : 'Extra time';
+  if (injury > 0) {
+    return { half, minute: `${base}+${injury + ticked}'` };
+  }
+  const nominalEnd = base <= 45 ? 45 : base <= 90 ? 90 : 120;
+  const m = base + ticked;
+  return m <= nominalEnd
+    ? { half, minute: `${m}'` }
+    : { half, minute: `${nominalEnd}+${m - nominalEnd}'` };
 }
