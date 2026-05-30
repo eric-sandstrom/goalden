@@ -70,26 +70,46 @@ foreach ($e in $entries) {
 
   if ($DryRun) { $removed += "$branch  ->  would remove $path"; continue }
 
-  try {
-    git -C $root worktree remove $path
-    # git worktree remove leaves the node_modules junction behind on Windows;
-    # remove the link only (never its target), then the leftover directory.
-    if (Test-Path $path) {
-      $nm = Join-Path $path 'node_modules'
-      if ((Test-Path $nm) -and ((Get-Item $nm -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { cmd /c rmdir "$nm" | Out-Null }
-      Remove-Item $path -Recurse -Force
-    }
-    git -C $root branch -D $branch | Out-Null
-    $removed += "$branch  (removed $path)"
-  } catch {
-    $skipped += "$branch (remove failed: $($_.Exception.Message))"
+  # Stop any dev server running IN this worktree (its cmdline contains the path),
+  # otherwise it locks the directory and the removal is left half-done.
+  $pb = ($path -replace '/', '\')
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like "*$pb*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+  git -C $root worktree remove $path --force 2>$null
+  # Delete the branch regardless of the dir-cleanup outcome (work is merged), so a
+  # locked leftover can never orphan the branch.
+  git -C $root branch -D $branch 2>$null
+  # Best-effort dir cleanup: junction LINK only (never its target), then the dir.
+  # If still locked (e.g. an open terminal), leave the husk; the sweep below
+  # removes it on a later reap once the lock is gone.
+  $note = ''
+  if (Test-Path $path) {
+    $nm = Join-Path $path 'node_modules'
+    if ((Test-Path $nm) -and ((Get-Item $nm -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { cmd /c rmdir "$nm" | Out-Null }
+    try { Remove-Item $path -Recurse -Force -ErrorAction Stop } catch { $note = ' (branch + git entry removed; leftover dir was locked, will sweep later)' }
   }
+  $removed += "$branch  (removed)$note"
 }
 
-# Tidy up the grouping folder if reaping emptied it.
+# Sweep husks left by earlier locked removals (dirs under goalden-worktrees that
+# aren't registered worktrees), then drop the grouping folder if it's now empty.
 if (-not $DryRun) {
   $wtRoot = Join-Path (Split-Path $root -Parent) 'goalden-worktrees'
-  if ((Test-Path $wtRoot) -and -not (Get-ChildItem $wtRoot -Force)) { Remove-Item $wtRoot -Force }
+  if (Test-Path $wtRoot) {
+    $reg = @()
+    foreach ($l in (git -C $root worktree list --porcelain)) {
+      if ($l -like 'worktree *') { $rp = Resolve-Path $l.Substring(9) -ErrorAction SilentlyContinue; if ($rp) { $reg += $rp.Path } }
+    }
+    foreach ($d in (Get-ChildItem $wtRoot -Directory -Force)) {
+      if ((Resolve-Path $d.FullName).Path -in $reg) { continue }       # a live worktree - leave it
+      $nm = Join-Path $d.FullName 'node_modules'
+      if ((Test-Path $nm) -and ((Get-Item $nm -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { cmd /c rmdir "$nm" | Out-Null }
+      try { Remove-Item $d.FullName -Recurse -Force -ErrorAction Stop } catch {}   # still locked - try again next reap
+    }
+    if (-not (Get-ChildItem $wtRoot -Force)) { Remove-Item $wtRoot -Force }
+  }
 }
 
 # Report.

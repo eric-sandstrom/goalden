@@ -36,6 +36,13 @@ foreach ($line in (git -C $root worktree list --porcelain)) {
 }
 if (-not $dest) { throw "No worktree found for branch $branch" }
 
+# Stop any dev server running IN this worktree (its cmdline contains the path),
+# otherwise it locks the directory and removal is left half-done.
+$pb = ($dest -replace '/', '\')
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like "*$pb*" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
 $removeArgs = @('worktree', 'remove', $dest)
 if ($Force) { $removeArgs += '--force' }
 
@@ -54,7 +61,8 @@ if (Test-Path $dest) {
   if ((Test-Path $nm) -and ((Get-Item $nm -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
     cmd /c rmdir "$nm" | Out-Null
   }
-  Remove-Item $dest -Recurse -Force
+  try { Remove-Item $dest -Recurse -Force -ErrorAction Stop }
+  catch { Write-Host "Note: removed from git, but the folder is still locked (close any terminal/editor open there); 'gw reap' will sweep it later." -ForegroundColor Yellow }
 }
 
 # Tidy up the grouping folder if it's now empty.
