@@ -106,3 +106,48 @@ const KNOCKOUT_STAGES: ReadonlySet<FixtureStage> = new Set<FixtureStage>([
 export function isKnockout(stage: FixtureStage): boolean {
   return KNOCKOUT_STAGES.has(stage);
 }
+
+/** A fixture's position within a two-legged knockout tie. */
+export interface LegInfo {
+  /** 1 = first leg, 2 = second leg (by kickoff order). */
+  readonly leg: 1 | 2;
+  /** Kickoff of the tie's other leg — for context labelling. */
+  readonly otherLegKickoff: Date;
+}
+
+/**
+ * Identifies two-legged knockout ties within a set of fixtures and returns a
+ * `matchId → leg position` map for the fixtures that belong to one.
+ *
+ * A two-legged tie is two knockout fixtures in the same stage between the same
+ * pair of teams, home/away swapped — as the Champions League knockout rounds
+ * are. Single-match knockouts (the World Cup, a final) and not-yet-drawn TBD
+ * fixtures (whose null team ids can't be paired) belong to no tie and are
+ * absent from the map. This is the same pairing the bracket view uses to
+ * collapse legs into one tie; here it just tags each leg for the Predict list.
+ */
+export function buildLegMap(fixtures: readonly Fixture[]): ReadonlyMap<string, LegInfo> {
+  const groups = new Map<string, Fixture[]>();
+  for (const f of fixtures) {
+    if (!isKnockout(f.stage)) continue;
+    const a = f.homeTeam.id;
+    const b = f.awayTeam.id;
+    if (a === null || b === null) continue;
+    const pair = a < b ? `${a}-${b}` : `${b}-${a}`;
+    const key = `${f.stage}:${pair}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(f);
+    else groups.set(key, [f]);
+  }
+  const out = new Map<string, LegInfo>();
+  for (const bucket of groups.values()) {
+    if (bucket.length < 2) continue; // single-match knockout — not a tie
+    const sorted = bucket
+      .slice()
+      .sort((x, y) => x.utcKickoff.getTime() - y.utcKickoff.getTime());
+    const [first, second] = sorted; // a tie has exactly two legs; ignore extras
+    out.set(first.id, { leg: 1, otherLegKickoff: second.utcKickoff });
+    out.set(second.id, { leg: 2, otherLegKickoff: first.utcKickoff });
+  }
+  return out;
+}
