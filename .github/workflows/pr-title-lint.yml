@@ -1,0 +1,54 @@
+# Enforce conventional-commit PR titles.
+#
+# Why: PRs are squash-merged, so the PR title becomes the commit subject on
+# main — and release-please derives the changelog + version bump from those
+# subjects. A non-conventional title is silently ignored by release-please and
+# its change never reaches the "What's new" dialog. This check turns that silent
+# drop into a failing status, so a bad title can't slip through.
+#
+# The allowed `types` below mirror release-please-config.json's changelog
+# sections. Keep the two lists in sync if you add or rename a type.
+
+name: PR Title Lint
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+# A burst of edits to a PR title should only run the latest check.
+concurrency:
+  group: pr-title-lint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint-title:
+    name: Validate conventional title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Mirror release-please-config.json changelog-sections.
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            chore
+            test
+            ci
+            build
+          # Scopes are optional and free-form (e.g. `feat(bracket): ...`).
+          requireScope: false
+          # release-please reads the subject, not the scope — keep titles
+          # readable rather than enforcing a fixed scope vocabulary.
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" should start with a lowercase letter, e.g.
+            "feat: add bracket tiebreaker view" — not "feat: Add ...".
