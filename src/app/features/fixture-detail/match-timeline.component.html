@@ -1,0 +1,84 @@
+@if (hasTimeline()) {
+  <ul class="timeline">
+    @for (item of timeline(); track item.key) {
+      <li class="tl-item">
+        <div class="tl-side left">
+          @if (item.side !== 'away') {
+            <span class="ev">
+              <span class="sr-only">
+                @switch (item.kind) {
+                  @case ('goal') { Goal }
+                  @case ('yellow') { Yellow card }
+                  @case ('red') { Red card }
+                  @case ('sub') { Substitution }
+                }
+              </span>
+              @switch (item.kind) {
+                @case ('goal') {
+                  <mat-icon class="ev-icon goal" aria-hidden="true">sports_soccer</mat-icon>
+                }
+                @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
+                @case ('red') { <span class="card red" aria-hidden="true"></span> }
+                @case ('sub') {
+                  <mat-icon class="ev-icon sub" aria-hidden="true">swap_horiz</mat-icon>
+                }
+              }
+              <span class="ev-text">
+                <span class="ev-player">{{ item.player }}</span>
+                @if (item.note) { <span class="ev-note">{{ item.note }}</span> }
+              </span>
+            </span>
+          }
+        </div>
+
+        <div class="tl-min">{{ item.minuteLabel }}</div>
+
+        <div class="tl-side right">
+          @if (item.side === 'away') {
+            <span class="ev">
+              <span class="sr-only">
+                @switch (item.kind) {
+                  @case ('goal') { Goal }
+                  @case ('yellow') { Yellow card }
+                  @case ('red') { Red card }
+                  @case ('sub') { Substitution }
+                }
+              </span>
+              @switch (item.kind) {
+                @case ('goal') {
+                  <mat-icon class="ev-icon goal" aria-hidden="true">sports_soccer</mat-icon>
+                }
+                @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
+                @case ('red') { <span class="card red" aria-hidden="true"></span> }
+                @case ('sub') {
+                  <mat-icon class="ev-icon sub" aria-hidden="true">swap_horiz</mat-icon>
+                }
+              }
+              <span class="ev-text">
+                <span class="ev-player">{{ item.player }}</span>
+                @if (item.note) { <span class="ev-note">{{ item.note }}</span> }
+              </span>
+            </span>
+          }
+        </div>
+      </li>
+    }
+  </ul>
+} @else {
+  <p class="timeline-empty">
+    <mat-icon aria-hidden="true">sports</mat-icon>
+    No match events to show yet.
+  </p>
+}
+
+@if (infoRows().length > 0) {
+  <mat-list class="info-list">
+    @for (row of infoRows(); track row.label) {
+      <mat-list-item>
+        <mat-icon matListItemIcon aria-hidden="true">{{ row.icon }}</mat-icon>
+        <span matListItemTitle>{{ row.value }}</span>
+        <span matListItemLine>{{ row.label }}</span>
+      </mat-list-item>
+    }
+  </mat-list>
+}

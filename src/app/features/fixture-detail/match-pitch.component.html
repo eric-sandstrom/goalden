@@ -1,0 +1,162 @@
+<!-- Reusable goal/assist/card badges, positioned on the number disc. -->
+<ng-template #contrib let-e>
+  @if (e.goals > 0) {
+    <span class="ind goal" aria-label="Goal">
+      <mat-icon aria-hidden="true">sports_soccer</mat-icon>
+      @if (e.goals > 1) { <span class="ind-count">{{ e.goals }}</span> }
+    </span>
+  }
+  @if (e.assists > 0) {
+    <span class="ind assist" aria-label="Assist">A@if (e.assists > 1) {{{ e.assists }}}</span>
+  }
+  @if (e.red) {
+    <span class="card red ind-card" aria-label="Red card"></span>
+  } @else if (e.yellow) {
+    <span class="card yellow ind-card" aria-label="Yellow card"></span>
+  }
+</ng-template>
+
+@if (pitch().markers.length > 0) {
+  <!-- Home bar (above pitch): manager left, formation right. -->
+  <div class="team-bar">
+    <span class="mgr">
+      <span
+        class="team-dot"
+        [style.background-color]="fill('home')"
+        [style.border-color]="ring('home')"
+      ></span>
+      {{ coachName('home') ?? teamName('home') }}
+    </span>
+    @if (formationOf('home'); as form) {
+      <span class="form">{{ form }}</span>
+    }
+  </div>
+
+  <div
+    class="pitch"
+    aria-label="Starting line-ups by formation"
+    [style.height.px]="pitch().height"
+  >
+    <span class="pitch-line" aria-hidden="true"></span>
+    <span class="pitch-circle" aria-hidden="true"></span>
+    @for (m of pitch().markers; track m.key) {
+      <div
+        class="marker"
+        [class.home]="m.side === 'home'"
+        [class.away]="m.side === 'away'"
+        [style.left.%]="m.x"
+        [style.top.%]="m.y"
+      >
+        <span class="dot-wrap">
+          <span
+            class="dot"
+            [style.background-color]="fill(m.side)"
+            [style.border-color]="ring(m.side)"
+            [style.color]="fg(m.side)"
+            >{{ m.number }}</span
+          >
+          @if (m.subOffMinute !== null) {
+            <span class="sub-off" [attr.aria-label]="'Subbed off ' + m.subOffMinute + '\''">
+              <mat-icon aria-hidden="true">south</mat-icon>
+            </span>
+          }
+          @if (m.events; as ev) {
+            <span class="contrib">
+              <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
+            </span>
+          }
+        </span>
+        <span class="mname">{{ m.name }}</span>
+      </div>
+    }
+  </div>
+
+  <!-- Away bar (below pitch): mirrored — formation left, manager right. -->
+  <div class="team-bar away">
+    <span class="mgr">
+      <span
+        class="team-dot"
+        [style.background-color]="fill('away')"
+        [style.border-color]="ring('away')"
+      ></span>
+      {{ coachName('away') ?? teamName('away') }}
+    </span>
+    @if (formationOf('away'); as form) {
+      <span class="form">{{ form }}</span>
+    }
+  </div>
+}
+
+<h3 class="section-h">Bench &amp; substitutions</h3>
+<div class="benches">
+  @for (side of ['home', 'away']; track side) {
+    @if (lineupFor($any(side)); as lu) {
+      <section class="bench-col" [class.home]="side === 'home'" [class.away]="side === 'away'">
+        @if (benchFor($any(side)).length > 0) {
+          <ul class="bench">
+            @for (b of benchFor($any(side)); track $index) {
+              <li class="bench-row" [class.came-on]="b.onMinute !== null">
+                <span class="shirt-wrap">
+                  <span
+                    class="shirt"
+                    [style.background-color]="fill($any(side))"
+                    [style.border-color]="ring($any(side))"
+                    [style.color]="fg($any(side))"
+                    >{{ b.player.shirtNumber ?? '–' }}</span
+                  >
+                  @if (b.onMinute !== null) {
+                    <span class="on-badge" aria-label="Came on">
+                      <mat-icon aria-hidden="true">arrow_upward</mat-icon>
+                    </span>
+                  }
+                  @if (playerEvents(b.player.id); as ev) {
+                    <span class="contrib">
+                      <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
+                    </span>
+                  }
+                </span>
+                <span class="bench-text">
+                  <span class="bench-line">
+                    <!-- Full name (wide) / last name (compact) -->
+                    <span class="bench-name">{{ b.player.name }}</span>
+                    <span class="bench-last">{{ surname(b.player.name) }}</span>
+                    @if (posAbbr(b.player.position); as pos) {
+                      <span class="bench-pos">{{ pos }}</span>
+                    }
+                  </span>
+                  @if (b.onMinute !== null) {
+                    <span class="bench-sub">
+                      <mat-icon aria-hidden="true">arrow_upward</mat-icon>
+                      {{ b.onMinute }}'@if (b.outName) { · {{ b.outName }} }
+                    </span>
+                  }
+                </span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="muted">No bench listed</p>
+        }
+      </section>
+    }
+  }
+</div>
+
+@if (hasReferees()) {
+  <h3 class="section-h">Officials</h3>
+  <ul class="officials">
+    @for (r of referees(); track $index) {
+      <li class="official">
+        <span class="ref-icon">
+          <mat-icon aria-hidden="true">sports</mat-icon>
+        </span>
+        <span class="ref-text">
+          <span class="ref-name">{{ r.name }}</span>
+          <span class="ref-role">
+            {{ refRole(r.type) }}@if (r.nationality) { · {{ r.nationality }} }
+          </span>
+        </span>
+      </li>
+    }
+  </ul>
+}

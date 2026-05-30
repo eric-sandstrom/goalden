@@ -1,0 +1,129 @@
+:host {
+  display: block;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tl-item {
+  display: grid;
+  grid-template-columns: 1fr 44px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.tl-min {
+  text-align: center;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.tl-side {
+  display: flex;
+  min-width: 0;
+
+  &.left {
+    justify-content: flex-end;
+  }
+  &.right {
+    justify-content: flex-start;
+  }
+}
+
+.ev {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  .tl-side.left & {
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+}
+
+.ev-icon.goal {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.ev-icon.sub {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: #2e8b3d;
+}
+
+// Yellow / red card chip, shown inline in the timeline.
+.card {
+  width: 12px;
+  height: 16px;
+  border-radius: 2px;
+  flex: none;
+
+  &.yellow {
+    background: #f6c700;
+  }
+  &.red {
+    background: #d32f2f;
+  }
+}
+
+.ev-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  .ev-player {
+    font-size: 0.9rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ev-note {
+    font-size: 0.72rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.timeline-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+
+.info-list {
+  margin-top: 8px;
+
+  mat-icon[matListItemIcon] {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
