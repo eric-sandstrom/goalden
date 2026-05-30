@@ -51,24 +51,29 @@
   }
 }
 
-/* Status filter chips — same layout as before; sits directly under
-   the comp tabs (when visible). */
-mat-button-toggle-group {
-  align-self: stretch;
-  overflow-x: auto;
-  /* flex: 0 0 auto stops the fixtures card below from squeezing
-     the filter bar when content is long. Height comes from the
-     inner buttons (set below) rather than min-height here, so
-     the bar exactly matches its content. */
-  flex: 0 0 auto;
-}
-mat-button-toggle-group .mat-button-toggle,
-mat-button-toggle-group .mat-button-toggle .mat-button-toggle-button {
-  height: 40px;
-}
 .fixtures-card {
   padding: 0;
   overflow: hidden;
+}
+/* Status filter tabs now live inside the fixtures card. The header-only
+   tab nav sits flush at the top; the panel fills the remaining height and
+   hands its scroll off to the inner .card-scroll, preserving the
+   fill-and-scroll model. */
+.filter-tabs {
+  flex: 0 0 auto;
+  /* Material draws the tab divider only under the scrollable link
+     container, so when the tabs overflow and pagination chevrons appear
+     the line stops short of the prev/next buttons. Draw the divider on
+     the nav itself instead so it runs the full width — under the chevrons
+     too. The container's own 1px line overlaps this one exactly (same
+     colour + baseline), so no double line shows. */
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.fixtures-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .group {
   display: contents;
