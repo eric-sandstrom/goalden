@@ -1,6 +1,12 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
+import {
+  AppRelease,
+  AppUpdateData,
+  WhatsNewDialogComponent,
+} from '../../shared/components/whats-new-dialog.component';
 import { NotificationsService } from './notifications.service';
 
 /**
@@ -12,9 +18,12 @@ import { NotificationsService } from './notifications.service';
  * a deploy, they'll happily use the cached old version forever. This
  * service:
  *   1. Subscribes to `versionUpdates$` — when a `VERSION_READY` event
- *      arrives, shows a sticky snackbar offering the user a Reload.
- *      Reload simply calls `location.reload()`; the service worker then
- *      activates the freshly-downloaded version on the new page load.
+ *      arrives, shows a sticky snackbar offering the user a Reload and a
+ *      "What's new" action that opens a change-log dialog. The change log
+ *      rides along on the new version's `appData` (set in `ngsw-config.json`),
+ *      so it needs no extra network fetch. Reload simply calls
+ *      `location.reload()`; the service worker then activates the
+ *      freshly-downloaded version on the new page load.
  *   2. Polls `checkForUpdate()` on a schedule so we catch deploys that
  *      land while the user is mid-session. Without the poll, the worker
  *      only checks at app startup — a fan watching a live match with the
@@ -32,6 +41,7 @@ import { NotificationsService } from './notifications.service';
 export class AppUpdateService {
   private readonly updates = inject(SwUpdate);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notifications = inject(NotificationsService);
 
@@ -111,18 +121,33 @@ export class AppUpdateService {
   private promptReload(event: VersionReadyEvent): void {
     if (this.snackbarShown) return;
     this.snackbarShown = true;
-    // No duration: stays visible until the user acts. We're asking them
-    // to reload the app — they should make a deliberate choice rather
-    // than miss a 5-second toast.
-    const ref = this.snackBar.open('A new version is available', 'Reload', {});
+
+    // The change log rides along on appData. The latest build carries the
+    // full release history (newest-first); the build the user is currently
+    // running carries its own version label. Slice the history down to just
+    // the releases between the two, so a user several versions behind sees
+    // every update they missed — not only the newest one.
+    const changelog: AppUpdateData = {
+      releases: selectReleases(event.latestVersion.appData, event.currentVersion.appData),
+    };
+
+    // The snackbar action is "What's new" — it opens the change-log dialog,
+    // which is where the actual Reload lives. We surface a dedicated action
+    // rather than just "Reload" so the user sees what changed before
+    // committing to a page reload mid-session.
+    // No duration: stays visible until the user acts. We're asking them to
+    // reload the app — a deliberate choice rather than a 5-second toast.
+    const ref = this.snackBar.open('A new version is available', "What's new", {});
     ref.onAction().subscribe(() => {
-      document.location.reload();
+      this.openChangelog(changelog);
     });
+
     // Also fire an OS notification (no-op unless the user enabled them) so a
-    // backgrounded tab still surfaces the update outside the app.
+    // backgrounded tab still surfaces the update outside the app. Fold the
+    // change log into the body when we have one.
     void this.notifications.showLocal(
       'A new version is available',
-      'Reopen Goalden to update to the latest version.',
+      changelogBody(changelog),
       'app-update',
     );
     ref.afterDismissed().subscribe((dismissed) => {
@@ -139,4 +164,91 @@ export class AppUpdateService {
         `(current ${event.currentVersion.hash.slice(0, 7)})`,
     );
   }
+
+  /** Open the change-log dialog; reload only if the user confirms. */
+  private openChangelog(data: AppUpdateData): void {
+    const dialogRef = this.dialog.open<WhatsNewDialogComponent, AppUpdateData, boolean>(
+      WhatsNewDialogComponent,
+      { data, autoFocus: false, restoreFocus: false },
+    );
+    dialogRef.afterClosed().subscribe((reload) => {
+      if (reload) {
+        document.location.reload();
+      } else {
+        // User chose "Later" / dismissed — re-arm so the next VERSION_READY
+        // (or the next tab focus) can prompt again.
+        this.snackbarShown = false;
+      }
+    });
+  }
+}
+
+/**
+ * Pick the releases to show: everything in the latest build's history that's
+ * newer than the build the user is currently running.
+ *
+ * The latest build's `appData.releases` is the full history (newest-first),
+ * and `current.version` labels the running build. We locate the running
+ * version in that history and return everything above it. No semver math —
+ * we match the version label against the retained history array, which is
+ * robust to any labelling scheme.
+ *
+ * Fallbacks (defensive — appData is opaque and may be stale or malformed):
+ *   - current version unknown, or not found in the retained history (the user
+ *     is so far behind we've pruned their version): show the whole history.
+ *   - current version is the newest entry: show nothing (a deploy that didn't
+ *     bump the version) — the dialog falls back to its generic message.
+ */
+function selectReleases(latest: unknown, current: unknown): AppRelease[] {
+  const history = readReleases(latest);
+  if (history.length === 0) return [];
+  const currentVersion = readVersion(current);
+  if (currentVersion) {
+    const idx = history.findIndex((r) => r.version === currentVersion);
+    if (idx === 0) return [];
+    if (idx > 0) return history.slice(0, idx);
+  }
+  return history;
+}
+
+/** Read the release history from a build's appData. Accepts the current
+ *  `{ releases: [...] }` shape and, for resilience against an older deployed
+ *  build, the legacy single-release `{ version, changes }` shape. */
+function readReleases(appData: unknown): AppRelease[] {
+  if (!appData || typeof appData !== 'object') return [];
+  const bag = appData as Record<string, unknown>;
+  if (Array.isArray(bag['releases'])) {
+    return bag['releases']
+      .map(toRelease)
+      .filter((r): r is AppRelease => r !== null);
+  }
+  const single = toRelease(bag);
+  return single ? [single] : [];
+}
+
+/** Coerce one opaque entry into an AppRelease, or null if it carries nothing. */
+function toRelease(value: unknown): AppRelease | null {
+  if (!value || typeof value !== 'object') return null;
+  const bag = value as Record<string, unknown>;
+  const version = typeof bag['version'] === 'string' ? bag['version'] : undefined;
+  const changes = Array.isArray(bag['changes'])
+    ? bag['changes'].filter((c): c is string => typeof c === 'string')
+    : [];
+  if (!version && changes.length === 0) return null;
+  return { version, changes };
+}
+
+/** The top-level `version` label a build stamps on its own appData. */
+function readVersion(appData: unknown): string | undefined {
+  if (!appData || typeof appData !== 'object') return undefined;
+  const v = (appData as Record<string, unknown>)['version'];
+  return typeof v === 'string' ? v : undefined;
+}
+
+/** Notification body text: a flat list of every change across the shown
+ *  releases, else a generic line. */
+function changelogBody(data: AppUpdateData): string {
+  const all = data.releases.flatMap((r) => r.changes);
+  if (all.length) return all.join(' • ');
+  return 'Reopen Goalden to update to the latest version.';
 }

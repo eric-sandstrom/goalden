@@ -1,0 +1,29 @@
+<h2 mat-dialog-title>
+  <mat-icon class="new-icon" aria-hidden="true">rocket_launch</mat-icon>
+  What's new{{ versionLabel }}
+</h2>
+<mat-dialog-content>
+  @if (releases.length) {
+    @for (release of releases; track release.version ?? $index) {
+      <section class="release">
+        @if (showVersionHeadings && release.version) {
+          <h3 class="release-version">{{ release.version }}</h3>
+        }
+        <ul class="changes">
+          @for (change of release.changes; track change) {
+            <li>{{ change }}</li>
+          }
+        </ul>
+      </section>
+    }
+  } @else {
+    <p class="hint">A new version of Goalden is ready. Reload to get the latest.</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="later()">Later</button>
+  <button mat-flat-button color="primary" cdkFocusInitial (click)="reload()">
+    <mat-icon>refresh</mat-icon>
+    Reload
+  </button>
+</mat-dialog-actions>

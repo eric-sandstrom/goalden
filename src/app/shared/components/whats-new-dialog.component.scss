@@ -1,0 +1,40 @@
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.new-icon {
+  color: var(--mat-sys-primary);
+}
+.hint {
+  margin: 0;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-on-surface-variant);
+}
+.release {
+  min-width: 260px;
+
+  & + .release {
+    margin-top: 1rem;
+  }
+}
+.release-version {
+  margin: 0 0 0.4rem;
+  font: var(--mat-sys-title-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+.changes {
+  margin: 0;
+  padding-left: 1.25rem;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-on-surface);
+
+  li {
+    margin-bottom: 0.4rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
