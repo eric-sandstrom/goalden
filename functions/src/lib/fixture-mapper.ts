@@ -6,11 +6,26 @@ export interface FootballDataMatch {
   readonly status: string;
   readonly stage: string;
   readonly group: string | null;
+  /** Current match minute while IN_PLAY/PAUSED (caps at the half's nominal
+   *  end — 45/90/120 — with stoppage carried in `injuryTime`). Null/absent
+   *  outside live play. */
+  readonly minute?: number | null;
+  /** Added (stoppage) minutes on top of `minute`, e.g. `minute:90,
+   *  injuryTime:4` → "90+4". Null/absent when not in stoppage. */
+  readonly injuryTime?: number | null;
   readonly homeTeam: { id: number | null; name: string | null; tla: string | null; crest: string | null };
   readonly awayTeam: { id: number | null; name: string | null; tla: string | null; crest: string | null };
   readonly score: {
     winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
+    /** Final result INCLUDING extra time and penalty-shootout goals (e.g.
+     *  a 1-1 match won on pens reads "7-6"). Also the running score while
+     *  live. NOT what we score on — see `regularTime`. */
     fullTime: { home: number | null; away: number | null };
+    /** Score after 90 minutes (regular time). Populated by football-data
+     *  only when the match went to extra time; absent otherwise (when
+     *  `fullTime` already is the 90-minute score). This is the score the
+     *  game grades on — ET/penalties are ignored. */
+    regularTime?: { home: number | null; away: number | null } | null;
   };
 }
 
@@ -81,9 +96,26 @@ export interface FixtureDoc {
   stage: string;
   group: string | null;
   score: {
+    /** Final result incl. extra time + penalties (and the live running
+     *  score). Kept for traceability/display; scoring reads `regularTime`. */
     fullTime: { home: number; away: number } | null;
+    /** Score after 90 minutes — the value the game grades on. Present only
+     *  for matches that went to extra time; null otherwise (use `fullTime`,
+     *  which is the 90-minute score for a match decided in regulation). */
+    regularTime?: { home: number; away: number } | null;
     winner: 'HOME' | 'AWAY' | 'DRAW' | null;
   };
+
+  // --- Live match clock (authoritative, from football-data) ----------------
+  // The current minute + stoppage time, refreshed every poll while the match
+  // is live (see fixtureChanged). The client anchors these to `lastSyncedAt`
+  // and ticks forward for a smooth, accurate clock including stoppage/extra
+  // time — unlike the ESPN overlay below, this covers every competition.
+  /** Match minute while live; caps at 45/90/120 with stoppage in
+   *  `injuryTime`. Null outside live play. */
+  minute?: number | null;
+  /** Added (stoppage) minutes on top of `minute`. Null when not in stoppage. */
+  injuryTime?: number | null;
 
   // --- ESPN live overlay (display-only) ------------------------------------
   // Written EXCLUSIVELY by the ESPN pass in the poller (pollEspnLive), never
@@ -162,6 +194,9 @@ export function mapFixture(
     m.score.fullTime.home !== null && m.score.fullTime.away !== null
       ? { home: m.score.fullTime.home, away: m.score.fullTime.away }
       : null;
+  const rt = m.score.regularTime;
+  const regularTime =
+    rt && rt.home !== null && rt.away !== null ? { home: rt.home, away: rt.away } : null;
   return {
     competitionId: ctx.competitionId,
     season: ctx.season,
@@ -184,10 +219,17 @@ export function mapFixture(
     group: mapGroup(m.group),
     score: {
       fullTime,
+      regularTime,
       winner: mapWinner(m.score.winner),
     },
+    minute: m.minute ?? null,
+    injuryTime: m.injuryTime ?? null,
   };
 }
+
+/** Live statuses during which the match clock advances — the only window in
+ *  which a `minute`/`injuryTime` change is worth a write. */
+const LIVE_STATUSES: ReadonlySet<string> = new Set(['IN_PLAY', 'PAUSED']);
 
 /** Returns true if the relevant subset of the doc has changed. */
 export function fixtureChanged(existing: FixtureDoc | undefined, next: FixtureDoc): boolean {
@@ -204,5 +246,18 @@ export function fixtureChanged(existing: FixtureDoc | undefined, next: FixtureDo
   if (a.winner !== b.winner) return true;
   if ((a.fullTime?.home ?? null) !== (b.fullTime?.home ?? null)) return true;
   if ((a.fullTime?.away ?? null) !== (b.fullTime?.away ?? null)) return true;
+  // The 90-minute score (the one we grade on) appears when a match goes to
+  // extra time — persist it so scoring and the UI pick it up.
+  if ((a.regularTime?.home ?? null) !== (b.regularTime?.home ?? null)) return true;
+  if ((a.regularTime?.away ?? null) !== (b.regularTime?.away ?? null)) return true;
+  // While a match is live, the minute/stoppage tick every poll — persist them
+  // so the client clock stays fresh (and `lastSyncedAt` re-anchors). Gated to
+  // live statuses so finished/scheduled fixtures (whose minute is a stable
+  // 90/null) never churn the doc. This is the one place we accept a per-poll
+  // write during a match, in exchange for an accurate live clock.
+  if (LIVE_STATUSES.has(next.status)) {
+    if ((existing.minute ?? null) !== (next.minute ?? null)) return true;
+    if ((existing.injuryTime ?? null) !== (next.injuryTime ?? null)) return true;
+  }
   return false;
 }

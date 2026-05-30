@@ -54,6 +54,10 @@ interface CachedFixture {
   stage: FixtureStage;
   group: string | null;
   score: Fixture['score'];
+  minute?: Fixture['minute'];
+  injuryTime?: Fixture['injuryTime'];
+  /** ISO string (Date serialises for JSON), or null. */
+  lastSyncedAt?: string | null;
   liveScore?: Fixture['liveScore'];
   liveState?: Fixture['liveState'];
   liveClock?: Fixture['liveClock'];
@@ -658,6 +662,11 @@ export class FixturesService {
       stage: (data['stage'] as FixtureStage) ?? 'GROUP',
       group: data['group'] ?? null,
       score: data['score'] ?? null,
+      // Authoritative live clock from football-data; the row anchors these to
+      // lastSyncedAt and ticks. Absent outside live play → null.
+      minute: typeof data['minute'] === 'number' ? data['minute'] : null,
+      injuryTime: typeof data['injuryTime'] === 'number' ? data['injuryTime'] : null,
+      lastSyncedAt: toDate(data['lastSyncedAt']),
       // ESPN live overlay (display-only). Absent on docs ESPN hasn't
       // matched yet — default to null so consumers can treat uniformly.
       liveScore: (data['liveScore'] as Fixture['liveScore']) ?? null,
@@ -667,6 +676,26 @@ export class FixturesService {
       espnEventId: (data['espnEventId'] as string) ?? null,
     };
   }
+}
+
+/**
+ * Converts a Firestore timestamp to a Date, accepting both real `Timestamp`
+ * instances (canonical docs) and the plain `{ seconds, nanoseconds }` shape
+ * that embedded timestamps take when read from a rollup array field. Returns
+ * null for anything missing/unrecognised.
+ */
+function toDate(value: unknown): Date | null {
+  if (value instanceof Timestamp) return value.toDate();
+  if (
+    value &&
+    typeof value === 'object' &&
+    'seconds' in value &&
+    'nanoseconds' in value
+  ) {
+    const { seconds, nanoseconds } = value as { seconds: number; nanoseconds: number };
+    return new Date(seconds * 1000 + nanoseconds / 1_000_000);
+  }
+  return null;
 }
 
 // =============================================================================
@@ -685,6 +714,9 @@ function fixtureToCache(f: Fixture): CachedFixture {
     stage: f.stage,
     group: f.group,
     score: f.score,
+    minute: f.minute ?? null,
+    injuryTime: f.injuryTime ?? null,
+    lastSyncedAt: f.lastSyncedAt ? f.lastSyncedAt.toISOString() : null,
     liveScore: f.liveScore ?? null,
     liveState: f.liveState ?? null,
     liveClock: f.liveClock ?? null,
@@ -705,6 +737,9 @@ function fixtureFromCache(c: CachedFixture): Fixture {
     stage: c.stage,
     group: c.group,
     score: c.score,
+    minute: c.minute ?? null,
+    injuryTime: c.injuryTime ?? null,
+    lastSyncedAt: c.lastSyncedAt ? new Date(c.lastSyncedAt) : null,
     liveScore: c.liveScore ?? null,
     liveState: c.liveState ?? null,
     liveClock: c.liveClock ?? null,

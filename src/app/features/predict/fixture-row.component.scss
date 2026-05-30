@@ -32,6 +32,13 @@
 }
 :host:last-of-type { border-bottom: none; }
 :host:nth-of-type(even) { background: var(--mat-sys-surface-container-low); }
+/* Live match accent — a faint error-tinted wash plus a left bar, so an
+   in-play row stands out from the list. Placed after the even-row rule so it
+   wins for live rows regardless of parity. */
+:host(.live) {
+  background: color-mix(in srgb, var(--mat-sys-error) 6%, transparent);
+  box-shadow: inset 3px 0 0 var(--mat-sys-error);
+}
 .row {
   padding: 0.75rem 1rem;
   position: relative;
@@ -274,11 +281,31 @@ a.team-link:focus-visible {
   color: var(--mat-sys-on-surface-variant);
   font-style: italic;
 }
+/* Live badge — a tinted pill with the pulsing dot, the half, and a ticking
+   minute, so an in-play match reads at a glance in the list. */
 .status.live {
   color: var(--mat-sys-error);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mat-sys-error) 13%, transparent);
+}
+.live-half {
+  font-size: 0.78rem;
+}
+.live-minute {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+/* Half-time — amber pill, distinct from the red live state. */
+.status.pause {
+  color: var(--mat-sys-tertiary);
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mat-sys-tertiary) 16%, transparent);
 }
 .status.final {
   font-weight: 600;

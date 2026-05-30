@@ -290,17 +290,22 @@ export class PredictComponent {
     });
   }
 
-  /** Called by the tab bar's (change) event — pushes the comp into the URL
-   *  (keeping the current filter). The signals follow from the navigation. */
+  /** Called by the tab bar's (change) event — writes the comp into the URL
+   *  (keeping the current filter). The signals follow from the navigation.
+   *  replaceUrl: switching comp never leaves the Predict view, so it should
+   *  replace the current history entry rather than stack up tab-flip back
+   *  steps. */
   protected selectComp(key: string): void {
-    void this.navigateTo(key, this.filter());
+    void this.navigateTo(key, this.filter(), { replaceUrl: true });
   }
 
-  /** Called by the filter chips — pushes the filter into the URL (keeping
-   *  the current comp). No-op until a comp has resolved. */
+  /** Called by the filter chips — writes the filter into the URL (keeping
+   *  the current comp). No-op until a comp has resolved. replaceUrl for the
+   *  same reason as selectComp: it's an in-view state change, not a real
+   *  navigation. */
   protected selectFilter(f: Filter): void {
     const key = this.selectedComp()?.key;
-    if (key) void this.navigateTo(key, f);
+    if (key) void this.navigateTo(key, f, { replaceUrl: true });
   }
 
   private navigateTo(
