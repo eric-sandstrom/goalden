@@ -200,11 +200,30 @@
             <!-- ===== Line-ups (pitch) + substitutions + bench ===== -->
             @case ('lineups') {
               <div class="panel-inner lineups-tab">
-                @if (pitchMarkers().length > 0) {
-                  <div class="pitch" aria-label="Starting line-ups by formation">
+                @if (pitch().markers.length > 0) {
+                  <!-- Away bar (above pitch): manager left, formation right. -->
+                  <div class="team-bar">
+                    <span class="mgr">
+                      <span
+                        class="team-dot"
+                        [style.background-color]="fill('away')"
+                        [style.border-color]="ring('away')"
+                      ></span>
+                      {{ coachName('away') ?? teamName('away') }}
+                    </span>
+                    @if (formationOf('away'); as form) {
+                      <span class="form">{{ form }}</span>
+                    }
+                  </div>
+
+                  <div
+                    class="pitch"
+                    aria-label="Starting line-ups by formation"
+                    [style.height.px]="pitch().height"
+                  >
                     <span class="pitch-line" aria-hidden="true"></span>
                     <span class="pitch-circle" aria-hidden="true"></span>
-                    @for (m of pitchMarkers(); track m.key) {
+                    @for (m of pitch().markers; track m.key) {
                       <div
                         class="marker"
                         [class.home]="m.side === 'home'"
@@ -212,15 +231,37 @@
                         [style.left.%]="m.x"
                         [style.top.%]="m.y"
                       >
-                        <span
-                          class="dot"
-                          [style.background-color]="fill(m.side)"
-                          [style.border-color]="ring(m.side)"
-                          [style.color]="fg(m.side)"
-                          >{{ m.number }}</span
-                        >
+                        <span class="dot-wrap">
+                          <span
+                            class="dot"
+                            [style.background-color]="fill(m.side)"
+                            [style.border-color]="ring(m.side)"
+                            [style.color]="fg(m.side)"
+                            >{{ m.number }}</span
+                          >
+                          @if (m.subOffMinute !== null) {
+                            <span class="sub-off" [attr.aria-label]="'Subbed off ' + m.subOffMinute + '\''">
+                              <mat-icon aria-hidden="true">south</mat-icon>
+                            </span>
+                          }
+                        </span>
                         <span class="mname">{{ m.name }}</span>
                       </div>
+                    }
+                  </div>
+
+                  <!-- Home bar (below pitch): manager left, formation right. -->
+                  <div class="team-bar">
+                    <span class="mgr">
+                      <span
+                        class="team-dot"
+                        [style.background-color]="fill('home')"
+                        [style.border-color]="ring('home')"
+                      ></span>
+                      {{ coachName('home') ?? teamName('home') }}
+                    </span>
+                    @if (formationOf('home'); as form) {
+                      <span class="form">{{ form }}</span>
                     }
                   </div>
                 }
@@ -282,12 +323,6 @@
                           </ul>
                         } @else {
                           <p class="muted">No bench listed</p>
-                        }
-                        @if (lu.coach && lu.coach.name) {
-                          <p class="coach">
-                            <mat-icon aria-hidden="true">sports</mat-icon>
-                            {{ lu.coach.name }}
-                          </p>
                         }
                       </section>
                     }

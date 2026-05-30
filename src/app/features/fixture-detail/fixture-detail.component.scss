@@ -404,13 +404,46 @@
 
 // ===== Line-ups: pitch =====
 
+// Manager (left) + formation (right) bar, above the away XI and below home.
+.team-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  max-width: 340px;
+  margin: 8px auto;
+
+  .mgr {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .form {
+    flex: none;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--mat-sys-surface-variant);
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 .pitch {
   position: relative;
   width: 100%;
   // Cap it so the field doesn't blow up to panel width on wide screens.
+  // Height is set inline, sized to the row count so rows never crowd.
   max-width: 340px;
   margin: 0 auto;
-  aspect-ratio: 3 / 4;
   border-radius: 10px;
   overflow: hidden;
   background: repeating-linear-gradient(
@@ -453,6 +486,33 @@
   gap: 2px;
   width: 64px;
   pointer-events: none;
+
+  .dot-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  // Small red "subbed off" badge at the disc's top-right corner.
+  .sub-off {
+    position: absolute;
+    top: -5px;
+    right: -7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #d32f2f;
+    color: #fff;
+    border: 1px solid #fff;
+
+    mat-icon {
+      font-size: 12px;
+      width: 12px;
+      height: 12px;
+    }
+  }
 
   .dot {
     display: flex;
@@ -627,10 +687,6 @@
   .bench-name {
     text-align: right;
   }
-  .coach {
-    flex-direction: row-reverse;
-    margin: 8px 16px 0 0;
-  }
 }
 
 .bench {
@@ -670,20 +726,6 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   flex: none;
-}
-
-.coach {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 0 16px;
-  font-size: 0.9rem;
-
-  mat-icon {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
-  }
 }
 
 .muted {

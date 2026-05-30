@@ -59,6 +59,9 @@ interface PitchMarker {
   readonly number: string;
   readonly name: string;
   readonly side: 'home' | 'away';
+  /** Minute this starter was subbed off, if they were — drives the on-pitch
+   *  "subbed off" badge. Null if they played the whole match. */
+  readonly subOffMinute: number | null;
 }
 
 interface SubItem {
@@ -382,15 +385,28 @@ export class FixtureDetailComponent {
   // --- pitch + substitutions (Line-ups tab) ----------------------------------
 
   /** Starting XIs placed on the pitch — home on the bottom half, away mirrored
-   *  on the top half, both laid out by their formation. */
-  protected readonly pitchMarkers = computed<readonly PitchMarker[]>(() => {
+   *  on the top half, both laid out by their formation. Also returns a height
+   *  sized to the row count so rows never crowd. */
+  protected readonly pitch = computed<{ markers: readonly PitchMarker[]; height: number }>(() => {
     const home = this.lineupFor('home');
     const away = this.lineupFor('away');
-    if (!home && !away) return [];
-    return [
-      ...(home ? markersForTeam(buildRows(home), 'home') : []),
-      ...(away ? markersForTeam(buildRows(away), 'away') : []),
+    const d = this.detail();
+    // playerOut id → minute, so a subbed-off starter gets its badge.
+    const offMap = new Map<number, number | null>();
+    if (d) {
+      for (const s of d.substitutions) {
+        if (s.playerOut?.id != null) offMap.set(s.playerOut.id, s.minute);
+      }
+    }
+    const homeRows = home ? buildRows(home) : [];
+    const awayRows = away ? buildRows(away) : [];
+    const markers = [
+      ...markersForTeam(homeRows, 'home', offMap),
+      ...markersForTeam(awayRows, 'away', offMap),
     ];
+    // ~60px per row keeps the dot + two-line name clear of its neighbours.
+    const height = Math.max(360, (homeRows.length + awayRows.length) * 60);
+    return { markers, height };
   });
 
   protected readonly subs = computed<readonly SubItem[]>(() => {
@@ -466,6 +482,17 @@ export class FixtureDetailComponent {
     const f = this.fixture();
     const t = side === 'home' ? f?.homeTeam : f?.awayTeam;
     return t?.name ?? t?.tla ?? (side === 'home' ? 'Home' : 'Away');
+  }
+
+  /** Manager name for a side's pitch bar, or null when unknown. */
+  protected coachName(side: 'home' | 'away'): string | null {
+    const c = this.lineupFor(side)?.coach;
+    return c && c.name ? c.name : null;
+  }
+
+  /** Formation string (e.g. "4-3-3") for a side, or null. */
+  protected formationOf(side: 'home' | 'away'): string | null {
+    return this.lineupFor(side)?.formation ?? null;
   }
 
   async refresh(): Promise<void> {
@@ -565,73 +592,102 @@ function lastName(name: string | null): string {
   return parts[parts.length - 1];
 }
 
-function posBucket(pos: string | null): 'GK' | 'DEF' | 'MID' | 'FWD' {
+/**
+ * Tactical depth of a position, 0 (goalkeeper) → 5 (striker). Drives which
+ * formation row a player lands in. football-data gives specific positions
+ * ("Centre-Back", "Left Winger", "Defensive Midfield"), so we rank by those
+ * rather than the lineup array order — which is NOT formation-ordered.
+ */
+function depthScore(pos: string | null): number {
   const p = (pos ?? '').toLowerCase();
-  if (p.includes('goal')) return 'GK';
-  if (p.includes('back') || p.includes('defen')) return 'DEF';
-  if (
-    p.includes('forward') ||
-    p.includes('offen') ||
-    p.includes('wing') ||
-    p.includes('strik') ||
-    p.includes('attack')
-  ) {
-    return 'FWD';
-  }
-  return 'MID';
+  if (p.includes('goal')) return 0;
+  if (p.includes('back') || p === 'defence' || p.includes('defender')) return 1;
+  if (p.includes('defensive mid')) return 2;
+  if (p.includes('attacking mid')) return 4;
+  if (p.includes('mid')) return 3;
+  if (p.includes('wing')) return 4.5;
+  if (p.includes('forward') || p.includes('strik') || p === 'offence') return 5;
+  return 3;
+}
+
+/** Horizontal lean of a position: 0 left, 1 centre, 2 right — for ordering
+ *  players across a row. */
+function horizRank(pos: string | null): number {
+  const p = (pos ?? '').toLowerCase();
+  if (p.includes('left')) return 0;
+  if (p.includes('right')) return 2;
+  return 1;
 }
 
 /**
- * Split a starting XI into rows, defensive → attacking, from the formation
- * string (e.g. "4-3-3" → [GK], [4], [3], [3]). The lineup array is in
- * formation order, so we just chunk the outfield by the formation numbers.
- * Falls back to grouping by broad position when the formation is missing or
- * doesn't add up to the XI.
+ * Split a starting XI into rows, defensive → attacking. Players are assigned
+ * to rows by tactical depth (NOT array order — football-data's lineup array
+ * isn't formation-ordered): sort by depth, then fill the formation's line
+ * sizes (4-3-3 → 4, 3, 3). Each row is then ordered left → right. Falls back
+ * to defence/midfield/attack buckets when the formation doesn't add up.
  */
 function buildRows(lu: MatchLineup): MatchPlayer[][] {
   const players = lu.lineup;
   if (players.length === 0) return [];
-  const gk = players.find((p) => (p.position ?? '').toLowerCase().includes('goal')) ?? players[0];
-  const outfield = players.filter((p) => p !== gk);
+  const gk = players.find((p) => depthScore(p.position) === 0) ?? players[0];
+  const outfield = players
+    .filter((p) => p !== gk)
+    .map((p, i) => ({ p, d: depthScore(p.position), i }))
+    .sort((a, b) => a.d - b.d || a.i - b.i)
+    .map((x) => x.p);
+
   const counts = (lu.formation ?? '')
     .split('-')
     .map((n) => parseInt(n, 10))
     .filter((n) => Number.isInteger(n) && n > 0);
-  const sum = counts.reduce((a, b) => a + b, 0);
-  if (counts.length > 0 && sum === outfield.length) {
-    const rows: MatchPlayer[][] = [[gk]];
+
+  let lines: MatchPlayer[][];
+  if (counts.length > 0 && counts.reduce((a, b) => a + b, 0) === outfield.length) {
+    lines = [];
     let i = 0;
     for (const c of counts) {
-      rows.push(outfield.slice(i, i + c));
+      lines.push(outfield.slice(i, i + c));
       i += c;
     }
-    return rows;
+  } else {
+    const def = outfield.filter((p) => depthScore(p.position) <= 1);
+    const mid = outfield.filter((p) => {
+      const d = depthScore(p.position);
+      return d > 1 && d < 4;
+    });
+    const fwd = outfield.filter((p) => depthScore(p.position) >= 4);
+    lines = [def, mid, fwd].filter((l) => l.length > 0);
   }
-  // Fallback: group by broad position so we still draw something sensible.
-  const buckets: Record<'GK' | 'DEF' | 'MID' | 'FWD', MatchPlayer[]> = {
-    GK: [],
-    DEF: [],
-    MID: [],
-    FWD: [],
-  };
-  for (const p of players) buckets[posBucket(p.position)].push(p);
-  return [buckets.GK, buckets.DEF, buckets.MID, buckets.FWD].filter((r) => r.length > 0);
+
+  // Order each line left → right.
+  lines = lines.map((line) =>
+    line
+      .map((p, i) => ({ p, h: horizRank(p.position), i }))
+      .sort((a, b) => a.h - b.h || a.i - b.i)
+      .map((x) => x.p),
+  );
+  return [[gk], ...lines];
 }
 
 /**
  * Place a team's rows on the pitch as percentage coordinates. Home occupies
- * the bottom half (GK deepest at y≈96, attackers near the halfway line);
- * away mirrors into the top half (GK at y≈4). Players in a row spread evenly
- * across the width.
+ * the bottom half (GK deepest at y≈95, attackers near the halfway line);
+ * away mirrors into the top half (GK at y≈5). Players in a row spread evenly
+ * across the width. `offMap` tags starters who were later subbed off.
  */
-function markersForTeam(rows: MatchPlayer[][], side: 'home' | 'away'): PitchMarker[] {
+function markersForTeam(
+  rows: MatchPlayer[][],
+  side: 'home' | 'away',
+  offMap: ReadonlyMap<number, number | null>,
+): PitchMarker[] {
   const markers: PitchMarker[] = [];
   const rowCount = rows.length;
   rows.forEach((row, ri) => {
     const t = rowCount > 1 ? ri / (rowCount - 1) : 0; // 0 = GK row … 1 = most attacking
-    const y = side === 'home' ? 96 - t * 42 : 4 + t * 42;
+    const y = side === 'home' ? 95 - t * 39 : 5 + t * 39;
     const k = row.length;
     row.forEach((p, j) => {
+      const subbed = p.id != null && offMap.has(p.id);
       markers.push({
         key: `${side}-${ri}-${j}`,
         x: ((j + 1) / (k + 1)) * 100,
@@ -639,6 +695,7 @@ function markersForTeam(rows: MatchPlayer[][], side: 'home' | 'away'): PitchMark
         number: p.shirtNumber != null ? String(p.shirtNumber) : '',
         name: lastName(p.name),
         side,
+        subOffMinute: subbed ? (offMap.get(p.id as number) ?? null) : null,
       });
     });
   });
