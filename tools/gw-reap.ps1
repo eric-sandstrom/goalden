@@ -1,7 +1,8 @@
 # Guarded reaper for dev worktrees. Removes only session/* worktrees that are
-# SAFE to delete — working tree clean AND every commit already merged into
-# origin/main. Skips anything dirty, unmerged, the primary worktree, or the
-# current directory. It never deletes unsaved or unmerged work.
+# SAFE to delete — working tree clean AND the branch has real commits that are
+# all merged into origin/main. Skips anything dirty, unmerged, fresh (no commits
+# yet — tip still equals origin/main), the primary worktree, or the current dir.
+# It never deletes unsaved, unmerged, or not-yet-started work.
 #
 #   gw reap            reap now
 #   gw reap -DryRun    show what would be reaped, change nothing
@@ -31,6 +32,7 @@ if ((Resolve-Path $top).Path -ne $primaryTop) {
 # Refresh origin/main so the "merged" check is accurate (read-only network op).
 try { git -C $root fetch --quiet origin main } catch {}
 
+$mainSha = (git -C $root rev-parse origin/main).Trim()
 $current = (Get-Location).Path
 $removed = @()
 $skipped = @()
@@ -55,6 +57,8 @@ foreach ($e in $entries) {
   if ($resolved.Path -eq $current) { $skipped += "$branch (current dir)"; continue }
 
   if (git -C $path status --porcelain) { $skipped += "$branch (uncommitted changes)"; continue }
+
+  if ((git -C $root rev-parse "$branch").Trim() -eq $mainSha) { $skipped += "$branch (no commits yet / fresh worktree)"; continue }
 
   $unmerged = (git -C $root rev-list "$branch" --not origin/main --count).Trim()
   if ($unmerged -ne '0') { $skipped += "$branch ($unmerged unmerged commit(s))"; continue }
