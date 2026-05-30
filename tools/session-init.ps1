@@ -32,9 +32,9 @@ try {
 } catch {}
 
 if (-not $listening) {
-  # Detached, minimized, its own window (visible so you can see compile output
-  # and close it to stop the server). cmd /k keeps a crashed server's error up.
-  Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', 'npm start' -WorkingDirectory $top -WindowStyle Minimized | Out-Null
+  # Detached, minimized, its own window. cmd /c (not /k) so the window closes
+  # when the server stops/is killed, releasing the dir lock cleanly at teardown.
+  Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm start' -WorkingDirectory $top -WindowStyle Minimized | Out-Null
 }
 
 $state = if ($listening) { 'is already running' } else { 'is starting now (ng serve compiles in ~15s)' }

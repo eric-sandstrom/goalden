@@ -109,8 +109,11 @@ if ($LASTEXITCODE -ne 0) { throw 'git worktree add failed' }
 # "no work done yet" (tip == base) from "finished, merged work" (tip moved on).
 $base = (git -C $dest rev-parse HEAD).Trim()
 $cfgPath = Join-Path $dest '.worktree.json'
-[ordered]@{ name = $slug; port = $Port; branch = $Branch; base = $base } |
-  ConvertTo-Json | Set-Content -Path $cfgPath -Encoding utf8
+# Write UTF-8 WITHOUT BOM. PowerShell's Set-Content -Encoding utf8 adds a BOM,
+# which makes Node's JSON.parse in serve.mjs throw, so the port was ignored and
+# every worktree fell back to firstFree(4200).
+$cfgJson = [ordered]@{ name = $slug; port = $Port; branch = $Branch; base = $base } | ConvertTo-Json
+[System.IO.File]::WriteAllText($cfgPath, $cfgJson)
 
 # --- dependencies ------------------------------------------------------------
 if ($LinkModules) {
@@ -129,11 +132,28 @@ if ($LinkModules) {
   try { npm install } finally { Pop-Location }
 }
 
+# --- start the dev server now (head start) -----------------------------------
+# Kick off `npm start` (ng serve on this worktree's port) in its own minimized
+# window the moment the worktree exists, so it is already compiling while the
+# session launches and orients -- by the time the app gets tested it should be
+# up. Idempotent: skip if the port is already bound. (The SessionStart hook also
+# ensures it's running; starting here just front-loads the ~15s compile.)
+$portBusy = $false
+try {
+  $probe = New-Object Net.Sockets.TcpClient
+  $iar = $probe.BeginConnect('127.0.0.1', [int]$Port, $null, $null)
+  if ($iar.AsyncWaitHandle.WaitOne(300)) { $probe.EndConnect($iar); $portBusy = $probe.Connected }
+  $probe.Close()
+} catch {}
+if (-not $portBusy) {
+  # cmd /c (not /k) so the window closes when the server stops/is killed, which
+  # releases the directory lock cleanly at teardown.
+  Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm start' -WorkingDirectory $dest -WindowStyle Minimized | Out-Null
+  Write-Host "Started dev server (npm start) -> http://localhost:$Port (compiling...)" -ForegroundColor Cyan
+}
+
 Write-Host ''
 Write-Host '+ Worktree ready.' -ForegroundColor Green
-Write-Host 'Next:'
-Write-Host "  cd `"$dest`""
-Write-Host "  npm start            # serves on http://localhost:$Port"
-Write-Host ''
-Write-Host "Point a new Claude Code session at: $dest"
+Write-Host "  dev server: http://localhost:$Port (starting in its own minimized window)"
+Write-Host "  open a Claude Code session here: $dest"
 Write-Host '(Emulators: run `npm run emulators` once from the main repo only.)'
