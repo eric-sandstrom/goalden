@@ -190,7 +190,15 @@ export class PredictedStandingsService {
 /**
  * The score that should drive the predicted table for one fixture:
  * the user's prediction if present, else the actual full-time score for a
- * finished match, else null (future + unpredicted → no contribution).
+ * finished match, else null (future/in-play + unpredicted → no contribution).
+ *
+ * Gates on a terminal status (FINISHED/AWARDED), NOT merely on the presence
+ * of `score.fullTime`: football-data reports the *running* score in
+ * `fullTime` during IN_PLAY/PAUSED, so a score-presence check would fold
+ * live, half-played matches into the table. The cancelled-but-played case
+ * (a played match the provider mislabels CANCELLED while still counting it)
+ * is handled upstream — the poller's `normalizeStatus` rewrites it to
+ * FINISHED — so the status check here already captures it.
  */
 function effectiveResult(
   fixture: Fixture,

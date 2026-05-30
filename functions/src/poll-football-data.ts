@@ -145,14 +145,16 @@ export async function runPollFootballData(
 }
 
 /** Fetches one competition's matches, writes changes, refreshes its
- *  per-comp rollup. The competition's id doubles as the football-data
- *  `code`, so the URL is straightforward. */
+ *  per-comp rollup. We address the comp by its football-data numeric id
+ *  (`fdId`) rather than our doc id — some comps (e.g. Superettan) have no
+ *  textual code, so we synthesise one for the doc id, but only the numeric
+ *  id resolves against the API. */
 async function pollOneCompetition(
   token: string,
   ctx: CompetitionContext,
 ): Promise<CompetitionPollResult> {
   const res = await fetch(
-    `https://api.football-data.org/v4/competitions/${ctx.id}/matches`,
+    `https://api.football-data.org/v4/competitions/${ctx.fdId ?? ctx.id}/matches`,
     { headers: { 'X-Auth-Token': token } },
   );
   if (!res.ok) {

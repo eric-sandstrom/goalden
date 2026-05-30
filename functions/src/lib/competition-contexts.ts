@@ -11,7 +11,15 @@ import * as logger from 'firebase-functions/logger';
  */
 
 export interface CompetitionContext {
+  /** Firestore doc id = our competition code. Internal identity: cache keys,
+   *  fixtures.competitionId, ESPN slug, logging. May be a derived code (e.g.
+   *  "SUP" for Superettan) when football-data ships no code for the comp. */
   readonly id: string;
+  /** football-data's numeric competition id. Use this — not `id` — in
+   *  football-data API URLs: their `/v4/competitions/{id}` path accepts the
+   *  numeric id, which always exists, whereas the textual code does not for
+   *  every comp. Null only for legacy docs synced before fdId was stored. */
+  readonly fdId: number | null;
   readonly season: string;
 }
 
@@ -50,7 +58,8 @@ export async function resolveCompetitionContexts(
       logger.info(`[${doc.id}] skipped — no current season`);
       continue;
     }
-    contexts.push({ id: doc.id, season });
+    const fdId = typeof data['fdId'] === 'number' ? (data['fdId'] as number) : null;
+    contexts.push({ id: doc.id, fdId, season });
   }
   return contexts;
 }

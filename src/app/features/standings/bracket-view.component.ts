@@ -146,6 +146,9 @@ function toMatch(
 
   // Predicted: the user's pick, else the real result for a finished match they
   // didn't predict (mirrors PredictedStandingsService's effective-result rule).
+  // Gates on status, not raw fullTime presence — football-data puts the live
+  // score in fullTime during play; the cancelled-but-played case is already
+  // normalised to FINISHED upstream by the poller.
   const p = preds.get(f.id);
   let score: { home: number; away: number } | null = null;
   if (p) {

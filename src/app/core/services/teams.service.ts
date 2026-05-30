@@ -17,6 +17,7 @@ import {
   Team,
 } from '../models/team.model';
 import { AuthService } from './auth.service';
+import { CompetitionsService } from './competitions.service';
 
 const CACHE_KEY = 'goalden:teams-cache';
 /**
@@ -63,6 +64,10 @@ interface CachedTeam {
 
 interface CacheEnvelope {
   teams: CachedTeam[];
+  /** Active competition ids this merged list was built from. The cache is
+   *  treated as stale when the active set changes (a comp activated/deactivated)
+   *  so newly-added comps' teams appear without waiting out the TTL. */
+  compIds: string[];
   cachedAt: number;
 }
 
@@ -70,6 +75,7 @@ interface CacheEnvelope {
 export class TeamsService {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly competitions = inject(CompetitionsService);
 
   private readonly _teams = signal<readonly Team[]>([]);
   private readonly _loaded = signal(false);
@@ -89,21 +95,32 @@ export class TeamsService {
     return m;
   });
 
+  /** Sorted active competition ids — the set of per-comp team rollups to read.
+   *  Sorted so it's a stable cache key regardless of catalogue ordering. */
+  private readonly activeCompIds = computed<readonly string[]>(() =>
+    this.competitions.activeCompetitions()
+      .map((c) => c.id)
+      .sort((a, b) => a.localeCompare(b)),
+  );
+
   constructor() {
     // 1. Populate from cache immediately — no auth required, no network. The
     //    UI gets to render real team data on first paint when the cache is
     //    warm, which is the common case for returning users.
     this.hydrateFromCache();
 
-    // 2. Auth-gated fresh fetch. Only hits the network when the cache is
-    //    missing or stale. Once data arrives we re-populate the signal and
-    //    overwrite the cache. The listener is one-shot — no real-time
-    //    subscription — so each user pays at most one batch read per day.
+    // 2. Auth-gated fresh fetch, keyed on the active competition set. Teams
+    //    live in per-comp rollups, so we wait until the competitions catalogue
+    //    has loaded, then read one rollup per active comp and merge. Re-runs
+    //    when the active set changes (admin toggles a comp). Only hits the
+    //    network when the cache is missing or stale for the current set.
     effect(() => {
       const uid = this.auth.uid();
       if (!uid) return;
-      if (this.cacheIsFresh()) return;
-      this.fetchTeams().catch((err) => {
+      const compIds = this.activeCompIds();
+      if (compIds.length === 0) return;
+      if (this.cacheIsFresh(compIds)) return;
+      this.fetchTeams(compIds).catch((err) => {
         console.error('[TeamsService] fetch failed:', err);
       });
     });
@@ -121,7 +138,7 @@ export class TeamsService {
   /** Force a network refresh, bypassing the TTL. No-op when signed out. */
   async refresh(): Promise<void> {
     if (!this.auth.uid()) return;
-    await this.fetchTeams();
+    await this.fetchTeams(this.activeCompIds());
   }
 
   // ---------------------------------------------------------------------------
@@ -135,7 +152,7 @@ export class TeamsService {
     this._loaded.set(true);
   }
 
-  private cacheIsFresh(): boolean {
+  private cacheIsFresh(compIds: readonly string[]): boolean {
     if (typeof localStorage === 'undefined') return false;
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return false;
@@ -146,6 +163,9 @@ export class TeamsService {
       // failed fetch (or one happening before pollTeams populates the
       // rollup) would lock the user out of teams data for 24h.
       if (!Array.isArray(env.teams) || env.teams.length === 0) return false;
+      // Stale if the active competition set changed since we cached, so a
+      // newly-activated comp's teams show up without waiting out the TTL.
+      if (!sameIds(env.compIds, compIds)) return false;
       return Date.now() - env.cachedAt < CACHE_TTL_MS;
     } catch {
       return false;
@@ -165,7 +185,7 @@ export class TeamsService {
     }
   }
 
-  private writeCache(teams: readonly Team[]): void {
+  private writeCache(teams: readonly Team[], compIds: readonly string[]): void {
     if (typeof localStorage === 'undefined') return;
     // Don't persist an empty result — that would poison the cache and
     // suppress re-fetches until the TTL expires, even though the underlying
@@ -174,6 +194,7 @@ export class TeamsService {
     try {
       const envelope: CacheEnvelope = {
         teams: teams.map(teamToCache),
+        compIds: [...compIds],
         cachedAt: Date.now(),
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(envelope));
@@ -188,57 +209,63 @@ export class TeamsService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Reads the aggregated rollup doc at `cache/teams`, which the pollTeams
-   * Cloud Function rewrites on every poll. One Firestore read returns every
-   * team — vs. 48 reads if we queried the collection directly. The rollup
-   * is always written from the same data as the per-team docs, so
-   * consistency is guaranteed within a poll cycle.
+   * Reads the per-comp rollup docs at `cache/teams-{compId}` — one per active
+   * competition — and merges them into a single flat, de-duplicated list
+   * (a club can play in more than one comp). One read per active comp, vs.
+   * one-per-team if we queried the collection. Per-comp rollups keep each doc
+   * well under Firestore's 1 MiB limit no matter how many comps are active.
    */
-  private async fetchTeams(): Promise<void> {
-    const snap = await getDoc(doc(this.db, 'cache', 'teams'));
-    if (snap.exists()) {
-      this.populateFromRollup(snap.data());
+  private async fetchTeams(compIds: readonly string[]): Promise<void> {
+    const snaps = await Promise.all(
+      compIds.map((id) => getDoc(doc(this.db, 'cache', `teams-${id}`))),
+    );
+
+    const byId = new Map<string, Team>();
+    let anyRollup = false;
+    for (const snap of snaps) {
+      if (!snap.exists()) continue;
+      anyRollup = true;
+      const rawTeams = Array.isArray(snap.data()['teams']) ? snap.data()['teams'] : [];
+      for (const entry of rawTeams as DocumentData[]) {
+        const id = typeof entry['id'] === 'string' ? entry['id'] : null;
+        if (!id) continue;
+        // Last write wins on duplicates — same team, same payload.
+        byId.set(id, this.parse(id, entry));
+      }
+    }
+
+    if (!anyRollup) {
+      // No rollups yet (e.g. before the first pollTeams cycle) — fall back to
+      // a one-shot read of the canonical collection. Self-heals: the next poll
+      // writes the rollups and this branch stops running.
+      console.warn(
+        '[TeamsService] no cache/teams-* rollups, falling back to teams collection',
+      );
+      try {
+        await this.fetchTeamsFromCollection(compIds);
+      } catch (err) {
+        console.error('[TeamsService] fallback collection read failed', err);
+        this._loaded.set(true);
+      }
       return;
     }
-    // Rollup missing — fall back to reading the canonical teams collection.
-    // ~50 reads instead of 1, but the user sees data and their localStorage
-    // caches it. Next pollTeams cycle regenerates the rollup globally.
-    console.warn(
-      '[TeamsService] cache/teams missing, falling back to teams collection',
-    );
-    try {
-      await this.fetchTeamsFromCollection();
-    } catch (err) {
-      console.error('[TeamsService] fallback collection read failed', err);
-      this._loaded.set(true);
-    }
-  }
 
-  private populateFromRollup(data: DocumentData): void {
-    const rawTeams = Array.isArray(data['teams']) ? data['teams'] : [];
-    const teams = rawTeams
-      .map((entry: DocumentData) => {
-        const id = typeof entry['id'] === 'string' ? entry['id'] : null;
-        if (!id) return null;
-        return this.parse(id, entry);
-      })
-      .filter((t: Team | null): t is Team => t !== null)
-      .sort((a: Team, b: Team) => a.name.localeCompare(b.name));
+    const teams = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
     this._teams.set(teams);
     this._loaded.set(true);
-    this.writeCache(teams);
+    this.writeCache(teams, compIds);
   }
 
-  /** Per-doc read of the entire teams collection — fallback when the
-   *  rollup is missing. ~50 reads vs 1 from the rollup. */
-  private async fetchTeamsFromCollection(): Promise<void> {
+  /** Per-doc read of the entire teams collection — fallback when no rollup
+   *  exists yet. ~N reads vs one-per-comp from the rollups. */
+  private async fetchTeamsFromCollection(compIds: readonly string[]): Promise<void> {
     const q = query(collection(this.db, 'teams'), orderBy('name'));
     const snap = await getDocs(q);
     const teams: Team[] = [];
     snap.forEach((d) => teams.push(this.parse(d.id, d.data())));
     this._teams.set(teams);
     this._loaded.set(true);
-    this.writeCache(teams);
+    this.writeCache(teams, compIds);
   }
 
   private parse(id: string, data: DocumentData): Team {
@@ -259,6 +286,20 @@ export class TeamsService {
       lastSyncedAt: synced instanceof Timestamp ? synced.toDate() : null,
     };
   }
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/** Order-insensitive equality for two id lists. Both are produced sorted by
+ *  `activeCompIds`, so a positional compare suffices. */
+function sameIds(a: readonly string[] | undefined, b: readonly string[]): boolean {
+  if (!Array.isArray(a) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 // =============================================================================

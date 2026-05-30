@@ -26,6 +26,9 @@ interface CompetitionStandingsResult {
   readonly tables: number;
   /** 1 if the rollup was rewritten this cycle, 0 if unchanged. */
   readonly written: number;
+  /** True when football-data has no standings for this comp (404) or doesn't
+   *  grant us access (403, paid tier). Not a failure — `ok` stays true. */
+  readonly skipped?: boolean;
   readonly error?: string;
 }
 
@@ -102,16 +105,25 @@ export async function runPollStandings(
 }
 
 /** Fetches one competition's standings and refreshes its rollup doc when
- *  the table content has changed. The competition id doubles as the
- *  football-data `code`, so the URL is straightforward. */
+ *  the table content has changed. We address the comp by its football-data
+ *  numeric id (`fdId`) rather than our doc id — some comps have no textual
+ *  code, and only the numeric id resolves against the API. */
 async function pollOneCompetitionStandings(
   token: string,
   ctx: CompetitionContext,
 ): Promise<CompetitionStandingsResult> {
   const res = await fetch(
-    `https://api.football-data.org/v4/competitions/${ctx.id}/standings`,
+    `https://api.football-data.org/v4/competitions/${ctx.fdId ?? ctx.id}/standings`,
     { headers: { 'X-Auth-Token': token } },
   );
+  // Some comps simply have no standings on our tier: a 404 (no standings
+  // resource — e.g. Superettan's stale free-tier season) or a 403 (comp
+  // gated behind a paid plan). Neither is a real failure; skip quietly so
+  // one such comp can't make the whole poll report `ok: false`.
+  if (res.status === 404 || res.status === 403) {
+    logger.warn(`[${ctx.id}] no standings available (HTTP ${res.status}) — skipping`);
+    return { compId: ctx.id, ok: true, tables: 0, written: 0, skipped: true };
+  }
   if (!res.ok) {
     const body = await res.text();
     logger.error(`[${ctx.id}] standings fetch failed`, { status: res.status, body });
