@@ -55,6 +55,9 @@ Thumbs.db
 .emulator-data/
 *-debug.log
 firebase-debug.log
+# Service-account key for local FCM sends (see docs/local-push-notifications.md)
+service-account*.json
+*-service-account.json
 
 # Playwright MCP scratch output (snapshots, screenshots, console logs)
 .playwright-mcp/

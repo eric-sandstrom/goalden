@@ -92,9 +92,22 @@ export const routes: Routes = [
           ),
       },
       {
+        // Componentless parent so /profile/admin nests under Profile while
+        // both children still render in the shell's router-outlet.
         path: 'profile',
-        loadComponent: () =>
-          import('./features/profile/profile.component').then((m) => m.ProfileComponent),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/profile/profile.component').then((m) => m.ProfileComponent),
+          },
+          {
+            path: 'admin',
+            canActivate: [adminGuard],
+            loadComponent: () =>
+              import('./features/admin/admin.component').then((m) => m.AdminComponent),
+          },
+        ],
       },
       {
         path: 'users/:uid',
@@ -109,12 +122,9 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/dev/dev-tools.component').then((m) => m.DevToolsComponent),
       },
-      {
-        path: 'admin',
-        canActivate: [adminGuard],
-        loadComponent: () =>
-          import('./features/admin/admin.component').then((m) => m.AdminComponent),
-      },
+      // Admin moved under Profile. Keep /admin as a redirect so existing
+      // bookmarks / links still land on the right page.
+      { path: 'admin', redirectTo: 'profile/admin', pathMatch: 'full' },
     ],
   },
   { path: '**', redirectTo: '' },

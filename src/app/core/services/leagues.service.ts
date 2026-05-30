@@ -434,6 +434,8 @@ export class LeaguesService {
     name: string;
     description: string;
     globalConfig: LeagueGlobalConfig;
+    competitionId: string;
+    season: string;
   }): Promise<{ leagueId: string; enrolled: number }> {
     const call = httpsCallable<typeof args, { leagueId: string; enrolled: number }>(
       this.functions,
