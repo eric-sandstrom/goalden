@@ -9,6 +9,7 @@ setGlobalOptions({
 });
 
 export { pollFootballData } from './poll-football-data';
+export { reconcileStuckFixtures } from './reconcile-stuck-fixtures';
 export { pollStandings } from './poll-standings';
 export { pollTeams } from './poll-teams';
 export { scoreMatch } from './score-match';
