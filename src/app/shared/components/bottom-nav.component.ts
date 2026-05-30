@@ -21,7 +21,7 @@ interface NavLink {
 export class BottomNavComponent {
   protected readonly links: readonly NavLink[] = [
     { path: '/', icon: 'home', label: 'Home', exact: true },
-    { path: '/predict', icon: 'sports_soccer', label: 'Predict' },
+    { path: '/matches', icon: 'sports_soccer', label: 'Matches' },
     // /leaderboard merged into /leagues — each league row shows the
     // caller's rank and points, so the standalone leaderboard tab is
     // redundant.

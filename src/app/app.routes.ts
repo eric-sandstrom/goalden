@@ -6,7 +6,6 @@ import {
   redirectIfAuthenticatedGuard,
   requiresAuthGuard,
 } from './core/guards/auth.guard';
-import { predictLastLocationGuard } from './features/predict/predict-view-storage';
 
 export const routes: Routes = [
   {
@@ -40,33 +39,19 @@ export const routes: Routes = [
           import('./features/home/home.component').then((m) => m.HomeComponent),
       },
       {
-        path: 'predict',
+        // Match list (formerly /predict). The selected competition + filter
+        // ride in query params (?comp=ALL_2026&tab=upcoming) rather than path
+        // segments, so the single-segment /matches/:id detail route below
+        // never collides with them. PredictComponent reads them off the query
+        // string and restores the last-viewed comp/tab from localStorage on a
+        // bare /matches.
+        path: 'matches',
         loadComponent: () =>
           import('./features/predict/predict.component').then((m) => m.PredictComponent),
-        // Two componentless child routes carry the view's state in the URL so
-        // a refresh restores it: `:comp` is the selected competition's
-        // `${compId}_${season}` key, `:tab` is the lower-cased filter chip.
-        // Neither renders anything — PredictComponent reads them off the
-        // activated route and writes them back on selection.
-        children: [
-          {
-            // A bare /predict redirects to the last-viewed comp + tab so
-            // pressing "Predict" returns you where you left off. Falls
-            // through to the component (which picks a default) on a first
-            // visit with nothing saved.
-            path: '',
-            canActivate: [predictLastLocationGuard],
-            children: [],
-          },
-          {
-            path: ':comp',
-            // Empty `children` keeps `:tab` a valid componentless route
-            // (Angular rejects a leaf with no component/children/redirect)
-            // while still rendering nothing — it only carries the param.
-            children: [{ path: ':tab', children: [] }],
-          },
-        ],
       },
+      // Legacy /predict bookmark → /matches (the per-comp/tab sub-paths are
+      // gone; the component restores them from localStorage / query params).
+      { path: 'predict', redirectTo: 'matches', pathMatch: 'full' },
       // /leaderboard merged into /leagues. Keep the path as a redirect so
       // existing bookmarks / shared links still land on the right page.
       { path: 'leaderboard', redirectTo: 'leagues', pathMatch: 'full' },
@@ -125,10 +110,10 @@ export const routes: Routes = [
           ),
       },
       {
-        // Per-match detail. `:fdid` is the football-data match id (the bare
+        // Per-match detail. `:id` is the football-data match id (the bare
         // numeric id behind our `fd-{id}` fixture doc); binds to the
         // component's required input via withComponentInputBinding().
-        path: 'match/:fdid',
+        path: 'matches/:id',
         loadComponent: () =>
           import('./features/fixture-detail/fixture-detail.component').then(
             (m) => m.FixtureDetailComponent,

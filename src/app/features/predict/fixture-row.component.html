@@ -204,7 +204,7 @@
     @if (!compact()) {
       <a
         class="details-link"
-        [routerLink]="['/match', detailFdid()]"
+        [routerLink]="['/matches', detailFdid()]"
         [attr.aria-label]="
           'Match details: ' + (fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'home') +
           ' versus ' + (fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'away')

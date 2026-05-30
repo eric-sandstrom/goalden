@@ -72,9 +72,10 @@ export class FixtureDetailComponent {
   private readonly matchDetail = inject(MatchDetailService);
   private readonly snackBar = inject(MatSnackBar);
 
-  /** football-data match id from the route (`/match/:fdid`), bound via
-   *  withComponentInputBinding(). Our fixture doc id is `fd-{fdid}`. */
-  readonly fdid = input.required<string>();
+  /** football-data match id from the route (`/matches/:id`), bound via
+   *  withComponentInputBinding(). Aliased so the `:id` route param maps onto
+   *  this `fdid` property. Our fixture doc id is `fd-{fdid}`. */
+  readonly fdid = input.required<string>({ alias: 'id' });
 
   protected readonly matchId = computed(() => `fd-${this.fdid()}`);
 
