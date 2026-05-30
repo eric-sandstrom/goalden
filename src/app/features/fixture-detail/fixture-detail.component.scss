@@ -416,7 +416,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 5px;
   width: 64px;
   pointer-events: none;
 
@@ -491,8 +491,8 @@
 // Goal: white pill (ball + optional count) at the disc's bottom-right.
 .ind.goal {
   position: absolute;
-  bottom: -5px;
-  right: -7px;
+  bottom: -1px;
+  right: -6px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -515,8 +515,8 @@
 // Assist: small pill with "A" at the bottom-left.
 .ind.assist {
   position: absolute;
-  bottom: -5px;
-  left: -7px;
+  bottom: -1px;
+  left: -6px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -538,16 +538,22 @@
   font-weight: 700;
 }
 
-// Card chip at the disc's top-left.
+// Card chip at the disc's top-left, sitting on the circle.
 .ind-card {
   position: absolute;
-  top: -5px;
-  left: -6px;
+  top: -2px;
+  left: -2px;
   z-index: 2;
   width: 9px;
   height: 12px;
   border: 1px solid #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+// Slightly smaller card on the pitch markers.
+.marker .ind-card {
+  width: 7px;
+  height: 10px;
 }
 
 // ===== Section heading + team swatch =====
