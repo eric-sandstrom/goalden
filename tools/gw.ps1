@@ -1,4 +1,4 @@
-# gw — launcher for isolated Goalden dev sessions (git worktree + own frontend
+# gw - launcher for isolated Goalden dev sessions (git worktree + own frontend
 # port + auto-launch into Claude Code). Call it via the `gw` function added to
 # your PowerShell profile (see tools/install-gw.ps1), or directly.
 #
@@ -73,7 +73,7 @@ switch -Regex ($Command) {
 
     $parent = Split-Path $root -Parent
     $slug = ($sessionName -replace '[^A-Za-z0-9._-]', '-').ToLower()
-    $dest = Join-Path $parent "goalden-$slug"
+    $dest = Join-Path $parent "goalden-worktrees\$slug"
 
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
       Write-Host ''

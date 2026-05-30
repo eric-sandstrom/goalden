@@ -12,7 +12,7 @@
 #
 # NOTE: the Firebase emulator suite is shared. Run `npm run emulators` ONCE
 # from the main repo; every worktree frontend talks to it over localhost.
-# Do NOT run emulators in more than one worktree — they bind fixed ports.
+# Do NOT run emulators in more than one worktree - they bind fixed ports.
 
 [CmdletBinding()]
 param(
@@ -37,10 +37,12 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $parent = Split-Path $root -Parent
 $slug = ($Name -replace '[^A-Za-z0-9._-]', '-').ToLower()
-$dest = Join-Path $parent "goalden-$slug"
+$wtRoot = Join-Path $parent 'goalden-worktrees'
+$dest = Join-Path $wtRoot $slug
 if ($Branch -eq '') { $Branch = "session/$slug" }
 
 if (Test-Path $dest) { throw "Destination already exists: $dest" }
+if (-not (Test-Path $wtRoot)) { New-Item -ItemType Directory -Path $wtRoot -Force | Out-Null }
 
 # --- pick a port -------------------------------------------------------------
 function Get-UsedPorts {
@@ -71,9 +73,12 @@ Write-Host "  port   $Port"
 git -C $root worktree add -b $Branch $dest
 if ($LASTEXITCODE -ne 0) { throw 'git worktree add failed' }
 
-# --- record the assigned port (git-ignored, per-worktree) --------------------
+# --- record port + base commit (git-ignored, per-worktree) -------------------
+# `base` is the commit the branch was created at; the reaper uses it to tell
+# "no work done yet" (tip == base) from "finished, merged work" (tip moved on).
+$base = (git -C $dest rev-parse HEAD).Trim()
 $cfgPath = Join-Path $dest '.worktree.json'
-[ordered]@{ name = $slug; port = $Port; branch = $Branch } |
+[ordered]@{ name = $slug; port = $Port; branch = $Branch; base = $base } |
   ConvertTo-Json | Set-Content -Path $cfgPath -Encoding utf8
 
 # --- dependencies ------------------------------------------------------------

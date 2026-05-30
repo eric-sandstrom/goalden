@@ -4,7 +4,8 @@
 #   pwsh tools/remove-session.ps1 -Name bracket-ui -DeleteBranch
 #   pwsh tools/remove-session.ps1 -Name bracket-ui -Force   # discard uncommitted changes
 #
-# Commit or push anything you want to keep first.
+# Commit or push anything you want to keep first. The worktree path is looked
+# up from git, so this works regardless of folder layout (grouped or flat).
 
 [CmdletBinding()]
 param(
@@ -21,10 +22,19 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$parent = Split-Path $root -Parent
 $slug = ($Name -replace '[^A-Za-z0-9._-]', '-').ToLower()
-$dest = Join-Path $parent "goalden-$slug"
 $branch = "session/$slug"
+
+# Resolve the worktree path from git (handles grouped or flat layouts).
+$dest = $null
+$p = ''
+foreach ($line in (git -C $root worktree list --porcelain)) {
+  if ($line -like 'worktree *') { $p = $line.Substring(9) }
+  elseif ($line -like 'branch *') {
+    if (($line.Substring(7) -replace '^refs/heads/', '') -eq $branch) { $dest = $p }
+  }
+}
+if (-not $dest) { throw "No worktree found for branch $branch" }
 
 $removeArgs = @('worktree', 'remove', $dest)
 if ($Force) { $removeArgs += '--force' }
@@ -35,5 +45,20 @@ if ($LASTEXITCODE -ne 0) { throw 'git worktree remove failed (uncommitted change
 if ($DeleteBranch) {
   git -C $root branch -D $branch
 }
+
+# `git worktree remove` leaves Windows junctions (our node_modules) behind, so
+# the directory lingers. Remove the junction LINK only (never its target), then
+# the now junction-free directory.
+if (Test-Path $dest) {
+  $nm = Join-Path $dest 'node_modules'
+  if ((Test-Path $nm) -and ((Get-Item $nm -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    cmd /c rmdir "$nm" | Out-Null
+  }
+  Remove-Item $dest -Recurse -Force
+}
+
+# Tidy up the grouping folder if it's now empty.
+$wtRoot = Join-Path (Split-Path $root -Parent) 'goalden-worktrees'
+if ((Test-Path $wtRoot) -and -not (Get-ChildItem $wtRoot -Force)) { Remove-Item $wtRoot -Force }
 
 Write-Host "+ Removed $dest" -ForegroundColor Green

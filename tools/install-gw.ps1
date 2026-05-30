@@ -1,5 +1,5 @@
 # Adds a `gw` function to your PowerShell profile so you can launch isolated
-# Goalden dev sessions from any terminal. Idempotent — safe to re-run (it
+# Goalden dev sessions from any terminal. Idempotent - safe to re-run (it
 # replaces its own managed block, so it stays correct if the repo moves).
 #
 #   .\tools\install-gw.ps1
