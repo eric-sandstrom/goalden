@@ -271,18 +271,19 @@
                                   }
                                 </span>
                                 <span class="bench-text">
-                                  <!-- Wide layout: full name + sub line -->
-                                  <span class="bench-name">{{ b.player.name }}</span>
+                                  <span class="bench-line">
+                                    <!-- Full name (wide) / last name (compact) -->
+                                    <span class="bench-name">{{ b.player.name }}</span>
+                                    <span class="bench-last">{{ surname(b.player.name) }}</span>
+                                    @if (posAbbr(b.player.position); as pos) {
+                                      <span class="bench-pos">{{ pos }}</span>
+                                    }
+                                  </span>
                                   @if (b.onMinute !== null) {
                                     <span class="bench-sub">
                                       <mat-icon aria-hidden="true">arrow_upward</mat-icon>
                                       {{ b.onMinute }}'@if (b.outName) { · {{ b.outName }} }
                                     </span>
-                                  }
-                                  <!-- Compact (small-screen) layout: last name + position -->
-                                  <span class="bench-last">{{ surname(b.player.name) }}</span>
-                                  @if (posAbbr(b.player.position); as pos) {
-                                    <span class="bench-pos">{{ pos }}</span>
                                   }
                                 </span>
                               </li>

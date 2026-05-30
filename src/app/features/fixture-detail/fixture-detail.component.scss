@@ -505,12 +505,9 @@
 
 .benches {
   display: grid;
-  grid-template-columns: 1fr;
+  // Home left, away right at every width.
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-
-  @media (min-width: 600px) {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 // Away bench mirrors the home one: shirt number on the right, names + heading
@@ -523,6 +520,9 @@
   }
   .bench-text {
     align-items: flex-end;
+  }
+  .bench-line {
+    flex-direction: row-reverse;
   }
   .bench-sub {
     flex-direction: row-reverse;
@@ -556,12 +556,28 @@
   flex: 1;
 }
 
+// Name + position, side by side on wide screens.
+.bench-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
 .bench-name {
   min-width: 0;
   font-size: 0.9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.bench-pos {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--mat-sys-on-surface-variant);
 }
 
 .bench-sub {
@@ -623,9 +639,8 @@
   }
 }
 
-// Compact-layout fields are off by default (wide layout uses full name + sub).
-.bench-last,
-.bench-pos {
+// The compact last-name is off on wide screens (which show the full name).
+.bench-last {
   display: none;
 }
 
@@ -662,6 +677,15 @@
     flex: none;
     min-width: 0;
     max-width: 64px;
+  }
+
+  // Stack last name over position in the chip (override the wide row / the
+  // away row-reverse).
+  .bench-line,
+  .bench-col.away .bench-line {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
   }
 
   .bench-last {
