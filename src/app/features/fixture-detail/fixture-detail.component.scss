@@ -56,14 +56,14 @@
   padding-left: calc(var(--rail-w) + var(--rail-gap));
 }
 
-// ===== Venue + competition chip =====
+// ===== Date + venue + competition chip =====
 
+.date-line,
 .venue-line {
   align-self: center;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 6px;
   font-size: 0.7rem;
   color: var(--mat-sys-on-surface-variant);
 
@@ -72,6 +72,14 @@
     width: 15px;
     height: 15px;
   }
+}
+
+.date-line {
+  margin-bottom: 4px;
+}
+
+.venue-line {
+  margin-bottom: 6px;
 }
 
 .comp-chip {
@@ -180,11 +188,6 @@
     color: var(--mat-sys-on-surface-variant);
     text-transform: uppercase;
     letter-spacing: 0.03em;
-  }
-
-  .kickoff {
-    font-size: 0.72rem;
-    color: var(--mat-sys-on-surface-variant);
   }
 
   .result-note {
@@ -440,7 +443,7 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 60px;
+  width: 64px;
   pointer-events: none;
 
   .dot {
@@ -453,22 +456,26 @@
     font-size: 0.78rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    // Background/foreground are set inline from each club's colours; the ring
-    // + shadow keep any colour legible against the green pitch.
-    border: 2px solid rgba(255, 255, 255, 0.85);
+    // Fill, ring (border-color) and text are all set inline from the club's
+    // two colours; the shadow keeps any colour legible against the pitch.
+    border: 2px solid transparent;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   }
 
   .mname {
-    max-width: 60px;
-    font-size: 0.62rem;
-    line-height: 1.1;
+    max-width: 64px;
+    font-size: 0.6rem;
+    line-height: 1.05;
     color: #fff;
     text-align: center;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    // Wrap long names to two lines (breaking a long single surname if needed)
+    // instead of ellipsis-clipping them.
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -499,9 +506,23 @@
 }
 
 .subs-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 6px;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+// Small two-tone swatch tying each subs column to its team's pitch markers
+// (fill + ring set inline, matching the dots).
+.team-dot {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid transparent;
 }
 
 .subs {

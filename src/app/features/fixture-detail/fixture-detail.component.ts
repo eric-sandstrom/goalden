@@ -165,23 +165,31 @@ export class FixtureDetailComponent {
     return `${ht.home}–${ht.away}`;
   });
 
-  /** Per-team marker colours, taken from each club's `clubColors`. The home
-   *  team uses its first listed colour, the away team its second (football's
-   *  "home/away kit" convention) — falling back to readable defaults that
-   *  contrast with the green pitch. `fg` is black/white picked for contrast. */
+  /**
+   * Per-team marker colours from each club's two `clubColors`. Both teams use
+   * both colours, inverted so they stay distinct: the home marker is filled
+   * with colour 1 and ringed with colour 2; the away marker is filled with
+   * colour 2 and ringed with colour 1. `fg` is the black/white that reads on
+   * the fill. Falls back to a blue + its contrast when a club has no colours.
+   */
   protected readonly teamColors = computed<{
-    home: { bg: string; fg: string };
-    away: { bg: string; fg: string };
+    home: { fill: string; ring: string; fg: string };
+    away: { fill: string; ring: string; fg: string };
   }>(() => {
     const f = this.fixture();
-    const resolve = (side: 'home' | 'away', fallback: string) => {
-      const teamId = side === 'home' ? f?.homeTeam.id : f?.awayTeam.id;
+    const pair = (teamId: number | null | undefined): { c1: string; c2: string } => {
       const colors = clubColorList(teamId != null ? this.teamsService.byExternalId(teamId)?.clubColors : null);
-      const name = (side === 'home' ? colors[0] : colors[1]) ?? colors[0];
-      const bg = (name && colorToHex(name)) || fallback;
-      return { bg, fg: textOn(bg) };
+      const c1 = (colors[0] && colorToHex(colors[0])) || '#1565c0';
+      // Second colour, or a contrasting tone so the ring is always visible.
+      const c2 = (colors[1] && colorToHex(colors[1])) || textOn(c1);
+      return { c1, c2 };
     };
-    return { home: resolve('home', '#1565c0'), away: resolve('away', '#fafafa') };
+    const home = pair(f?.homeTeam.id);
+    const away = pair(f?.awayTeam.id);
+    return {
+      home: { fill: home.c1, ring: home.c2, fg: textOn(home.c1) },
+      away: { fill: away.c2, ring: away.c1, fg: textOn(away.c2) },
+    };
   });
 
   /** Whether the match has reached a terminal, result-bearing state — the
@@ -343,9 +351,12 @@ export class FixtureDetailComponent {
     return rows;
   });
 
-  /** Marker background / text colour for a side, for inline binding. */
-  protected bg(side: 'home' | 'away'): string {
-    return side === 'home' ? this.teamColors().home.bg : this.teamColors().away.bg;
+  /** Marker fill / ring / text colour for a side, for inline binding. */
+  protected fill(side: 'home' | 'away'): string {
+    return side === 'home' ? this.teamColors().home.fill : this.teamColors().away.fill;
+  }
+  protected ring(side: 'home' | 'away'): string {
+    return side === 'home' ? this.teamColors().home.ring : this.teamColors().away.ring;
   }
   protected fg(side: 'home' | 'away'): string {
     return side === 'home' ? this.teamColors().home.fg : this.teamColors().away.fg;
