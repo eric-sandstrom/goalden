@@ -1,6 +1,17 @@
 {
   "$schema": "./node_modules/@angular/service-worker/config/schema.json",
   "index": "/index.html",
+  "appData": {
+    "version": "1.0.0",
+    "releases": [
+      {
+        "version": "1.0.0",
+        "changes": [
+          "Added a \"What's new\" change log to the update prompt"
+        ]
+      }
+    ]
+  },
   "navigationUrls": [
     "/**",
     "!/**/*.*",
@@ -36,7 +47,9 @@
   "dataGroups": [
     {
       "name": "team-crests",
-      "urls": ["https://crests.football-data.org/**"],
+      "urls": [
+        "https://crests.football-data.org/**"
+      ],
       "cacheConfig": {
         "maxSize": 200,
         "maxAge": "30d",

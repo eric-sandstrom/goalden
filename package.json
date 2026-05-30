@@ -1,9 +1,11 @@
 {
   "name": "goalden",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "scripts": {
     "ng": "ng",
     "start": "node tools/serve.mjs",
+    "changelog:sync": "node tools/sync-changelog.mjs",
+    "prebuild": "node tools/sync-changelog.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
