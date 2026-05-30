@@ -65,6 +65,7 @@
       display: flex;
       flex-direction: column;
     }
+    /* Skeleton-only header block (loaded state uses the mat-tab-nav below). */
     .matches-tabs {
       display: flex;
       flex-direction: column;
@@ -72,12 +73,16 @@
       padding: 1rem 1rem 0.75rem;
       border-bottom: 1px solid var(--mat-sys-outline-variant);
     }
-    .matches-tabs mat-button-toggle-group {
-      align-self: stretch;
-      overflow-x: auto;
+    /* Live / Up next / Recent tab bar. Fixed-height header; Material draws
+       its own full-width divider under the links (no pagination here, so
+       it spans edge to edge). */
+    .matches-tab-nav {
+      flex: 0 0 auto;
     }
+    /* Contextual caption under the tabs (count / countdown). */
     .pane-subtitle {
       margin: 0;
+      padding: 0.6rem 1rem 0;
       font-size: 0.85rem;
       color: var(--mat-sys-on-surface-variant);
     }

@@ -8,18 +8,26 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTabsModule } from '@angular/material/tabs';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { LeaderboardService } from '../../core/services/leaderboard.service';
+import { LeaguesService } from '../../core/services/leagues.service';
 import { PredictionsService } from '../../core/services/predictions.service';
 import { UserService } from '../../core/services/user.service';
+import { Fixture } from '../../core/models/fixture.model';
 import { PODIUM_LOCK } from '../../core/models/podium.model';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { FixtureRowComponent } from '../predict/fixture-row.component';
 
 type MatchView = 'live' | 'upcoming' | 'recent';
+
+/** A (competition, season) pair to load fixtures for. */
+interface CompKey {
+  readonly compId: string;
+  readonly season: string;
+}
 
 const UPCOMING_LIMIT = 3;
 const RECENT_LIMIT = 3;
@@ -29,9 +37,9 @@ const RECENT_LIMIT = 3;
   imports: [
     RouterLink,
     MatButtonModule,
-    MatButtonToggleModule,
     MatCardModule,
     MatIconModule,
+    MatTabsModule,
     SkelComponent,
     FixtureRowComponent,
   ],
@@ -44,6 +52,7 @@ export class HomeComponent {
   private readonly fixtures = inject(FixturesService);
   private readonly predictions = inject(PredictionsService);
   private readonly leaderboard = inject(LeaderboardService);
+  private readonly leagues = inject(LeaguesService);
 
   private readonly nowTick = signal(Date.now());
 
@@ -52,14 +61,52 @@ export class HomeComponent {
   private readonly _userSelectedView = signal<MatchView | null>(null);
 
   protected readonly userLoaded = this.userService.loaded;
+
   /**
-   * Hardcoded to WC for now — Home's "live / upcoming / recent" tabs are
-   * still WC-only because the user's set of comps isn't wired here yet.
-   * A follow-up turns this into a derived list of (comp, season) pairs
-   * from the user's league memberships, then iterates fixturesFor each.
+   * The (comp, season) pairs Home loads fixtures for: every distinct
+   * competition the user has joined a league in. Home only surfaces
+   * matches the user can act on, so it's scoped strictly to their league
+   * memberships — fixtures from comps they haven't joined never appear
+   * (unlike Predict, which can show all selectable comps via its show-all
+   * toggle). Empty while leagues are still settling so the loading state
+   * holds rather than flashing an empty set.
    */
-  private readonly _wcFixtures = this.fixtures.fixturesFor('WC', '2026');
-  protected readonly fixturesLoaded = this.fixtures.loadedFor('WC', '2026');
+  private readonly compKeys = computed<readonly CompKey[]>(() => {
+    if (!this.leagues.fullyLoaded()) return [];
+    const mine = new Map<string, CompKey>();
+    for (const { league } of this.leagues.myLeagueList()) {
+      const key = `${league.competitionId}_${league.season}`;
+      if (!mine.has(key)) {
+        mine.set(key, { compId: league.competitionId, season: league.season });
+      }
+    }
+    return [...mine.values()];
+  });
+
+  /**
+   * Every loaded fixture across all of the user's comps. Reading each
+   * comp's `fixturesFor` signal both registers it for loading and tracks
+   * it reactively; the shared store already has the live overlay merged
+   * in, so live scores surface here without extra wiring.
+   */
+  private readonly allFixtures = computed<readonly Fixture[]>(() => {
+    const out: Fixture[] = [];
+    for (const { compId, season } of this.compKeys()) {
+      out.push(...this.fixtures.fixturesFor(compId, season)());
+    }
+    return out;
+  });
+
+  /** True once every requested comp's fixtures have loaded. Holds false
+   *  while leagues are still resolving so the skeleton shows instead of a
+   *  premature empty state. */
+  protected readonly fixturesLoaded = computed<boolean>(() => {
+    if (!this.leagues.fullyLoaded()) return false;
+    const keys = this.compKeys();
+    if (keys.length === 0) return true;
+    return keys.every(({ compId, season }) => this.fixtures.loadedFor(compId, season)());
+  });
+
   protected readonly podiumLoaded = this.predictions.podiumLoaded;
   protected readonly totals = this.userService.totals;
   protected readonly skelRows = [0, 1, 2];
@@ -73,21 +120,24 @@ export class HomeComponent {
   // --------------------------------------------------------------------------
 
   protected readonly liveFixtures = computed(() =>
-    this._wcFixtures().filter((f) => f.status === 'IN_PLAY' || f.status === 'PAUSED'),
+    this.allFixtures()
+      .filter((f) => f.status === 'IN_PLAY' || f.status === 'PAUSED')
+      .sort((a, b) => a.utcKickoff.getTime() - b.utcKickoff.getTime()),
   );
 
   protected readonly upcomingFixtures = computed(() => {
     const now = this.nowTick();
-    return this._wcFixtures()
+    // Sorted across comps so the soonest kickoff anywhere comes first —
+    // each comp's list is sorted internally, but the concatenation isn't.
+    return this.allFixtures()
       .filter((f) => f.status === 'TIMED' && f.utcKickoff.getTime() > now)
+      .sort((a, b) => a.utcKickoff.getTime() - b.utcKickoff.getTime())
       .slice(0, UPCOMING_LIMIT);
   });
 
   protected readonly recentResults = computed(() => {
-    const all = this._wcFixtures().filter(
-      (f) => f.status === 'FINISHED' || f.status === 'AWARDED',
-    );
-    return [...all]
+    return this.allFixtures()
+      .filter((f) => f.status === 'FINISHED' || f.status === 'AWARDED')
       .sort((a, b) => b.utcKickoff.getTime() - a.utcKickoff.getTime())
       .slice(0, RECENT_LIMIT);
   });
