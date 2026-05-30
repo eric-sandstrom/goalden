@@ -12,6 +12,9 @@
     "emulators:kill": "kill-port 4000 4400 4500 5000 5001 8080 8085 9099 9150",
     "preemulators": "npm run emulators:kill",
     "emulators": "firebase emulators:start --import=.emulator-data --export-on-exit=.emulator-data",
+    "emulators:fresh": "npm run functions:build && npm run emulators",
+    "functions:build": "npm --prefix functions run build",
+    "functions:watch": "npm --prefix functions run build:watch",
     "snapshot": "firebase emulators:export .emulator-data --force"
   },
   "prettier": {
