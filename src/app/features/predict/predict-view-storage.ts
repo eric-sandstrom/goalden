@@ -1,11 +1,10 @@
-import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
-
 /**
- * Persistence + restore for the Predict view's location (which competition
- * and which filter tab). The URL is the source of truth while you're on the
- * page; these localStorage values let a *bare* `/predict` (the bottom-nav
- * link, the home "predict" link) restore where you last were.
+ * Persistence + restore for the Matches view's location (which competition
+ * and which filter tab). The URL query string is the source of truth while
+ * you're on the page; these localStorage values let a *bare* `/matches` (the
+ * bottom-nav link, the home "matches" link) restore where you last were —
+ * MatchesComponent reads them when no `?comp`/`?tab` query params are present
+ * and canonicalises the URL.
  */
 
 /** Last-viewed competition, stored as the `${compId}_${season}` tab key. */
@@ -50,20 +49,3 @@ export function writeSelectedTab(tab: string): void {
     // See writeSelectedComp.
   }
 }
-
-/**
- * Guards the bare `/predict` route: if we remember a competition, redirect
- * straight to `/predict/:comp/:tab` so pressing "Predict" returns you to the
- * exact view you left. Doing this at the routing layer (rather than letting
- * the component navigate after it mounts) means the bare URL never commits,
- * so no in-flight view transition gets aborted.
- *
- * Returns `true` when nothing is saved yet (a first-ever visit) — the bare
- * route renders and PredictComponent resolves a sensible default itself.
- */
-export const predictLastLocationGuard: CanActivateFn = () => {
-  const comp = readSelectedComp();
-  if (!comp) return true;
-  const tab = readSelectedTab() ?? 'upcoming';
-  return inject(Router).createUrlTree(['/predict', comp, tab]);
-};

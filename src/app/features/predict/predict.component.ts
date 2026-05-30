@@ -7,13 +7,7 @@ import {
   resource,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import {
-  ActivatedRoute,
-  ActivatedRouteSnapshot,
-  NavigationEnd,
-  Router,
-} from '@angular/router';
-import { filter as rxFilter, map } from 'rxjs/operators';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -83,16 +77,17 @@ export class PredictComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  /** `{ comp, tab }` read off the two componentless child routes. Re-reads
-   *  on every completed navigation; seeded synchronously so the first
-   *  render already reflects a deep-linked / refreshed URL. */
-  private readonly urlParams = toSignal(
-    this.router.events.pipe(
-      rxFilter((e) => e instanceof NavigationEnd),
-      map(() => readChildParams(this.route)),
-    ),
-    { initialValue: readChildParams(this.route) },
-  );
+  /** `{ comp, tab }` read off the URL query string (`?comp=…&tab=…`).
+   *  Re-derives whenever the query params change; the map signal is seeded
+   *  synchronously so the first render already reflects a deep-linked /
+   *  refreshed URL. */
+  private readonly queryMap = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+  private readonly urlParams = computed<{ comp: string | null; tab: string | null }>(() => {
+    const q = this.queryMap();
+    return { comp: q.get('comp'), tab: q.get('tab') };
+  });
 
   protected readonly skelRows = [0, 1, 2, 3, 4, 5];
 
@@ -268,15 +263,15 @@ export class PredictComponent {
       if (!sel) return;
       const url = this.urlParams();
       // Remember the resolved comp + the active tab so a future bare
-      // /predict restores both. Only persist the tab when it's actually in
+      // /matches restores both. Only persist the tab when it's actually in
       // the URL — never the UPCOMING default a bare entry resolves to, or
       // we'd clobber the saved value before we get to use it below.
       writeSelectedComp(sel.key);
       if (url.tab) writeSelectedTab(url.tab);
       // Canonicalise the URL when it doesn't already name the resolved comp:
-      //   - bare /predict (no :comp) — the guard handles the common case,
-      //     but a first-ever visit with nothing saved still lands here;
-      //   - a stale/unknown :comp the user can't see any more (left the
+      //   - bare /matches (no ?comp) — restores the saved comp/tab into the
+      //     query string, or resolves a sensible default on a first visit;
+      //   - a stale/unknown ?comp the user can't see any more (left the
       //     league, season rolled over) — selectedComp fell back to the
       //     first tab, so realign the URL to it.
       // replaceUrl keeps these out of history; once the URL matches it's a
@@ -313,7 +308,10 @@ export class PredictComponent {
     f: Filter,
     extras?: { replaceUrl: boolean },
   ): Promise<boolean> {
-    return this.router.navigate(['/predict', compKey, f.toLowerCase()], extras);
+    return this.router.navigate(['/matches'], {
+      queryParams: { comp: compKey, tab: f.toLowerCase() },
+      ...extras,
+    });
   }
 
   /** Re-run the fixtures resource loader after a failed load. */
@@ -400,33 +398,7 @@ function seasonFromComp(comp: Competition | null): string | null {
   return startDate.slice(0, 4);
 }
 
-/** Walk the route-snapshot chain below PredictComponent and pick up the
- *  `comp` (from the `:comp` route) and `tab` (from the `:tab` route)
- *  params. Walking the *snapshot* tree (rather than the `ActivatedRoute`
- *  objects) is safe at construction time — the snapshot tree is fully built
- *  during route recognition, before child `ActivatedRoute.snapshot`s are
- *  populated. Reading each off its own snapshot keeps this independent of
- *  the router's param-inheritance strategy. Returns nulls for a bare
- *  `/predict` (no child routes matched). */
-function readChildParams(route: ActivatedRoute): {
-  comp: string | null;
-  tab: string | null;
-} {
-  let comp: string | null = null;
-  let tab: string | null = null;
-  for (
-    let snap: ActivatedRouteSnapshot | null = route.snapshot;
-    snap;
-    snap = snap.firstChild
-  ) {
-    const pm = snap.paramMap;
-    if (pm.has('comp')) comp = pm.get('comp');
-    if (pm.has('tab')) tab = pm.get('tab');
-  }
-  return { comp, tab };
-}
-
-/** Parse a `:tab` segment back to a Filter, case-insensitively. Returns
+/** Parse a `tab` query value back to a Filter, case-insensitively. Returns
  *  null for an absent or unrecognised value so callers can default. */
 function parseFilter(raw: string | null): Filter | null {
   if (!raw) return null;

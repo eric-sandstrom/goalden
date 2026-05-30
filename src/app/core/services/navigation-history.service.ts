@@ -38,7 +38,7 @@ export class NavigationHistoryService {
    *  clears the back-stack — they're considered "fresh starts". */
   private readonly bottomNavPaths = new Set<string>([
     '/',
-    '/predict',
+    '/matches',
     '/leagues',
     '/profile',
   ]);
@@ -134,10 +134,10 @@ export class NavigationHistoryService {
 
     // Landing on a bottom-nav tab root is always a fresh start — clear the
     // back-stack. Checked before the replace/popstate handling so it wins
-    // even when we arrive via a guard's replaceUrl redirect: tapping Predict
-    // navigates to the bare /predict, which the guard immediately rewrites
-    // to /predict/:comp/:tab, so the committed URL is a sub-route (see
-    // isTabRoot). Without this, switching to the Predict tab from a
+    // even when we arrive via the Matches view's replaceUrl canonicalisation:
+    // tapping Matches lands on /matches (then the component adds ?comp/&tab
+    // via replaceUrl), and pathOf() strips the query so it still reads as the
+    // /matches tab root. Without this, switching to the Matches tab from a
     // drill-down (e.g. a league) left a stale "Back to League" button.
     if (trigger === 'imperative' && this.isTabRoot(this.pathOf(url))) {
       this._stack.set([{ url, label: this.labelFor(url) }]);
@@ -172,16 +172,15 @@ export class NavigationHistoryService {
 
   /**
    * Whether a path is a bottom-nav tab root — a "fresh start" with no
-   * meaningful back target. Exact matches cover Home / Leagues / Profile.
-   * Predict is special: its canonical URL always carries the selected comp
-   * and filter as sub-route segments (`/predict/:comp/:tab`); the bare
-   * `/predict` only exists for the instant before `predictLastLocationGuard`
-   * redirects, so we match the whole Predict tab by prefix.
+   * meaningful back target. Exact matches cover Home / Matches / Leagues /
+   * Profile. The Matches list keeps its comp/filter state in the query string
+   * (not path segments), so the path is always exactly `/matches` here
+   * (pathOf strips the query) — the match detail `/matches/:id` is a deeper
+   * page that should keep its back button, so a plain Set membership check is
+   * all we need.
    */
   private isTabRoot(path: string): boolean {
-    // bottomNavPaths already contains the bare '/predict'; the prefix match
-    // extends that to its always-present '/:comp/:tab' sub-routes.
-    return this.bottomNavPaths.has(path) || path.startsWith('/predict/');
+    return this.bottomNavPaths.has(path);
   }
 
   /** Strip query/fragment so route matching ignores them. */
@@ -204,7 +203,8 @@ export class NavigationHistoryService {
   private labelFor(url: string): string {
     const path = this.pathOf(url);
     if (path === '/') return 'Home';
-    if (path === '/predict' || path.startsWith('/predict/')) return 'Predict';
+    if (path === '/matches') return 'Matches';
+    if (path.startsWith('/matches/')) return 'Match';
     if (path === '/leagues') return 'Leagues';
     if (path === '/profile') return 'Profile';
     if (path === '/teams') return 'Teams';
@@ -222,6 +222,7 @@ export class NavigationHistoryService {
    *  a reasonable parent route based on the current URL. */
   private fallbackParent(url: string): string {
     const path = this.pathOf(url);
+    if (path.startsWith('/matches/')) return '/matches';
     if (path.startsWith('/leagues/')) return '/leagues';
     if (path.startsWith('/comp/') && path.endsWith('/teams')) return '/leagues';
     if (path.startsWith('/teams/')) return '/teams';
