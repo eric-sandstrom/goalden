@@ -122,7 +122,12 @@ export class LeaguesComponent {
     const results = await Promise.all(
       items.map(async (item) => {
         try {
-          const standing = await this.leagues.getLeagueStanding(item.league.id, uid);
+          const standing = await this.leagues.getLeagueStanding(
+            item.league.id,
+            uid,
+            item.league.competitionId,
+            item.league.season,
+          );
           return [item.league.id, standing] as const;
         } catch (err) {
           console.error(`[Leagues] standing for ${item.league.id} failed`, err);
