@@ -480,6 +480,50 @@
   }
 }
 
+// ===== Goal / assist / card badges (pitch + bench) =====
+
+.contrib {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.ind {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+
+  mat-icon {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+  }
+}
+
+.ind.assist {
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.ind-count {
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+// Smaller card chips when used as a contribution badge.
+.contrib .card {
+  width: 9px;
+  height: 12px;
+}
+
+// On the pitch the badges sit over the green — render them light.
+.marker .contrib {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
 // ===== Section heading + team swatch =====
 
 .section-h {
@@ -741,11 +785,14 @@
 
 .officials {
   list-style: none;
-  margin: 0;
+  // Centre the whole list as one block (fit-content + auto margins) so every
+  // row is left-aligned to the same edge — the icons line up in a column.
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
   padding: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 8px;
 }
 

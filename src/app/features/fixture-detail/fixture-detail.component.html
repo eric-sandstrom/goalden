@@ -8,6 +8,23 @@
       </div>
     </mat-card>
   } @else if (fixture(); as f) {
+    <!-- Reusable goal/assist/card badges for a player (pitch + bench). -->
+    <ng-template #contrib let-e>
+      @if (e.goals > 0) {
+        <span class="ind goal" aria-label="Goal">
+          <mat-icon aria-hidden="true">sports_soccer</mat-icon>
+          @if (e.goals > 1) { <span class="ind-count">{{ e.goals }}</span> }
+        </span>
+      }
+      @if (e.assists > 0) {
+        <span class="ind assist" aria-label="Assist">
+          A@if (e.assists > 1) { <span class="ind-count">{{ e.assists }}</span> }
+        </span>
+      }
+      @if (e.yellow) { <span class="card yellow" aria-label="Yellow card"></span> }
+      @if (e.red) { <span class="card red" aria-label="Red card"></span> }
+    </ng-template>
+
     <mat-card appearance="outlined" class="match-card">
       <!-- ===== Pinned header: meta line + scoreboard ===== -->
       <div class="header">
@@ -227,6 +244,11 @@
                           }
                         </span>
                         <span class="mname">{{ m.name }}</span>
+                        @if (m.events; as ev) {
+                          <span class="contrib">
+                            <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
+                          </span>
+                        }
                       </div>
                     }
                   </div>
@@ -283,6 +305,11 @@
                                     <span class="bench-sub">
                                       <mat-icon aria-hidden="true">arrow_upward</mat-icon>
                                       {{ b.onMinute }}'@if (b.outName) { · {{ b.outName }} }
+                                    </span>
+                                  }
+                                  @if (playerEvents(b.player.id); as ev) {
+                                    <span class="contrib">
+                                      <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
                                     </span>
                                   }
                                 </span>

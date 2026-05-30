@@ -1,4 +1,4 @@
-import { NgOptimizedImage } from '@angular/common';
+import { NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -43,6 +43,14 @@ interface InfoRow {
   readonly value: string;
 }
 
+/** Goals / assists / cards a player recorded, for the on-pitch + bench badges. */
+interface PlayerEvents {
+  goals: number;
+  assists: number;
+  yellow: boolean;
+  red: boolean;
+}
+
 /** A starter placed on the pitch — coordinates are percentages of the pitch
  *  box (x: 0 left … 100 right, y: 0 top … 100 bottom). */
 interface PitchMarker {
@@ -55,6 +63,8 @@ interface PitchMarker {
   /** Minute this starter was subbed off, if they were — drives the on-pitch
    *  "subbed off" badge. Null if they played the whole match. */
   readonly subOffMinute: number | null;
+  /** Goals/assists/cards this player recorded, or null if none. */
+  readonly events: PlayerEvents | null;
 }
 
 /** A bench player, with substitution info overlaid when they came on. */
@@ -70,6 +80,7 @@ interface BenchEntry {
   selector: 'app-fixture-detail',
   imports: [
     NgOptimizedImage,
+    NgTemplateOutlet,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -394,11 +405,12 @@ export class FixtureDetailComponent {
         if (s.playerOut?.id != null) offMap.set(s.playerOut.id, s.minute);
       }
     }
+    const events = this.eventsByPlayer();
     const homeRows = home ? buildRows(home) : [];
     const awayRows = away ? buildRows(away) : [];
     const markers = [
-      ...markersForTeam(homeRows, 'home', offMap),
-      ...markersForTeam(awayRows, 'away', offMap),
+      ...markersForTeam(homeRows, 'home', offMap, events),
+      ...markersForTeam(awayRows, 'away', offMap, events),
     ];
     // ~60px per row keeps the dot + two-line name clear of its neighbours.
     const height = Math.max(360, (homeRows.length + awayRows.length) * 60);
@@ -464,6 +476,39 @@ export class FixtureDetailComponent {
   protected coachName(side: 'home' | 'away'): string | null {
     const c = this.lineupFor(side)?.coach;
     return c && c.name ? c.name : null;
+  }
+
+  /** Goals / assists / cards per player id, from the match events. */
+  private readonly eventsByPlayer = computed<ReadonlyMap<number, PlayerEvents>>(() => {
+    const d = this.detail();
+    const m = new Map<number, PlayerEvents>();
+    if (!d) return m;
+    const slot = (id: number): PlayerEvents => {
+      let e = m.get(id);
+      if (!e) {
+        e = { goals: 0, assists: 0, yellow: false, red: false };
+        m.set(id, e);
+      }
+      return e;
+    };
+    for (const g of d.goals) {
+      if (g.type !== 'OWN' && g.scorer?.id != null) slot(g.scorer.id).goals++;
+      if (g.assist?.id != null) slot(g.assist.id).assists++;
+    }
+    for (const b of d.bookings) {
+      if (b.player?.id != null) {
+        const e = slot(b.player.id);
+        if (b.card === 'RED') e.red = true;
+        else e.yellow = true;
+      }
+    }
+    return m;
+  });
+
+  /** Goals/assists/cards for one player (for the bench badges), or null. */
+  protected playerEvents(id: number | null | undefined): PlayerEvents | null {
+    if (id == null) return null;
+    return this.eventsByPlayer().get(id) ?? null;
   }
 
   /** Surname for the compact (small-screen) bench chip. */
@@ -718,6 +763,7 @@ function markersForTeam(
   rows: MatchPlayer[][],
   side: 'home' | 'away',
   offMap: ReadonlyMap<number, number | null>,
+  events: ReadonlyMap<number, PlayerEvents>,
 ): PitchMarker[] {
   const markers: PitchMarker[] = [];
   const rowCount = rows.length;
@@ -735,6 +781,7 @@ function markersForTeam(
         name: lastName(p.name),
         side,
         subOffMinute: subbed ? (offMap.get(p.id as number) ?? null) : null,
+        events: p.id != null ? (events.get(p.id) ?? null) : null,
       });
     });
   });
