@@ -55,12 +55,13 @@ interface PitchMarker {
   readonly subOffMinute: number | null;
 }
 
-interface SubItem {
-  readonly key: string;
-  readonly side: Side;
-  readonly minute: number | null;
-  readonly inName: string;
-  readonly outName: string;
+/** A bench player, with substitution info overlaid when they came on. */
+interface BenchEntry {
+  readonly player: MatchPlayer;
+  /** Minute they came on, or null if they stayed an unused sub. */
+  readonly onMinute: number | null;
+  /** Who they replaced, when they came on. */
+  readonly outName: string | null;
 }
 
 @Component({
@@ -400,22 +401,38 @@ export class FixtureDetailComponent {
     return { markers, height };
   });
 
-  protected readonly subs = computed<readonly SubItem[]>(() => {
+  /**
+   * A team's bench, with substitution info overlaid: players who came on are
+   * tagged with the minute + who they replaced and sorted to the top (by
+   * minute), then the unused subs follow in their listed order.
+   */
+  protected benchFor(side: 'home' | 'away'): readonly BenchEntry[] {
+    const lu = this.lineupFor(side);
+    if (!lu) return [];
     const d = this.detail();
-    if (!d) return [];
-    return d.substitutions.map((s, i) => ({
-      key: `s${i}`,
-      side: this.sideOf(s.teamId),
-      minute: s.minute,
-      inName: s.playerIn?.name ?? '—',
-      outName: s.playerOut?.name ?? '—',
-    }));
-  });
-
-  /** Substitutions for one team, so the Line-ups tab can group them under a
-   *  team heading (the flat list didn't say who subbed for whom). */
-  protected subsFor(side: 'home' | 'away'): readonly SubItem[] {
-    return this.subs().filter((s) => s.side === side);
+    const inMap = new Map<number, { minute: number | null; outName: string | null }>();
+    if (d) {
+      for (const s of d.substitutions) {
+        if (this.sideOf(s.teamId) === side && s.playerIn?.id != null) {
+          inMap.set(s.playerIn.id, { minute: s.minute, outName: s.playerOut?.name ?? null });
+        }
+      }
+    }
+    const entries = lu.bench.map<BenchEntry>((p) => {
+      const info = p.id != null ? inMap.get(p.id) : undefined;
+      return { player: p, onMinute: info?.minute ?? null, outName: info?.outName ?? null };
+    });
+    // Came-on first (by minute), then unused subs in their original order.
+    return entries
+      .map((e, i) => ({ e, i }))
+      .sort((a, b) => {
+        const ao = a.e.onMinute !== null;
+        const bo = b.e.onMinute !== null;
+        if (ao && bo) return (a.e.onMinute ?? 0) - (b.e.onMinute ?? 0);
+        if (ao !== bo) return ao ? -1 : 1;
+        return a.i - b.i;
+      })
+      .map((x) => x.e);
   }
 
   /** Side ('home' badge column) for a given event team id. */

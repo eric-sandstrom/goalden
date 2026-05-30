@@ -474,7 +474,7 @@
   }
 }
 
-// ===== Line-ups: substitutions =====
+// ===== Section heading + team swatch =====
 
 .section-h {
   margin: 16px 0 4px;
@@ -484,47 +484,7 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
-.subs-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-
-  @media (min-width: 600px) {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.subs-col {
-  // Left accent colour is set inline from the team's colours.
-  border-left: 3px solid var(--mat-sys-outline-variant);
-  padding-left: 10px;
-
-  // Away column mirrors so the two sides read outward from the centre.
-  &.away {
-    text-align: right;
-
-    .subs-team {
-      flex-direction: row-reverse;
-    }
-    .sub-item {
-      flex-direction: row-reverse;
-    }
-    .sub-names {
-      align-items: flex-end;
-    }
-  }
-}
-
-.subs-team {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-// Small two-tone swatch tying each subs column to its team's pitch markers
+// Small two-tone swatch tying a column to its team's pitch markers
 // (fill + ring set inline, matching the dots).
 .team-dot {
   display: inline-block;
@@ -533,62 +493,6 @@
   height: 12px;
   border-radius: 50%;
   border: 2px solid transparent;
-}
-
-.subs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.sub-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  background: var(--mat-sys-surface-container-low);
-
-  .sub-min {
-    font-size: 0.8rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    min-width: 32px;
-  }
-
-  .sub-names {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .sub-in,
-  .sub-out {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.85rem;
-
-    mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-    }
-  }
-
-  .sub-in mat-icon {
-    color: #2e7d32;
-  }
-  .sub-out {
-    color: var(--mat-sys-on-surface-variant);
-
-    mat-icon {
-      color: #c62828;
-    }
-  }
 }
 
 // ===== Line-ups: benches =====
@@ -603,16 +507,31 @@
   }
 }
 
+.bench-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 // Away bench mirrors the home one: shirt number on the right, names + heading
 // right-aligned, so the two columns read outward like a team sheet.
 .bench-col.away {
   text-align: right;
 
+  .bench-team {
+    flex-direction: row-reverse;
+  }
   .bench-row {
     flex-direction: row-reverse;
   }
-  .bench-name {
-    text-align: right;
+  .bench-text {
+    align-items: flex-end;
+  }
+  .bench-sub {
+    flex-direction: row-reverse;
   }
 }
 
@@ -629,15 +548,41 @@
   display: flex;
   align-items: center;
   gap: 10px;
+
+  // A used sub stands out from the unused ones below it.
+  &.came-on .bench-name {
+    font-weight: 600;
+  }
+}
+
+.bench-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
 }
 
 .bench-name {
-  flex: 1;
   min-width: 0;
   font-size: 0.9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.bench-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--mat-sys-on-surface-variant);
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: #2e8b3d;
+  }
 }
 
 // Shirt-number disc, coloured per team (fill / ring / text set inline).
