@@ -9,124 +9,63 @@
     </mat-card>
   } @else if (fixture(); as f) {
     <mat-card appearance="outlined" class="match-card">
-      <!-- ===== Scoreboard ===== -->
-      <div class="scoreboard">
-        <div class="team home">
-          @if (f.homeTeam.crest) {
-            <img [ngSrc]="f.homeTeam.crest" width="56" height="56" priority [alt]="teamName('home') + ' crest'" />
-          } @else {
-            <mat-icon class="crest-fallback" aria-hidden="true">shield</mat-icon>
-          }
-          <span class="team-name">{{ teamName('home') }}</span>
+      <!-- ===== Pinned header: competition + scoreboard + kick-off ===== -->
+      <div class="header">
+        <span class="comp-chip">{{ competitionName() }}</span>
+
+        <div class="scoreboard">
+          <div class="team home">
+            @if (f.homeTeam.crest) {
+              <img [ngSrc]="f.homeTeam.crest" width="56" height="56" priority [alt]="teamName('home') + ' crest'" />
+            } @else {
+              <mat-icon class="crest-fallback" aria-hidden="true">shield</mat-icon>
+            }
+            <span class="team-name">{{ teamName('home') }}</span>
+          </div>
+
+          <div class="centre">
+            @if (displayScore(); as s) {
+              <div class="score">
+                <span class="num">{{ s.home }}</span>
+                <span class="dash">–</span>
+                <span class="num">{{ s.away }}</span>
+              </div>
+            } @else {
+              <div class="score vs"><span class="dash">vs</span></div>
+            }
+            <span class="status">{{ statusLabel() }}</span>
+            <span class="kickoff">{{ kickoffLabel() }}</span>
+            @if (resultNote(); as note) {
+              <span class="result-note">{{ note }}</span>
+            }
+          </div>
+
+          <div class="team away">
+            @if (f.awayTeam.crest) {
+              <img [ngSrc]="f.awayTeam.crest" width="56" height="56" priority [alt]="teamName('away') + ' crest'" />
+            } @else {
+              <mat-icon class="crest-fallback" aria-hidden="true">shield</mat-icon>
+            }
+            <span class="team-name">{{ teamName('away') }}</span>
+          </div>
         </div>
 
-        <div class="centre">
-          @if (displayScore(); as s) {
-            <div class="score">
-              <span class="num">{{ s.home }}</span>
-              <span class="dash">–</span>
-              <span class="num">{{ s.away }}</span>
-            </div>
-          } @else {
-            <div class="score vs"><span class="dash">vs</span></div>
-          }
-          <span class="status">{{ statusLabel() }}</span>
-          @if (resultNote(); as note) {
-            <span class="result-note">{{ note }}</span>
-          }
-        </div>
-
-        <div class="team away">
-          @if (f.awayTeam.crest) {
-            <img [ngSrc]="f.awayTeam.crest" width="56" height="56" priority [alt]="teamName('away') + ' crest'" />
-          } @else {
-            <mat-icon class="crest-fallback" aria-hidden="true">shield</mat-icon>
-          }
-          <span class="team-name">{{ teamName('away') }}</span>
-        </div>
+        @if (refreshing()) {
+          <div class="refresh-row">
+            <mat-progress-spinner mode="indeterminate" diameter="20" />
+            <span>Loading match details…</span>
+          </div>
+        } @else if (showRefresh()) {
+          <div class="refresh-row">
+            <button mat-stroked-button type="button" (click)="refresh()">
+              <mat-icon aria-hidden="true">refresh</mat-icon>
+              Load match details
+            </button>
+          </div>
+        }
       </div>
 
-      @if (refreshing()) {
-        <div class="refresh-row">
-          <mat-progress-spinner mode="indeterminate" diameter="20" />
-          <span>Loading match details…</span>
-        </div>
-      } @else if (showRefresh()) {
-        <div class="refresh-row">
-          <button mat-stroked-button type="button" (click)="refresh()">
-            <mat-icon aria-hidden="true">refresh</mat-icon>
-            Load match details
-          </button>
-        </div>
-      }
-
-      <!-- ===== Goals / cards timeline ===== -->
-      @if (hasTimeline()) {
-        <ul class="timeline">
-          @for (item of timeline(); track item.key) {
-            <li class="tl-item">
-              <div class="tl-side left">
-                @if (item.side !== 'away') {
-                  <span class="ev">
-                    <span class="sr-only">
-                      @switch (item.kind) {
-                        @case ('goal') { Goal }
-                        @case ('yellow') { Yellow card }
-                        @case ('red') { Red card }
-                      }
-                    </span>
-                    @switch (item.kind) {
-                      @case ('goal') {
-                        <mat-icon class="ev-icon goal" aria-hidden="true">sports_soccer</mat-icon>
-                      }
-                      @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
-                      @case ('red') { <span class="card red" aria-hidden="true"></span> }
-                    }
-                    <span class="ev-text">
-                      <span class="ev-player">{{ item.player }}</span>
-                      @if (item.note) { <span class="ev-note">{{ item.note }}</span> }
-                    </span>
-                  </span>
-                }
-              </div>
-
-              <div class="tl-min">{{ item.minuteLabel }}</div>
-
-              <div class="tl-side right">
-                @if (item.side === 'away') {
-                  <span class="ev">
-                    <span class="sr-only">
-                      @switch (item.kind) {
-                        @case ('goal') { Goal }
-                        @case ('yellow') { Yellow card }
-                        @case ('red') { Red card }
-                      }
-                    </span>
-                    @switch (item.kind) {
-                      @case ('goal') {
-                        <mat-icon class="ev-icon goal" aria-hidden="true">sports_soccer</mat-icon>
-                      }
-                      @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
-                      @case ('red') { <span class="card red" aria-hidden="true"></span> }
-                    }
-                    <span class="ev-text">
-                      <span class="ev-player">{{ item.player }}</span>
-                      @if (item.note) { <span class="ev-note">{{ item.note }}</span> }
-                    </span>
-                  </span>
-                }
-              </div>
-            </li>
-          }
-        </ul>
-      } @else if (isTerminal() && detailMissing() && !refreshing()) {
-        <p class="timeline-empty">
-          <mat-icon aria-hidden="true">sports</mat-icon>
-          No goal or card detail yet — load it above.
-        </p>
-      }
-
-      <!-- ===== Vertical icon-rail tabs ===== -->
+      <!-- ===== Vertical icon-rail tabs (fills remaining height, scrolls) ===== -->
       <div class="tabs">
         <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Match sections">
           @for (t of availableTabs(); track t.id) {
@@ -149,68 +88,160 @@
 
         <div class="panel" role="tabpanel" [attr.data-dir]="slideDir()">
           @switch (activeId()) {
-            @case ('lineups') {
-              <div class="panel-inner lineups">
-                @for (side of ['home', 'away']; track side) {
-                  @if (lineupFor($any(side)); as lu) {
-                    <section class="lineup-col">
-                      <h2 class="lineup-team">
-                        {{ teamName($any(side)) }}
-                        @if (lu.formation) { <span class="formation">{{ lu.formation }}</span> }
-                      </h2>
-                      @if (lu.lineup.length > 0) {
-                        <h3 class="lineup-sub">Starting XI</h3>
-                        <mat-list>
-                          @for (p of lu.lineup; track $index) {
-                            <mat-list-item>
-                              <span matListItemAvatar class="shirt">{{ p.shirtNumber ?? '–' }}</span>
-                              <span matListItemTitle>{{ p.name }}</span>
-                              @if (p.position) { <span matListItemLine>{{ p.position }}</span> }
-                            </mat-list-item>
+            <!-- ===== Events + meta ===== -->
+            @case ('info') {
+              <div class="panel-inner">
+                @if (hasTimeline()) {
+                  <ul class="timeline">
+                    @for (item of timeline(); track item.key) {
+                      <li class="tl-item">
+                        <div class="tl-side left">
+                          @if (item.side !== 'away') {
+                            <span class="ev">
+                              <span class="sr-only">
+                                @switch (item.kind) {
+                                  @case ('goal') { Goal }
+                                  @case ('yellow') { Yellow card }
+                                  @case ('red') { Red card }
+                                }
+                              </span>
+                              @switch (item.kind) {
+                                @case ('goal') {
+                                  <mat-icon class="ev-icon goal" aria-hidden="true">sports_soccer</mat-icon>
+                                }
+                                @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
+                                @case ('red') { <span class="card red" aria-hidden="true"></span> }
+                              }
+                              <span class="ev-text">
+                                <span class="ev-player">{{ item.player }}</span>
+                                @if (item.note) { <span class="ev-note">{{ item.note }}</span> }
+                              </span>
+                            </span>
                           }
-                        </mat-list>
-                      }
-                      @if (lu.bench.length > 0) {
-                        <h3 class="lineup-sub">Bench</h3>
-                        <mat-list>
-                          @for (p of lu.bench; track $index) {
-                            <mat-list-item>
-                              <span matListItemAvatar class="shirt bench">{{ p.shirtNumber ?? '–' }}</span>
-                              <span matListItemTitle>{{ p.name }}</span>
-                            </mat-list-item>
+                        </div>
+
+                        <div class="tl-min">{{ item.minuteLabel }}</div>
+
+                        <div class="tl-side right">
+                          @if (item.side === 'away') {
+                            <span class="ev">
+                              <span class="sr-only">
+                                @switch (item.kind) {
+                                  @case ('goal') { Goal }
+                                  @case ('yellow') { Yellow card }
+                                  @case ('red') { Red card }
+                                }
+                              </span>
+                              @switch (item.kind) {
+                                @case ('goal') {
+                                  <mat-icon class="ev-icon goal" aria-hidden="true">sports_soccer</mat-icon>
+                                }
+                                @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
+                                @case ('red') { <span class="card red" aria-hidden="true"></span> }
+                              }
+                              <span class="ev-text">
+                                <span class="ev-player">{{ item.player }}</span>
+                                @if (item.note) { <span class="ev-note">{{ item.note }}</span> }
+                              </span>
+                            </span>
                           }
-                        </mat-list>
-                      }
-                      @if (lu.coach && lu.coach.name) {
-                        <p class="coach">
-                          <mat-icon aria-hidden="true">sports</mat-icon>
-                          {{ lu.coach.name }}
-                        </p>
-                      }
-                    </section>
-                  }
+                        </div>
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="timeline-empty">
+                    <mat-icon aria-hidden="true">sports</mat-icon>
+                    No match events to show yet.
+                  </p>
+                }
+
+                @if (infoRows().length > 0) {
+                  <mat-list class="info-list">
+                    @for (row of infoRows(); track row.label) {
+                      <mat-list-item>
+                        <mat-icon matListItemIcon aria-hidden="true">{{ row.icon }}</mat-icon>
+                        <span matListItemTitle>{{ row.value }}</span>
+                        <span matListItemLine>{{ row.label }}</span>
+                      </mat-list-item>
+                    }
+                  </mat-list>
                 }
               </div>
             }
-            @case ('subs') {
-              <div class="panel-inner">
-                <mat-list class="subs-list">
-                  @for (s of detail()!.substitutions; track $index) {
-                    <mat-list-item>
-                      <span matListItemAvatar class="sub-min">{{ s.minute }}'</span>
-                      <span matListItemTitle class="sub-in">
-                        <mat-icon aria-hidden="true">arrow_upward</mat-icon>
-                        {{ s.playerIn?.name ?? '—' }}
-                      </span>
-                      <span matListItemLine class="sub-out">
-                        <mat-icon aria-hidden="true">arrow_downward</mat-icon>
-                        {{ s.playerOut?.name ?? '—' }}
-                      </span>
-                    </mat-list-item>
+
+            <!-- ===== Line-ups (pitch) + substitutions + bench ===== -->
+            @case ('lineups') {
+              <div class="panel-inner lineups-tab">
+                @if (pitchMarkers().length > 0) {
+                  <div class="pitch" aria-label="Starting line-ups by formation">
+                    <span class="pitch-line" aria-hidden="true"></span>
+                    <span class="pitch-circle" aria-hidden="true"></span>
+                    @for (m of pitchMarkers(); track m.key) {
+                      <div
+                        class="marker"
+                        [class.home]="m.side === 'home'"
+                        [class.away]="m.side === 'away'"
+                        [style.left.%]="m.x"
+                        [style.top.%]="m.y"
+                      >
+                        <span class="dot">{{ m.number }}</span>
+                        <span class="mname">{{ m.name }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (subs().length > 0) {
+                  <h3 class="section-h">Substitutions</h3>
+                  <ul class="subs">
+                    @for (s of subs(); track s.key) {
+                      <li class="sub-item" [class.home]="s.side === 'home'" [class.away]="s.side === 'away'">
+                        <span class="sub-min">{{ s.minute }}'</span>
+                        <span class="sub-names">
+                          <span class="sub-in">
+                            <mat-icon aria-hidden="true">arrow_upward</mat-icon>{{ s.inName }}
+                          </span>
+                          <span class="sub-out">
+                            <mat-icon aria-hidden="true">arrow_downward</mat-icon>{{ s.outName }}
+                          </span>
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                }
+
+                <div class="benches">
+                  @for (side of ['home', 'away']; track side) {
+                    @if (lineupFor($any(side)); as lu) {
+                      <section class="bench-col">
+                        <h3 class="section-h">{{ teamName($any(side)) }}</h3>
+                        @if (lu.bench.length > 0) {
+                          <mat-list>
+                            @for (p of lu.bench; track $index) {
+                              <mat-list-item>
+                                <span matListItemAvatar class="shirt bench">{{ p.shirtNumber ?? '–' }}</span>
+                                <span matListItemTitle>{{ p.name }}</span>
+                              </mat-list-item>
+                            }
+                          </mat-list>
+                        } @else {
+                          <p class="muted">No bench listed</p>
+                        }
+                        @if (lu.coach && lu.coach.name) {
+                          <p class="coach">
+                            <mat-icon aria-hidden="true">sports</mat-icon>
+                            {{ lu.coach.name }}
+                          </p>
+                        }
+                      </section>
+                    }
                   }
-                </mat-list>
+                </div>
               </div>
             }
+
+            <!-- ===== Officials ===== -->
             @case ('officials') {
               <div class="panel-inner">
                 <mat-list>
@@ -221,19 +252,6 @@
                       <span matListItemLine>
                         {{ r.type }}@if (r.nationality) { · {{ r.nationality }} }
                       </span>
-                    </mat-list-item>
-                  }
-                </mat-list>
-              </div>
-            }
-            @case ('info') {
-              <div class="panel-inner">
-                <mat-list class="info-list">
-                  @for (row of infoRows(); track row.label) {
-                    <mat-list-item>
-                      <mat-icon matListItemIcon aria-hidden="true">{{ row.icon }}</mat-icon>
-                      <span matListItemTitle>{{ row.value }}</span>
-                      <span matListItemLine>{{ row.label }}</span>
                     </mat-list-item>
                   }
                 </mat-list>

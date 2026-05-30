@@ -1,14 +1,22 @@
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
 }
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   max-width: 760px;
   margin: 0 auto;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .sr-only {
@@ -23,11 +31,40 @@
   border: 0;
 }
 
-// ===== Scoreboard =====
+// ===== Card shell: fills the page, scrolls internally =====
 
 .match-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 16px;
+  overflow: hidden;
 }
+
+.header {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+
+// ===== Competition chip =====
+
+.comp-chip {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+// ===== Scoreboard =====
 
 .skel-board,
 .scoreboard {
@@ -108,8 +145,13 @@
     letter-spacing: 0.03em;
   }
 
+  .kickoff {
+    font-size: 0.72rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
   .result-note {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--mat-sys-on-surface-variant);
   }
 }
@@ -128,13 +170,87 @@
   }
 }
 
-// ===== Timeline =====
+// ===== Vertical icon-rail tabs =====
+
+.tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.rail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-tab {
+  color: var(--mat-sys-on-surface-variant);
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &.active {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+  }
+}
+
+.panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+// Vertical enter animation — direction set by the rail movement (down the
+// rail → enter from below; up → from above). The @switch recreates
+// .panel-inner each switch, so the animation re-runs.
+@keyframes fd-enter-from-below {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fd-enter-from-above {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.panel[data-dir='down'] .panel-inner {
+  animation: fd-enter-from-below 200ms ease both;
+}
+.panel[data-dir='up'] .panel-inner {
+  animation: fd-enter-from-above 200ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel .panel-inner {
+    animation: none;
+  }
+}
+
+// ===== Timeline (now in the Info tab) =====
 
 .timeline {
   list-style: none;
-  margin: 16px 0 0;
-  padding: 12px 0 0;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -142,7 +258,7 @@
 
 .tl-item {
   display: grid;
-  grid-template-columns: 1fr 40px 1fr;
+  grid-template-columns: 1fr 44px 1fr;
   align-items: center;
   gap: 8px;
 }
@@ -223,87 +339,182 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin: 16px 0 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  margin: 8px 0;
   color: var(--mat-sys-on-surface-variant);
   font-size: 0.85rem;
 }
 
-// ===== Vertical icon-rail tabs =====
+.info-list {
+  margin-top: 8px;
 
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  mat-icon[matListItemIcon] {
+    color: var(--mat-sys-on-surface-variant);
+  }
 }
 
-.rail {
+// ===== Line-ups: pitch =====
+
+.pitch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    0deg,
+    #2f8a3e 0,
+    #2f8a3e 12.5%,
+    #2b8139 12.5%,
+    #2b8139 25%
+  );
+  // Pitch outline.
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.pitch-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.pitch-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+}
+
+.marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  flex: none;
+  align-items: center;
+  gap: 2px;
+  width: 60px;
+  pointer-events: none;
+
+  .dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+
+  .mname {
+    max-width: 60px;
+    font-size: 0.62rem;
+    line-height: 1.1;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &.home .dot {
+    background: var(--mat-sys-primary);
+    color: var(--mat-sys-on-primary);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+  }
+  &.away .dot {
+    background: #ffffff;
+    color: #14110e;
+    border: 2px solid rgba(0, 0, 0, 0.18);
+  }
 }
 
-.rail-tab {
+// ===== Line-ups: substitutions =====
+
+.section-h {
+  margin: 16px 0 4px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--mat-sys-on-surface-variant);
-  transition: background 0.15s ease, color 0.15s ease;
+}
 
-  &.active {
-    background: var(--mat-sys-secondary-container);
-    color: var(--mat-sys-on-secondary-container);
+.subs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sub-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-left: 3px solid transparent;
+  border-radius: 4px;
+  background: var(--mat-sys-surface-container-low);
+
+  &.home {
+    border-left-color: var(--mat-sys-primary);
+  }
+  &.away {
+    border-left-color: var(--mat-sys-tertiary);
+  }
+
+  .sub-min {
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+  }
+
+  .sub-names {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .sub-in,
+  .sub-out {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85rem;
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .sub-in mat-icon {
+    color: #2e7d32;
+  }
+  .sub-out {
+    color: var(--mat-sys-on-surface-variant);
+
+    mat-icon {
+      color: #c62828;
+    }
   }
 }
 
-.panel {
-  flex: 1;
-  min-width: 0;
-  // Clip the vertical slide so an entering panel never spills a scrollbar.
-  overflow: hidden;
-}
+// ===== Line-ups: benches =====
 
-// Vertical enter animation, direction set by the rail movement: moving DOWN
-// the rail slides the new panel up into place (enters from below); moving UP
-// slides it down (enters from above). The @switch recreates .panel-inner on
-// every tab change, so the animation re-runs each time.
-@keyframes fd-enter-from-below {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes fd-enter-from-above {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.panel[data-dir='down'] .panel-inner {
-  animation: fd-enter-from-below 200ms ease both;
-}
-.panel[data-dir='up'] .panel-inner {
-  animation: fd-enter-from-above 200ms ease both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .panel .panel-inner {
-    animation: none;
-  }
-}
-
-.lineups {
+.benches {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
@@ -311,31 +522,6 @@
   @media (min-width: 600px) {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-.lineup-team {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 0 16px;
-  font-size: 1rem;
-
-  .formation {
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--mat-sys-on-surface-variant);
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: var(--mat-sys-surface-variant);
-  }
-}
-
-.lineup-sub {
-  margin: 8px 0 0 16px;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--mat-sys-on-surface-variant);
 }
 
 .shirt {
@@ -356,7 +542,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 12px 0 0 16px;
+  margin: 8px 0 0 16px;
   font-size: 0.9rem;
 
   mat-icon {
@@ -366,46 +552,20 @@
   }
 }
 
-.subs-list {
-  .sub-min {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
-
-  .sub-in,
-  .sub-out {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-
-    mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-    }
-  }
-
-  .sub-in mat-icon {
-    color: #2e7d32;
-  }
-  .sub-out mat-icon {
-    color: #c62828;
-  }
-}
-
-.info-list mat-icon[matListItemIcon] {
+.muted {
+  margin: 4px 0 0 16px;
+  font-size: 0.85rem;
   color: var(--mat-sys-on-surface-variant);
 }
 
 // ===== Empty / not found =====
 
 .empty {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   padding: 40px 16px;
   text-align: center;
