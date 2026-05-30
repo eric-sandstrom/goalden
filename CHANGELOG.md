@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/eric-sandstrom/goalden/compare/v1.0.2...v1.1.0) (2026-05-30)
+
+
+### Features
+
+* **predict:** live match clock/status on rows and 90-minute scoring ([#20](https://github.com/eric-sandstrom/goalden/issues/20)) ([ea062a4](https://github.com/eric-sandstrom/goalden/commit/ea062a4638d3f55d3a19b21575b3fcb5c8c620c7))
+
 ## [1.0.2](https://github.com/eric-sandstrom/goalden/compare/v1.0.1...v1.0.2) (2026-05-30)
 
 
