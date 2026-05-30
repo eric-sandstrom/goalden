@@ -345,6 +345,16 @@ Material 3, generated from primary `#0F7B3A` (football-pitch green) and tertiary
 - **Always split components into `.ts` + `.html` + `.scss`.** No inline `template:` or `styles:` blocks, regardless of size.
 - **No CSS frameworks** beyond Angular Material + a thin global stylesheet for the bottom nav and any non-Material custom pieces.
 
+## Releases & changelog
+
+Versioning and the in-app "What's new" dialog are automated via **release-please** — do **not** hand-edit `CHANGELOG.md`, `package.json` `version`, or `changelog.json` (the latter no longer exists).
+
+- **PR titles must be conventional commits.** They are the source of the changelog and the version bump: `feat:` → minor, `fix:` / `perf:` → patch, `feat!:` / `BREAKING CHANGE:` → major. `chore`/`docs`/`ci`/`refactor`/`test`/`build` are valid but don't trigger a release on their own. A non-conventional title fails the **PR Title Lint** check (`.github/workflows/pr-title-lint.yml`).
+- **Subjects are lowercase**, e.g. `feat: add bracket tiebreaker view` (not `feat: Add …`). Scope optional: `feat(bracket): …`.
+- **Merge via squash only** (enforced at the repo level): the squash commit subject *is* the PR title, which is what release-please reads.
+- **Flow:** merge feature PRs → release-please maintains a standing `chore(main): release X.Y.Z` PR that bumps the version + regenerates `CHANGELOG.md` → merging *that* PR tags `vX.Y.Z` and deploys. The `prebuild` hook (`tools/sync-changelog.mjs`) parses `CHANGELOG.md` into `ngsw-config.json` `appData.releases`, which feeds the "What's new" dialog.
+- Deciding *when* to merge the release PR (i.e. cut a release) is a human call — everything else is automatic.
+
 ## Phase 1 plan (May 26 → June 11)
 
 | Day | Date | Goal |
