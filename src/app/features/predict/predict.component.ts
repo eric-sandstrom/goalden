@@ -11,6 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTabsModule } from '@angular/material/tabs';
 import { Fixture, isKnockout } from '../../core/models/fixture.model';
 import { Competition } from '../../core/models/competition.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
@@ -49,6 +50,7 @@ const STORAGE_KEY_SELECTED_COMP = 'goalden:predict-selected-comp';
     MatButtonToggleModule,
     MatCardModule,
     MatIconModule,
+    MatTabsModule,
     SkelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
