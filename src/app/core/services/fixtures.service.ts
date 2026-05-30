@@ -341,6 +341,23 @@ export class FixturesService {
     }
   }
 
+  /**
+   * One-shot read of a single fixture by its doc id, for use as an Angular
+   * `resource()` loader (the fixture-detail view, keyed on the route id).
+   * Reads the canonical `fixtures/{matchId}` doc directly so it resolves any
+   * fixture regardless of whether its competition is in the shared store —
+   * mirrors `TeamsService.loadTeam`. Returns null when the doc doesn't exist.
+   * Pure: no signal writes, so it's safe to call from reactive code.
+   */
+  async loadFixtureById(matchId: string): Promise<Fixture | null> {
+    const snap = await getDoc(doc(this.db, 'fixtures', matchId));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const compId = typeof data['competitionId'] === 'string' ? data['competitionId'] : 'WC';
+    const season = typeof data['season'] === 'string' ? data['season'] : '2026';
+    return this.parse(snap.id, data, compId, season);
+  }
+
   // ---------------------------------------------------------------------------
   // Internals — fetching
   // ---------------------------------------------------------------------------

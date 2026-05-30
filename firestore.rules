@@ -151,6 +151,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ----- fixtures/{matchId}/detail/{docId} -------------------------------
+    //
+    // Rich per-match detail (goals, bookings, substitutions, referees,
+    // lineups) fetched from football-data's `/v4/matches/{id}` endpoint by
+    // the `refreshMatchDetail` callable. Rules don't cascade into
+    // subcollections, so this needs its own block — without it the read falls
+    // through to the catch-all deny. World-readable for signed-in users (the
+    // fixture-detail view); writes server-only via the callable (Admin SDK).
+
+    match /fixtures/{matchId}/detail/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ----- competitions ----------------------------------------------------
     //
     // Catalogue of competitions Goalden supports. Discovered from football-data

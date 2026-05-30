@@ -50,3 +50,4 @@ export { generatePredictorPersonality } from './personality';
 export { generateTheme } from './theme-ai';
 export { sendTestNotification, broadcastNotification } from './notifications';
 export { correctFixtureScore, getAdminMetrics, scoreMissedFixtures } from './admin-tools';
+export { refreshMatchDetail } from './refresh-match-detail';

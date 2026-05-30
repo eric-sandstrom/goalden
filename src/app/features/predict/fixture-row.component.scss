@@ -244,6 +244,30 @@ a.team-link:focus-visible {
   gap: 0.4rem 0.6rem;
   margin-top: 0.5rem;
 }
+/* "Open match detail" affordance — a quiet chevron pushed to the row's
+   trailing edge. A plain link (not a form control) so it never collides with
+   the score inputs / steppers; margin-left:auto sends it right of the
+   centred status cluster. */
+.details-link {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mat-sys-on-surface-variant);
+  border-radius: 999px;
+  text-decoration: none;
+  position: relative;
+  z-index: 1;
+}
+.details-link:hover {
+  color: var(--mat-sys-on-surface);
+  background: var(--mat-sys-surface-container-high);
+}
+.details-link mat-icon {
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+}
 /* Two-leg tie marker — a quiet outlined pill so it reads as context, not a
    call to action competing with the kickoff/lock status beside it. */
 .leg-badge {
