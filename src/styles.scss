@@ -175,3 +175,107 @@ app-root {
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+
+// =============================================================================
+// Route transitions
+// =============================================================================
+//
+// `withViewTransitions()` wraps every navigation in a native
+// `document.startViewTransition()`. By default it snapshots the ENTIRE page as
+// the `root` group, so we shape the animation in two layers:
+//
+//   1. Direction — `onRouteViewTransition` (core/router/view-transitions.ts)
+//      stamps `<html data-route-direction="forward|back">` based on whether
+//      we're navigating into a sub-route or back to a parent. Forward slides
+//      the page left, back slides it right; siblings/unrelated routes carry no
+//      attribute and just cross-fade.
+//   2. Persistent chrome — the bottom nav is pulled into its OWN snapshot
+//      (`view-transition-name`) so it stays put while the page content slides
+//      past it, instead of sliding along with the `root` snapshot.
+//
+// Browsers without View Transitions support just navigate instantly — no error,
+// no fallback needed.
+
+// Lift the always-present bottom nav out of the `root` snapshot. Matching name
+// in both the old and new DOM → the browser holds it in place (no movement)
+// while everything else animates.
+app-bottom-nav {
+  view-transition-name: bottom-nav;
+}
+
+// --- Default (siblings / top-level tabs): fade + subtle lift -----------------
+
+@keyframes route-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes route-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+::view-transition-old(root) {
+  animation: route-fade-out 120ms ease-in both;
+}
+
+::view-transition-new(root) {
+  animation: route-fade-in 200ms ease-out both;
+}
+
+// --- Directional slides ------------------------------------------------------
+//
+// iOS-style push/pop: the incoming page slides fully across from one edge while
+// the outgoing page drifts a shorter distance the same way (parallax) and fades.
+
+@keyframes route-slide-out-left {
+  to {
+    transform: translateX(-25%);
+    opacity: 0;
+  }
+}
+@keyframes route-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes route-slide-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes route-slide-in-left {
+  from {
+    transform: translateX(-25%);
+    opacity: 0;
+  }
+}
+
+// Forward (into a sub-route): content slides to the LEFT.
+:root[data-route-direction='forward']::view-transition-old(root) {
+  animation: route-slide-out-left 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+:root[data-route-direction='forward']::view-transition-new(root) {
+  animation: route-slide-in-right 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+// Back (to a parent): content slides to the RIGHT.
+:root[data-route-direction='back']::view-transition-old(root) {
+  animation: route-slide-out-right 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+:root[data-route-direction='back']::view-transition-new(root) {
+  animation: route-slide-in-left 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+// Honour the user's reduced-motion preference: cut every transition animation
+// (the `!important` overrides the directional rules above) so navigations
+// resolve instantly. The bottom-nav stays lifted out either way — harmless.
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}

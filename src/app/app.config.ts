@@ -10,9 +10,14 @@ import {
   MAT_SNACK_BAR_DEFAULT_OPTIONS,
   MatSnackBarConfig,
 } from '@angular/material/snack-bar';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import {
+  provideRouter,
+  withComponentInputBinding,
+  withViewTransitions,
+} from '@angular/router';
 
 import { environment } from '../environments/environment';
+import { onRouteViewTransition } from './core/router/view-transitions';
 import { provideFirebase } from './core/firebase/firebase.providers';
 import { AppUpdateService } from './core/services/app-update.service';
 import { NotificationsService } from './core/services/notifications.service';
@@ -39,7 +44,15 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideAnimationsAsync(),
-    provideRouter(routes, withComponentInputBinding()),
+    provideRouter(
+      routes,
+      withComponentInputBinding(),
+      withViewTransitions({
+        // No animation on the very first paint — only on subsequent navigations.
+        skipInitialTransition: true,
+        onViewTransitionCreated: onRouteViewTransition,
+      }),
+    ),
     provideFirebase({
       options: environment.firebase,
       useEmulators: environment.useEmulators,

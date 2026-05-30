@@ -55,3 +55,6 @@ Thumbs.db
 .emulator-data/
 *-debug.log
 firebase-debug.log
+
+# Playwright MCP scratch output (snapshots, screenshots, console logs)
+.playwright-mcp/
