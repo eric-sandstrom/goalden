@@ -655,6 +655,58 @@
   flex: none;
 }
 
+// ===== Officials (in the Line-ups tab) =====
+
+.officials {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.official {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ref-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--mat-sys-surface-variant);
+  color: var(--mat-sys-on-surface-variant);
+
+  mat-icon {
+    margin: 0;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.ref-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ref-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.ref-role {
+  font-size: 0.72rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .muted {
   margin: 4px 0 0 16px;
   font-size: 0.85rem;

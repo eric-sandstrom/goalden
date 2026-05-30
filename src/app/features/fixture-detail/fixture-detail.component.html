@@ -310,17 +310,21 @@
 
                 @if (hasReferees()) {
                   <h3 class="section-h">Officials</h3>
-                  <mat-list>
+                  <ul class="officials">
                     @for (r of detail()!.referees; track $index) {
-                      <mat-list-item>
-                        <mat-icon matListItemAvatar aria-hidden="true">sports</mat-icon>
-                        <span matListItemTitle>{{ r.name }}</span>
-                        <span matListItemLine>
-                          {{ r.type }}@if (r.nationality) { · {{ r.nationality }} }
+                      <li class="official">
+                        <span class="ref-icon">
+                          <mat-icon aria-hidden="true">sports</mat-icon>
                         </span>
-                      </mat-list-item>
+                        <span class="ref-text">
+                          <span class="ref-name">{{ r.name }}</span>
+                          <span class="ref-role">
+                            {{ refRole(r.type) }}@if (r.nationality) { · {{ r.nationality }} }
+                          </span>
+                        </span>
+                      </li>
                     }
-                  </mat-list>
+                  </ul>
                 }
             </div>
           </mat-tab>

@@ -450,6 +450,17 @@ export class FixtureDetailComponent {
     return this.lineupFor(side)?.formation ?? null;
   }
 
+  /** Humanise a football-data referee type, e.g. ASSISTANT_REFEREE_N2 →
+   *  "Assistant referee 2", VIDEO_ASSISTANT_REFEREE_N1 → "VAR 1". */
+  protected refRole(type: string | null): string {
+    if (!type) return 'Official';
+    const n = type.match(/_N(\d+)$/);
+    const suffix = n ? ` ${n[1]}` : '';
+    const base = type.replace(/_N\d+$/, '').replace(/_/g, ' ').trim().toLowerCase();
+    if (base === 'video assistant referee') return `VAR${suffix}`;
+    return base.charAt(0).toUpperCase() + base.slice(1) + suffix;
+  }
+
   async refresh(): Promise<void> {
     if (this.refreshing()) return;
     this.refreshing.set(true);
