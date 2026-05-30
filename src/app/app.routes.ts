@@ -80,6 +80,15 @@ export const routes: Routes = [
           ),
       },
       {
+        // Comp-scoped teams browser. `:competitionId` binds to the
+        // component's input via withComponentInputBinding(), scoping the
+        // list to that competition's `cache/teams-{compId}` rollup.
+        path: 'comp/:competitionId/teams',
+        loadComponent: () =>
+          import('./features/teams/teams.component').then((m) => m.TeamsComponent),
+      },
+      {
+        // Unscoped fallback — merges every active competition's teams.
         path: 'teams',
         loadComponent: () =>
           import('./features/teams/teams.component').then((m) => m.TeamsComponent),
