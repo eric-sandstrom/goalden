@@ -68,6 +68,88 @@ export const correctFixtureScore = onCall(
 );
 
 // =============================================================================
+// scoreMissedFixtures({ competitionId?, matchId? }) → { fixturesProcessed, ... }
+//
+// Backfills scoring for terminal (FINISHED/AWARDED) fixtures whose predictions
+// never got scored. Two ways a match can slip through the live `scoreMatch`
+// trigger:
+//   1. The trigger fired but its collection-group query threw (e.g. a missing
+//      `matches.matchId` index) — predictions stay at points==null.
+//   2. The fixture was first written already in a terminal state (a comp added
+//      mid-season whose matches had already been played) — `onDocumentUpdated`
+//      never fires on create, so scoring never ran.
+//
+// Runs applyMatchScoring with force:false, so ONLY predictions still at
+// points==null are scored; already-scored predictions are left untouched.
+// That makes this idempotent — safe to run repeatedly, and a fully-scored
+// database produces zero writes. Optional `competitionId` scopes the scan to
+// one comp; optional `matchId` targets a single fixture.
+// =============================================================================
+
+export const scoreMissedFixtures = onCall(
+  { region: 'europe-west1', timeoutSeconds: 540 },
+  async (request) => {
+    await requireAdminOrEmulator(request);
+    const db = getFirestore();
+
+    const { competitionId, matchId } = request.data ?? {};
+    if (competitionId !== undefined && typeof competitionId !== 'string') {
+      throw new HttpsError('invalid-argument', 'competitionId must be a string when provided');
+    }
+    if (matchId !== undefined && typeof matchId !== 'string') {
+      throw new HttpsError('invalid-argument', 'matchId must be a string when provided');
+    }
+
+    // Build the candidate set with a single-field query (no composite index
+    // needed): a `matchId` fetches one doc; a `competitionId` filters on that
+    // field; otherwise we scan terminal fixtures directly. Status is then
+    // re-checked in code so all three branches share one terminal filter.
+    const rows: { id: string; data: FirebaseFirestore.DocumentData }[] = [];
+    if (matchId) {
+      const snap = await db.collection('fixtures').doc(matchId).get();
+      if (!snap.exists) throw new HttpsError('not-found', `fixture ${matchId} not found`);
+      rows.push({ id: snap.id, data: snap.data()! });
+    } else if (competitionId) {
+      const snap = await db.collection('fixtures').where('competitionId', '==', competitionId).get();
+      snap.forEach((d) => rows.push({ id: d.id, data: d.data() }));
+    } else {
+      const snap = await db
+        .collection('fixtures')
+        .where('status', 'in', ['FINISHED', 'AWARDED'])
+        .get();
+      snap.forEach((d) => rows.push({ id: d.id, data: d.data() }));
+    }
+
+    const TERMINAL = new Set(['FINISHED', 'AWARDED']);
+    let fixturesProcessed = 0;
+    let predictionsScored = 0;
+    const details: { matchId: string; scored: number }[] = [];
+
+    // Sequential on purpose: each applyMatchScoring runs a collection-group
+    // query + batched writes, and this is a rare admin one-shot, not a hot
+    // path — keeping it serial avoids spiking Firestore and stays simple.
+    for (const { id, data } of rows) {
+      if (!TERMINAL.has(data['status'])) continue;
+      const fullTime = (data['score'] as { fullTime?: unknown } | undefined)?.fullTime;
+      if (!fullTime) continue; // terminal but unplayed/no score — nothing to score
+
+      const { scored } = await applyMatchScoring(db, id, data, { force: false });
+      fixturesProcessed++;
+      if (scored > 0) {
+        predictionsScored += scored;
+        details.push({ matchId: id, scored });
+      }
+    }
+
+    logger.info(
+      `scoreMissedFixtures: processed ${fixturesProcessed} fixtures, scored ${predictionsScored} predictions`,
+      { competitionId: competitionId ?? null, matchId: matchId ?? null, details },
+    );
+    return { fixturesProcessed, predictionsScored, details };
+  },
+);
+
+// =============================================================================
 // getAdminMetrics() → at-a-glance operational counts
 //
 // Predictions live under per-user subcollections that admins can't read
