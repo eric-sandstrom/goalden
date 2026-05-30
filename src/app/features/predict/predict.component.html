@@ -1,5 +1,15 @@
 <section class="page">
-  @if (showTabBar()) {
+  @if (compBarLoading()) {
+    <div class="comp-bar" aria-hidden="true">
+      <div class="comp-tabs-skel">
+        @for (w of compTabSkels; track w) {
+          <div class="comp-tab-skel">
+            <app-skel [width]="w" height="14px" />
+          </div>
+        }
+      </div>
+    </div>
+  } @else if (showTabBar()) {
     <div class="comp-bar">
       <mat-button-toggle-group
         class="comp-tabs"
@@ -11,45 +21,32 @@
         @for (tab of visibleComps(); track tab.key) {
           <mat-button-toggle [value]="tab.key" [attr.aria-label]="tab.comp.name">
             <span class="comp-tab-inner">
-              @if (tab.comp.emblem) {
-                <img
-                  class="comp-tab-crest"
-                  [src]="tab.comp.emblem"
-                  [alt]="tab.comp.name + ' emblem'"
-                  width="20"
-                  height="20"
-                />
-              }
+              <img
+                class="comp-tab-crest"
+                [src]="crestFor(tab.comp)"
+                [alt]="tab.comp.name + ' emblem'"
+                width="20"
+                height="20"
+                (error)="hideBrokenCrest($event)"
+              />
               <span class="comp-tab-label">{{ tab.comp.id }}</span>
             </span>
           </mat-button-toggle>
         }
       </mat-button-toggle-group>
-
-      <button
-        type="button"
-        mat-icon-button
-        class="show-all-toggle"
-        [class.active]="showAll()"
-        (click)="toggleShowAll()"
-        [attr.aria-label]="showAll() ? 'Show only my competitions' : 'Show all competitions'"
-        [attr.title]="showAll() ? 'Show only my competitions' : 'Show all competitions'"
-      >
-        <mat-icon>{{ showAll() ? 'filter_alt_off' : 'filter_alt' }}</mat-icon>
-      </button>
     </div>
   }
 
   <mat-card appearance="outlined" class="card-grow fixtures-card">
     <nav mat-tab-nav-bar [tabPanel]="fixturesPanel" class="filter-tabs" aria-label="Filter fixtures">
-      <a mat-tab-link [active]="filter() === 'UPCOMING'" (click)="filter.set('UPCOMING')">Upcoming</a>
-      <a mat-tab-link [active]="filter() === 'LIVE'" (click)="filter.set('LIVE')">Live</a>
-      <a mat-tab-link [active]="filter() === 'FINISHED'" (click)="filter.set('FINISHED')">Finished</a>
+      <a mat-tab-link [active]="filter() === 'UPCOMING'" (click)="selectFilter('UPCOMING')">Upcoming</a>
+      <a mat-tab-link [active]="filter() === 'LIVE'" (click)="selectFilter('LIVE')">Live</a>
+      <a mat-tab-link [active]="filter() === 'FINISHED'" (click)="selectFilter('FINISHED')">Finished</a>
       @if (showStageFilters()) {
-        <a mat-tab-link [active]="filter() === 'GROUP'" (click)="filter.set('GROUP')">Group</a>
-        <a mat-tab-link [active]="filter() === 'KNOCKOUTS'" (click)="filter.set('KNOCKOUTS')">Knockouts</a>
+        <a mat-tab-link [active]="filter() === 'GROUP'" (click)="selectFilter('GROUP')">Group</a>
+        <a mat-tab-link [active]="filter() === 'KNOCKOUTS'" (click)="selectFilter('KNOCKOUTS')">Knockouts</a>
       }
-      <a mat-tab-link [active]="filter() === 'ALL'" (click)="filter.set('ALL')">All</a>
+      <a mat-tab-link [active]="filter() === 'ALL'" (click)="selectFilter('ALL')">All</a>
     </nav>
 
     <mat-tab-nav-panel #fixturesPanel class="fixtures-panel">
