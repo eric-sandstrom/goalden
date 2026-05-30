@@ -1,0 +1,54 @@
+# Automated release management via release-please.
+#
+# How it works:
+#   1. On every push to main, release-please scans the conventional-commit
+#      history since the last release tag and maintains a standing "release PR"
+#      that bumps package.json + regenerates CHANGELOG.md from those commits.
+#        - feat:            -> minor bump   (1.0.0 -> 1.1.0)
+#        - fix: / perf:     -> patch bump   (1.0.0 -> 1.0.1)
+#        - feat!: / "BREAKING CHANGE:" footer -> major bump (1.0.0 -> 2.0.0)
+#      Commits whose type isn't release-worthy (chore/docs/ci/...) don't open a
+#      release PR on their own, but ride along in the next one.
+#   2. You review the release PR; merging it lands the version bump + changelog
+#      on main and creates the GitHub release + git tag (e.g. v1.1.0).
+#   3. That merge is itself a push to main, so deploy.yml runs: `npm run build`
+#      fires the `prebuild` hook (sync-changelog.mjs), which parses the freshly
+#      merged CHANGELOG.md into ngsw-config.json's appData. The deployed build
+#      then surfaces the accumulated changes in the in-app "What's new" dialog.
+#
+# Source of truth: PR titles. Because PRs are squash-merged, the squash commit
+# subject is the PR title — so PR titles MUST be conventional commits
+# (`feat: ...`, `fix: ...`). A non-conventional title is silently ignored and
+# its change won't appear in the changelog.
+#
+# Repo setting required (one-time): Settings -> Actions -> General ->
+# "Workflow permissions" -> tick "Allow GitHub Actions to create and approve
+# pull requests". Without it, release-please can't open the release PR using the
+# default GITHUB_TOKEN.
+
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Don't race with itself if two merges land close together.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Maintain release PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Defaults to release-please-config.json + .release-please-manifest.json
+          # at the repo root.
