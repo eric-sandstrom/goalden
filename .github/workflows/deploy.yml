@@ -1,6 +1,19 @@
-# Auto-deploy to Firebase on push to main.
+# Deploys to Firebase: Hosting (Angular app) + Cloud Functions + Firestore
+# rules + indexes.
 #
-# Deploys: Hosting (Angular app) + Cloud Functions + Firestore rules + indexes.
+# Triggers (changed from "every push to main"):
+#   - workflow_call:     invoked by release-please.yml ONLY when a release PR
+#                        merges (i.e. a new version is cut). Tying deploys to
+#                        releases keeps the deployed build's version in step
+#                        with CHANGELOG.md, so the in-app "What's new" dialog is
+#                        always populated (one reload prompt per release, never
+#                        an empty interim one).
+#   - workflow_dispatch: manual deploy from the Actions tab — hotfixes,
+#                        backend-only (functions/rules) changes you don't want
+#                        to wait for a release, or a plain re-deploy.
+#
+# Ordinary merges to main no longer deploy. To ship: cut a release (merge the
+# release PR), or run this workflow manually via workflow_dispatch.
 #
 # Authentication uses a Google Cloud service account. firebase-tools v15+
 # dropped support for the old FIREBASE_TOKEN env var, so we now pass a
@@ -23,9 +36,12 @@
 name: Deploy to Firebase
 
 on:
-  push:
-    branches: [main]
-  # Lets you re-deploy manually from the Actions tab without pushing a commit.
+  # Called in-line by release-please.yml when a release PR merges. (We can't
+  # trigger off the release tag: tags pushed by the default GITHUB_TOKEN don't
+  # start workflows — a GitHub anti-recursion safeguard.)
+  workflow_call:
+  # Manual deploy from the Actions tab — hotfixes, backend-only changes, or a
+  # plain re-deploy without cutting a release.
   workflow_dispatch:
 
 # Cancel in-progress deploys if a newer commit lands on main. Prevents two
