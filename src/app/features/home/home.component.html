@@ -74,28 +74,26 @@
           </mat-card>
         } @else if (availableViews().length > 0) {
           <mat-card appearance="outlined" class="fixtures-card matches-card">
-            <div class="matches-tabs">
-              <mat-button-toggle-group
-                [value]="currentView()"
-                (change)="setView($event.value)"
-                hideSingleSelectionIndicator
-                aria-label="Match list"
-              >
-                @for (v of availableViews(); track v) {
-                  <mat-button-toggle [value]="v">
-                    @if (v === 'live') {
-                      <span class="tab-live-dot" aria-hidden="true"></span>
-                    }
-                    {{ viewLabel(v) }}
-                  </mat-button-toggle>
-                }
-              </mat-button-toggle-group>
-              @if (paneSubtitle(); as subtitle) {
-                <p class="pane-subtitle">{{ subtitle }}</p>
+            <nav
+              mat-tab-nav-bar
+              [tabPanel]="matchesPanel"
+              class="matches-tab-nav"
+              aria-label="Match list"
+            >
+              @for (v of availableViews(); track v) {
+                <a mat-tab-link [active]="currentView() === v" (click)="setView(v)">
+                  @if (v === 'live') {
+                    <span class="tab-live-dot" aria-hidden="true"></span>
+                  }
+                  {{ viewLabel(v) }}
+                </a>
               }
-            </div>
+            </nav>
+            @if (paneSubtitle(); as subtitle) {
+              <p class="pane-subtitle">{{ subtitle }}</p>
+            }
 
-            <div class="rows">
+            <mat-tab-nav-panel #matchesPanel class="rows">
               @switch (currentView()) {
                 @case ('live') {
                   @for (f of liveFixtures(); track f.id) {
@@ -113,7 +111,7 @@
                   }
                 }
               }
-            </div>
+            </mat-tab-nav-panel>
 
             <mat-card-actions align="end">
               <a mat-button routerLink="/predict">
