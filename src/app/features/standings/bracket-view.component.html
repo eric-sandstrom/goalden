@@ -11,39 +11,49 @@
   <div class="bracket">
     <div class="bracket-track">
     @for (round of rounds(); track round.stage) {
-      <div class="round" [class.r-single]="round.matches.length === 1">
+      <div class="round" [class.r-single]="round.ties.length === 1">
         <h4 class="round-label">{{ round.label }}</h4>
         <div class="round-matches">
-          @for (m of round.matches; track m.id) {
-            <div class="match">
+          @for (tie of round.ties; track tie.id) {
+            <div class="match" [class.two-leg]="tie.legs.length > 0">
               <div
                 class="slot"
-                [class.winner]="m.winner === 'home'"
-                [class.tbd]="m.home.id === null"
-                [class.hl]="m.home.id !== null && highlightSet().has(m.home.id)"
+                [class.winner]="tie.winner === 'a'"
+                [class.tbd]="tie.sideA.team.id === null"
+                [class.hl]="tie.sideA.team.id !== null && highlightSet().has(tie.sideA.team.id)"
               >
-                @if (m.home.crest) {
-                  <img class="crest" [src]="m.home.crest" alt="" width="18" height="18" loading="lazy" />
+                @if (tie.sideA.team.crest) {
+                  <img class="crest" [src]="tie.sideA.team.crest" alt="" width="18" height="18" loading="lazy" />
                 } @else {
                   <span class="crest ph" aria-hidden="true"></span>
                 }
-                <span class="tla">{{ m.home.tla ?? m.home.name ?? 'TBD' }}</span>
-                <span class="sc">{{ m.homeScore }}</span>
+                <span class="tla">{{ tie.sideA.team.tla ?? tie.sideA.team.name ?? 'TBD' }}</span>
+                <span class="sc">{{ tie.sideA.score }}</span>
               </div>
               <div
                 class="slot"
-                [class.winner]="m.winner === 'away'"
-                [class.tbd]="m.away.id === null"
-                [class.hl]="m.away.id !== null && highlightSet().has(m.away.id)"
+                [class.winner]="tie.winner === 'b'"
+                [class.tbd]="tie.sideB.team.id === null"
+                [class.hl]="tie.sideB.team.id !== null && highlightSet().has(tie.sideB.team.id)"
               >
-                @if (m.away.crest) {
-                  <img class="crest" [src]="m.away.crest" alt="" width="18" height="18" loading="lazy" />
+                @if (tie.sideB.team.crest) {
+                  <img class="crest" [src]="tie.sideB.team.crest" alt="" width="18" height="18" loading="lazy" />
                 } @else {
                   <span class="crest ph" aria-hidden="true"></span>
                 }
-                <span class="tla">{{ m.away.tla ?? m.away.name ?? 'TBD' }}</span>
-                <span class="sc">{{ m.awayScore }}</span>
+                <span class="tla">{{ tie.sideB.team.tla ?? tie.sideB.team.name ?? 'TBD' }}</span>
+                <span class="sc">{{ tie.sideB.score }}</span>
               </div>
+              @if (tie.legs.length > 0) {
+                <div class="legs">
+                  @for (leg of tie.legs; track leg.label) {
+                    <span class="leg">
+                      <span class="leg-label">{{ leg.label }}</span>
+                      <span class="leg-score">{{ leg.a ?? '–' }}–{{ leg.b ?? '–' }}</span>
+                    </span>
+                  }
+                </div>
+              }
             </div>
           }
         </div>
@@ -55,23 +65,23 @@
         <h4 class="round-label">3rd place</h4>
         <div class="round-matches">
           <div class="match">
-            <div class="slot" [class.winner]="tp.winner === 'home'" [class.tbd]="tp.home.id === null">
-              @if (tp.home.crest) {
-                <img class="crest" [src]="tp.home.crest" alt="" width="18" height="18" loading="lazy" />
+            <div class="slot" [class.winner]="tp.winner === 'a'" [class.tbd]="tp.sideA.team.id === null">
+              @if (tp.sideA.team.crest) {
+                <img class="crest" [src]="tp.sideA.team.crest" alt="" width="18" height="18" loading="lazy" />
               } @else {
                 <span class="crest ph" aria-hidden="true"></span>
               }
-              <span class="tla">{{ tp.home.tla ?? tp.home.name ?? 'TBD' }}</span>
-              <span class="sc">{{ tp.homeScore }}</span>
+              <span class="tla">{{ tp.sideA.team.tla ?? tp.sideA.team.name ?? 'TBD' }}</span>
+              <span class="sc">{{ tp.sideA.score }}</span>
             </div>
-            <div class="slot" [class.winner]="tp.winner === 'away'" [class.tbd]="tp.away.id === null">
-              @if (tp.away.crest) {
-                <img class="crest" [src]="tp.away.crest" alt="" width="18" height="18" loading="lazy" />
+            <div class="slot" [class.winner]="tp.winner === 'b'" [class.tbd]="tp.sideB.team.id === null">
+              @if (tp.sideB.team.crest) {
+                <img class="crest" [src]="tp.sideB.team.crest" alt="" width="18" height="18" loading="lazy" />
               } @else {
                 <span class="crest ph" aria-hidden="true"></span>
               }
-              <span class="tla">{{ tp.away.tla ?? tp.away.name ?? 'TBD' }}</span>
-              <span class="sc">{{ tp.awayScore }}</span>
+              <span class="tla">{{ tp.sideB.team.tla ?? tp.sideB.team.name ?? 'TBD' }}</span>
+              <span class="sc">{{ tp.sideB.score }}</span>
             </div>
           </div>
         </div>

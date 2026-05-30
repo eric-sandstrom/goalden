@@ -111,6 +111,37 @@
   min-width: 1ch;
   text-align: right;
 }
+/* The aggregate is the decisive number on a two-legged tie — give it the
+   weight the per-leg scores below don't have. */
+.match.two-leg .sc {
+  font-weight: 700;
+}
+
+/* Per-leg scorelines for a two-legged tie, oriented top-row–bottom-row (A–B).
+   A muted footer so the aggregate on the team rows stays the headline. */
+.legs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.6rem;
+  padding: 0.22rem 0.45rem;
+  border-top: 1px dashed var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container);
+  font-size: 0.66rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+.leg {
+  display: inline-flex;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+.leg-label {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.leg-score {
+  font-variant-numeric: tabular-nums;
+  color: var(--mat-sys-on-surface);
+}
 
 /* Third-place playoff sits off the main tree. */
 .third {

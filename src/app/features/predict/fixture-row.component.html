@@ -146,6 +146,12 @@
   }
 
   <div class="meta">
+    @if (legBadge(); as lg) {
+      <span class="leg-badge" [title]="lg.title">
+        <mat-icon class="leg-badge-icon" aria-hidden="true">repeat</mat-icon>
+        {{ lg.label }}
+      </span>
+    }
     @if (tbd()) {
       <span class="status tbd">
         <mat-icon class="status-icon" aria-hidden="true">hourglass_empty</mat-icon>

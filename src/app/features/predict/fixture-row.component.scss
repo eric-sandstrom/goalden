@@ -233,7 +233,30 @@ a.team-link:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
   margin-top: 0.5rem;
+}
+/* Two-leg tie marker — a quiet outlined pill so it reads as context, not a
+   call to action competing with the kickoff/lock status beside it. */
+.leg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+}
+.leg-badge-icon {
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+  line-height: 13px;
 }
 .status {
   display: inline-flex;

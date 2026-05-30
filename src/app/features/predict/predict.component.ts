@@ -12,7 +12,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
-import { Fixture, isKnockout } from '../../core/models/fixture.model';
+import { Fixture, LegInfo, buildLegMap, isKnockout } from '../../core/models/fixture.model';
 import { Competition } from '../../core/models/competition.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
@@ -267,6 +267,17 @@ export class PredictComponent {
 
   protected predictionFor(matchId: string) {
     return this.predictionsService.matchPredictions().get(matchId) ?? null;
+  }
+
+  /** `matchId → leg position` for the comp's two-legged knockout ties, so each
+   *  leg's row can show a "1st leg" / "2nd leg" badge. Empty for single-match
+   *  competitions (the World Cup) — those fixtures pair to nothing. */
+  private readonly legMap = computed<ReadonlyMap<string, LegInfo>>(() =>
+    buildLegMap(this.currentFixtures()),
+  );
+
+  protected legFor(matchId: string): LegInfo | null {
+    return this.legMap().get(matchId) ?? null;
   }
 
   private applyFilter(fixtures: readonly Fixture[], f: Filter): readonly Fixture[] {

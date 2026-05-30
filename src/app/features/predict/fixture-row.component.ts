@@ -13,7 +13,7 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
-import { Fixture, isLocked, isTbd } from '../../core/models/fixture.model';
+import { Fixture, LegInfo, isLocked, isTbd } from '../../core/models/fixture.model';
 import {
   MatchPrediction,
   PredictionsService,
@@ -38,6 +38,9 @@ import {
 export class FixtureRowComponent {
   readonly fixture = input.required<Fixture>();
   readonly prediction = input<MatchPrediction | null>(null);
+  /** Set when this fixture is one leg of a two-legged knockout tie — drives the
+   *  "1st leg" / "2nd leg" badge. Null for single-match knockouts and groups. */
+  readonly leg = input<LegInfo | null>(null);
   /** When true (default), the row saves the pick automatically a beat after
    *  the score changes. Set false to defer saving to an explicit `save()`
    *  call — e.g. the predict-next card persists only when you press Next. */
@@ -89,6 +92,21 @@ export class FixtureRowComponent {
       minute: '2-digit',
     }),
   );
+
+  /** "1st leg" / "2nd leg" badge for a two-legged tie, with a tooltip pointing
+   *  to when the other leg is played. Null when this isn't part of a tie. */
+  protected readonly legBadge = computed<{ label: string; title: string } | null>(() => {
+    const lg = this.leg();
+    if (!lg) return null;
+    const otherDate = lg.otherLegKickoff.toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+    return lg.leg === 1
+      ? { label: '1st leg', title: `Second leg ${otherDate}` }
+      : { label: '2nd leg', title: `First leg ${otherDate}` };
+  });
 
   protected readonly lockChip = computed<{
     label: string;
