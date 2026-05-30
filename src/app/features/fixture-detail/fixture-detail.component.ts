@@ -466,6 +466,16 @@ export class FixtureDetailComponent {
     return c && c.name ? c.name : null;
   }
 
+  /** Surname for the compact (small-screen) bench chip. */
+  protected surname(name: string | null): string {
+    return lastName(name);
+  }
+
+  /** Short position code (CB, DM, LW…) for the compact bench chip. */
+  protected posAbbr(pos: string | null): string {
+    return positionAbbr(pos);
+  }
+
   /** Formation string (e.g. "4-3-3") for a side, or null. */
   protected formationOf(side: 'home' | 'away'): string | null {
     return this.lineupFor(side)?.formation ?? null;
@@ -598,6 +608,27 @@ function lastName(name: string | null): string {
   if (!name) return '';
   const parts = name.trim().split(/\s+/);
   return parts[parts.length - 1];
+}
+
+/** Short code for a football-data position, e.g. "Centre-Back" → "CB". */
+function positionAbbr(pos: string | null): string {
+  const p = (pos ?? '').toLowerCase();
+  if (!p) return '';
+  if (p.includes('goal')) return 'GK';
+  if (p.includes('left') && p.includes('back')) return 'LB';
+  if (p.includes('right') && p.includes('back')) return 'RB';
+  if (p.includes('back')) return 'CB';
+  if (p === 'defence' || p.includes('defender')) return 'DEF';
+  if (p.includes('defensive mid')) return 'DM';
+  if (p.includes('attacking mid')) return 'AM';
+  if (p.includes('left') && p.includes('mid')) return 'LM';
+  if (p.includes('right') && p.includes('mid')) return 'RM';
+  if (p.includes('mid')) return 'CM';
+  if (p.includes('left') && p.includes('wing')) return 'LW';
+  if (p.includes('right') && p.includes('wing')) return 'RW';
+  if (p.includes('wing')) return 'WG';
+  if (p.includes('forward') || p.includes('strik') || p === 'offence') return 'FW';
+  return '';
 }
 
 /**

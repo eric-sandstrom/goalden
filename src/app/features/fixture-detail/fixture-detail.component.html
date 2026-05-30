@@ -256,20 +256,33 @@
                           <ul class="bench">
                             @for (b of benchFor($any(side)); track $index) {
                               <li class="bench-row" [class.came-on]="b.onMinute !== null">
-                                <span
-                                  class="shirt"
-                                  [style.background-color]="fill($any(side))"
-                                  [style.border-color]="ring($any(side))"
-                                  [style.color]="fg($any(side))"
-                                  >{{ b.player.shirtNumber ?? '–' }}</span
-                                >
+                                <span class="shirt-wrap">
+                                  <span
+                                    class="shirt"
+                                    [style.background-color]="fill($any(side))"
+                                    [style.border-color]="ring($any(side))"
+                                    [style.color]="fg($any(side))"
+                                    >{{ b.player.shirtNumber ?? '–' }}</span
+                                  >
+                                  @if (b.onMinute !== null) {
+                                    <span class="on-badge" aria-label="Came on">
+                                      <mat-icon aria-hidden="true">arrow_upward</mat-icon>
+                                    </span>
+                                  }
+                                </span>
                                 <span class="bench-text">
+                                  <!-- Wide layout: full name + sub line -->
                                   <span class="bench-name">{{ b.player.name }}</span>
                                   @if (b.onMinute !== null) {
                                     <span class="bench-sub">
                                       <mat-icon aria-hidden="true">arrow_upward</mat-icon>
                                       {{ b.onMinute }}'@if (b.outName) { · {{ b.outName }} }
                                     </span>
+                                  }
+                                  <!-- Compact (small-screen) layout: last name + position -->
+                                  <span class="bench-last">{{ surname(b.player.name) }}</span>
+                                  @if (posAbbr(b.player.position); as pos) {
+                                    <span class="bench-pos">{{ pos }}</span>
                                   }
                                 </span>
                               </li>

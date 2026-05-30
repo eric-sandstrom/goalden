@@ -270,6 +270,14 @@ app-bottom-nav {
   animation: route-slide-in-left 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+// Query-param-only navigation (same path) — no animation. Used for in-view
+// state changes like the fixture-detail tab or the Matches comp/filter, so
+// they don't cross-fade the whole page.
+:root[data-route-direction='none']::view-transition-old(root),
+:root[data-route-direction='none']::view-transition-new(root) {
+  animation: none !important;
+}
+
 // Honour the user's reduced-motion preference: cut every transition animation
 // (the `!important` overrides the directional rules above) so navigations
 // resolve instantly. The bottom-nav stays lifted out either way — harmless.
