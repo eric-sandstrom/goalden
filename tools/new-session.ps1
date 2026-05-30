@@ -64,13 +64,44 @@ if ($Port -eq 0) {
   while ($used -contains $Port) { $Port++ }
 }
 
+# --- base the new worktree on the latest main --------------------------------
+# Fetch so we branch from up-to-date main even when work was merged via GitHub
+# (origin advances but local main can lag). Offline: fall back to local refs.
+git -C $root fetch origin main --quiet 2>$null
+$baseRef = 'main'
+$localMain = git -C $root rev-parse --verify -q main 2>$null
+$originMain = git -C $root rev-parse --verify -q origin/main 2>$null
+if ($originMain) {
+  if (-not $localMain) {
+    $baseRef = 'origin/main'
+  } else {
+    git -C $root merge-base --is-ancestor $localMain $originMain 2>$null
+    if ($LASTEXITCODE -eq 0) {
+      # origin/main is ahead of (or equal to) local main: branch from latest.
+      $baseRef = 'origin/main'
+      # Keep the hub current too: fast-forward local main when it is safe.
+      if ($localMain -ne $originMain -and
+          (git -C $root symbolic-ref --quiet --short HEAD) -eq 'main' -and
+          -not (git -C $root status --porcelain)) {
+        git -C $root merge --ff-only origin/main --quiet 2>$null
+      }
+    }
+    # else: local main has commits origin lacks (unpushed/diverged) -> keep local main
+  }
+}
+
+# Branch from the resolved commit, not the ref, so the session branch does NOT
+# inherit origin/main as its upstream (which would muddle git status / push).
+$baseSha = git -C $root rev-parse $baseRef 2>$null
+
 Write-Host 'Creating worktree:' -ForegroundColor Cyan
 Write-Host "  path   $dest"
 Write-Host "  branch $Branch"
+Write-Host "  base   $baseRef ($(git -C $root rev-parse --short $baseRef 2>$null))"
 Write-Host "  port   $Port"
 
 # --- create the worktree -----------------------------------------------------
-git -C $root worktree add -b $Branch $dest
+git -C $root worktree add -b $Branch $dest $baseSha
 if ($LASTEXITCODE -ne 0) { throw 'git worktree add failed' }
 
 # --- record port + base commit (git-ignored, per-worktree) -------------------
