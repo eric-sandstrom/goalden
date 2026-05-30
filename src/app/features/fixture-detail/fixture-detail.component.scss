@@ -343,6 +343,14 @@
   flex: none;
 }
 
+.ev-icon.sub {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: #2e8b3d;
+}
+
 .card {
   width: 12px;
   height: 16px;
@@ -503,6 +511,21 @@
   // Left accent colour is set inline from the team's colours.
   border-left: 3px solid var(--mat-sys-outline-variant);
   padding-left: 10px;
+
+  // Away column mirrors so the two sides read outward from the centre.
+  &.away {
+    text-align: right;
+
+    .subs-team {
+      flex-direction: row-reverse;
+    }
+    .sub-item {
+      flex-direction: row-reverse;
+    }
+    .sub-names {
+      align-items: flex-end;
+    }
+  }
 }
 
 .subs-team {
@@ -593,18 +616,60 @@
   }
 }
 
+// Away bench mirrors the home one: shirt number on the right, names + heading
+// right-aligned, so the two columns read outward like a team sheet.
+.bench-col.away {
+  text-align: right;
+
+  .bench-row {
+    flex-direction: row-reverse;
+  }
+  .bench-name {
+    text-align: right;
+  }
+  .coach {
+    flex-direction: row-reverse;
+    margin: 8px 16px 0 0;
+  }
+}
+
+.bench {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bench-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bench-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Shirt-number disc, coloured per team (fill / ring / text set inline).
 .shirt {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 600;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--mat-sys-on-surface-variant);
-
-  &.bench {
-    opacity: 0.7;
-  }
+  flex: none;
 }
 
 .coach {

@@ -122,6 +122,7 @@
                                   @case ('goal') { Goal }
                                   @case ('yellow') { Yellow card }
                                   @case ('red') { Red card }
+                                  @case ('sub') { Substitution }
                                 }
                               </span>
                               @switch (item.kind) {
@@ -130,6 +131,9 @@
                                 }
                                 @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
                                 @case ('red') { <span class="card red" aria-hidden="true"></span> }
+                                @case ('sub') {
+                                  <mat-icon class="ev-icon sub" aria-hidden="true">swap_horiz</mat-icon>
+                                }
                               }
                               <span class="ev-text">
                                 <span class="ev-player">{{ item.player }}</span>
@@ -149,6 +153,7 @@
                                   @case ('goal') { Goal }
                                   @case ('yellow') { Yellow card }
                                   @case ('red') { Red card }
+                                  @case ('sub') { Substitution }
                                 }
                               </span>
                               @switch (item.kind) {
@@ -157,6 +162,9 @@
                                 }
                                 @case ('yellow') { <span class="card yellow" aria-hidden="true"></span> }
                                 @case ('red') { <span class="card red" aria-hidden="true"></span> }
+                                @case ('sub') {
+                                  <mat-icon class="ev-icon sub" aria-hidden="true">swap_horiz</mat-icon>
+                                }
                               }
                               <span class="ev-text">
                                 <span class="ev-player">{{ item.player }}</span>
@@ -222,7 +230,7 @@
                   <div class="subs-grid">
                     @for (side of ['home', 'away']; track side) {
                       @if (subsFor($any(side)).length > 0) {
-                        <section class="subs-col" [style.border-left-color]="fill($any(side))">
+                        <section class="subs-col" [class.away]="side === 'away'" [style.border-left-color]="fill($any(side))">
                           <h4 class="subs-team">
                             <span
                               class="team-dot"
@@ -255,17 +263,23 @@
                 <div class="benches">
                   @for (side of ['home', 'away']; track side) {
                     @if (lineupFor($any(side)); as lu) {
-                      <section class="bench-col">
+                      <section class="bench-col" [class.away]="side === 'away'">
                         <h3 class="section-h">{{ teamName($any(side)) }}</h3>
                         @if (lu.bench.length > 0) {
-                          <mat-list>
+                          <ul class="bench">
                             @for (p of lu.bench; track $index) {
-                              <mat-list-item>
-                                <span matListItemAvatar class="shirt bench">{{ p.shirtNumber ?? '–' }}</span>
-                                <span matListItemTitle>{{ p.name }}</span>
-                              </mat-list-item>
+                              <li class="bench-row">
+                                <span
+                                  class="shirt"
+                                  [style.background-color]="fill($any(side))"
+                                  [style.border-color]="ring($any(side))"
+                                  [style.color]="fg($any(side))"
+                                  >{{ p.shirtNumber ?? '–' }}</span
+                                >
+                                <span class="bench-name">{{ p.name }}</span>
+                              </li>
                             }
-                          </mat-list>
+                          </ul>
                         } @else {
                           <p class="muted">No bench listed</p>
                         }

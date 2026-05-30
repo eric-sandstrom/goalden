@@ -30,7 +30,7 @@ interface TimelineItem {
   readonly sortKey: number;
   readonly minuteLabel: string;
   readonly side: Side;
-  readonly kind: 'goal' | 'yellow' | 'red';
+  readonly kind: 'goal' | 'yellow' | 'red' | 'sub';
   readonly player: string;
   readonly note: string | null;
 }
@@ -302,6 +302,18 @@ export class FixtureDetailComponent {
         kind: b.card === 'RED' ? 'red' : 'yellow',
         player: b.player?.name ?? (b.card === 'RED' ? 'Red card' : 'Booking'),
         note: null,
+      });
+    });
+
+    d.substitutions.forEach((s, i) => {
+      items.push({
+        key: `sub${i}`,
+        sortKey: sortKey(s.minute, null),
+        minuteLabel: minuteLabel(s.minute, null),
+        side: this.sideOf(s.teamId),
+        kind: 'sub',
+        player: s.playerIn?.name ?? 'Substitution',
+        note: s.playerOut?.name ? `for ${s.playerOut.name}` : null,
       });
     });
 
