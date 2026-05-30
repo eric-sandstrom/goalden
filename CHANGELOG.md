@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/eric-sandstrom/goalden/compare/v1.2.0...v1.3.0) (2026-05-30)
+
+
+### Features
+
+* **fixture-detail:** rich match-detail design — scoreboard, events, pitch line-ups ([#28](https://github.com/eric-sandstrom/goalden/issues/28)) ([935338c](https://github.com/eric-sandstrom/goalden/commit/935338caeb5ba64d5eefb917cb892bbbfd27b5c9))
+
 ## [1.2.0](https://github.com/eric-sandstrom/goalden/compare/v1.1.1...v1.2.0) (2026-05-30)
 
 
