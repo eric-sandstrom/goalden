@@ -41,7 +41,10 @@ interface FdCompetition {
   readonly id: number;
   readonly area: FdArea;
   readonly name: string;
-  readonly code: string;
+  // football-data leaves `code` blank/absent for some competitions
+  // (more common since the tier upgrade). We key docs on `code`, so
+  // code-less comps get filtered out below rather than typed as required.
+  readonly code?: string | null;
   readonly type: 'LEAGUE' | 'CUP';
   readonly emblem: string | null;
   readonly plan?: string;
@@ -60,6 +63,14 @@ interface FdResponse {
  *  error, rather than consuming the whole budget and surfacing an opaque
  *  `deadline-exceeded` (the Cloud Run 504) to the client. */
 const FETCH_TIMEOUT_MS = 20_000;
+
+/** Competition code we use as the Firestore doc id. football-data leaves it
+ *  blank for some comps (e.g. Superettan), so fall back to the first three
+ *  alphanumeric letters of the name, uppercased (e.g. "Superettan" -> "SUP"). */
+function resolveCode(c: FdCompetition): string {
+  if (typeof c.code === 'string' && c.code.length > 0) return c.code;
+  return c.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
+}
 
 export const syncCompetitionsFromApi = onCall(
   { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN] },
@@ -102,8 +113,23 @@ export const syncCompetitionsFromApi = onCall(
     const data = (await res.json()) as FdResponse;
     logger.info(`Discovered ${data.competitions.length} competitions`);
 
+    // We key competition docs on `code`. football-data returns some comps
+    // (e.g. Superettan, fdId 2074) with a blank/missing code, which would
+    // throw at `.doc(c.code)`. Fall back to the first 3 letters of the name,
+    // uppercased, and use that as both the code and the doc id.
+    const competitions = data.competitions.map((c) => ({
+      ...c,
+      code: resolveCode(c),
+    }));
+    const derived = competitions.filter((c, i) => c.code !== data.competitions[i].code);
+    if (derived.length > 0) {
+      logger.warn(`Derived a code for ${derived.length} competition(s) with none`, {
+        names: derived.map((c) => `${c.name} -> ${c.code} (fdId ${c.id})`),
+      });
+    }
+
     const db = getFirestore();
-    const refs = data.competitions.map((c) => db.collection('competitions').doc(c.code));
+    const refs = competitions.map((c) => db.collection('competitions').doc(c.code));
     const snapshots = refs.length > 0 ? await db.getAll(...refs) : [];
     const existingByCode = new Map<string, FirebaseFirestore.DocumentSnapshot>();
     for (const s of snapshots) existingByCode.set(s.id, s);
@@ -112,7 +138,7 @@ export const syncCompetitionsFromApi = onCall(
     let updated = 0;
     const batch = db.batch();
 
-    for (const c of data.competitions) {
+    for (const c of competitions) {
       const ref = db.collection('competitions').doc(c.code);
       const existing = existingByCode.get(c.code);
 
@@ -159,7 +185,7 @@ export const syncCompetitionsFromApi = onCall(
       }
     }
 
-    if (data.competitions.length > 0) {
+    if (competitions.length > 0) {
       await batch.commit();
     }
 
@@ -167,6 +193,7 @@ export const syncCompetitionsFromApi = onCall(
     return {
       ok: true,
       discovered: data.competitions.length,
+      derived: derived.length,
       created,
       updated,
     };

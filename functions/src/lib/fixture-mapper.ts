@@ -69,7 +69,15 @@ export interface FixtureDoc {
     crest: string | null;
   };
   utcKickoff: Timestamp;
+  /** Our normalised status. Mostly football-data's status mapped through
+   *  STATUS_MAP, but a non-live match that carries a final score is forced
+   *  to 'FINISHED' even if the provider labelled it CANCELLED/POSTPONED —
+   *  see normalizeStatus. This is the status every consumer (lock, scoring,
+   *  UI, filters) reads. */
   status: string;
+  /** Raw football-data status, kept verbatim for traceability so we never
+   *  lose what the provider actually reported when `status` was normalised. */
+  apiStatus: string;
   stage: string;
   group: string | null;
   score: {
@@ -125,10 +133,35 @@ export function mapGroup(g: string | null): string | null {
   return g ? g.replace(/^GROUP_/, '') : null;
 }
 
+/**
+ * Normalises a mapped status against whether the match has a final score.
+ *
+ * football-data occasionally publishes a played match's full-time result
+ * while still labelling it CANCELLED (or POSTPONED) — and counts it in the
+ * official table. A non-live match that carries a result is, for our
+ * purposes, finished: forcing it to 'FINISHED' keeps the one `status` field
+ * truthful for every consumer (lock, scoring trigger, UI badges, filters).
+ *
+ * Pass-through cases: no result yet (nothing to finish), live in-progress
+ * (IN_PLAY/PAUSED — a live score isn't a full-time result), and the already
+ * meaningful terminal results FINISHED / AWARDED (a walkover stays AWARDED).
+ */
+export function normalizeStatus(mapped: string, hasResult: boolean): string {
+  if (!hasResult) return mapped;
+  if (mapped === 'IN_PLAY' || mapped === 'PAUSED') return mapped;
+  if (mapped === 'FINISHED' || mapped === 'AWARDED') return mapped;
+  return 'FINISHED';
+}
+
 export function mapFixture(
   m: FootballDataMatch,
   ctx: FixtureMapContext = DEFAULT_CONTEXT,
 ): FixtureDoc {
+  const mappedStatus = STATUS_MAP[m.status] ?? 'TIMED';
+  const fullTime =
+    m.score.fullTime.home !== null && m.score.fullTime.away !== null
+      ? { home: m.score.fullTime.home, away: m.score.fullTime.away }
+      : null;
   return {
     competitionId: ctx.competitionId,
     season: ctx.season,
@@ -145,14 +178,12 @@ export function mapFixture(
       crest: m.awayTeam.crest,
     },
     utcKickoff: Timestamp.fromDate(new Date(m.utcDate)),
-    status: STATUS_MAP[m.status] ?? 'TIMED',
+    status: normalizeStatus(mappedStatus, fullTime !== null),
+    apiStatus: m.status,
     stage: STAGE_MAP[m.stage] ?? m.stage,
     group: mapGroup(m.group),
     score: {
-      fullTime:
-        m.score.fullTime.home !== null && m.score.fullTime.away !== null
-          ? { home: m.score.fullTime.home, away: m.score.fullTime.away }
-          : null,
+      fullTime,
       winner: mapWinner(m.score.winner),
     },
   };
@@ -162,6 +193,11 @@ export function mapFixture(
 export function fixtureChanged(existing: FixtureDoc | undefined, next: FixtureDoc): boolean {
   if (!existing) return true;
   if (existing.status !== next.status) return true;
+  // Persist raw-status changes too (e.g. CANCELLED→POSTPONED) so the
+  // traceability field stays accurate even when the normalised status is
+  // unchanged. `existing.apiStatus` is undefined for docs written before
+  // this field existed — treat that as changed so they backfill on next poll.
+  if ((existing.apiStatus ?? null) !== next.apiStatus) return true;
   if (existing.utcKickoff.toMillis() !== next.utcKickoff.toMillis()) return true;
   const a = existing.score;
   const b = next.score;

@@ -10,7 +10,11 @@ import { requireAdminOrEmulator } from './lib/admin-check';
  * the scheduled function runs, so verifying the dev path verifies the
  * production path too.
  *
- * Refuses to run anywhere except the local Functions emulator.
+ * Accepts an optional `compId` to scope the poll to one competition. Without
+ * it, polls teams for every `competitions/* where active == true`, same as
+ * the scheduled cron.
+ *
+ * Gated by `requireAdminOrEmulator`.
  */
 export const devPollTeamsNow = onCall(
   { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN] },
@@ -25,8 +29,18 @@ export const devPollTeamsNow = onCall(
       );
     }
 
-    const result = await runPollTeams(token);
-    logger.info('devPollTeamsNow finished', result);
+    const compId = request.data?.compId;
+    if (compId !== undefined && (typeof compId !== 'string' || compId.length === 0)) {
+      throw new HttpsError('invalid-argument', 'compId must be a non-empty string when provided');
+    }
+
+    const result = await runPollTeams(token, compId);
+    logger.info('devPollTeamsNow finished', {
+      compId: compId ?? '(all active)',
+      fetched: result.fetched,
+      written: result.written,
+      perComp: result.competitions.length,
+    });
     return result;
   },
 );
