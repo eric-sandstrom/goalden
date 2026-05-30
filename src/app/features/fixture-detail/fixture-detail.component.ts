@@ -14,7 +14,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatTabsModule } from '@angular/material/tabs';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Fixture } from '../../core/models/fixture.model';
 import { MatchDetail, MatchLineup } from '../../core/models/match-detail.model';
 import { FixturesService } from '../../core/services/fixtures.service';
@@ -39,6 +39,15 @@ interface InfoRow {
   readonly value: string;
 }
 
+type TabId = 'lineups' | 'subs' | 'officials' | 'info';
+
+interface DetailTab {
+  readonly id: TabId;
+  readonly icon: string;
+  /** Tooltip + accessible name for the icon-only rail button. */
+  readonly label: string;
+}
+
 const STAGE_LABELS: Record<string, string> = {
   GROUP: 'Group stage',
   REGULAR_SEASON: 'League',
@@ -60,7 +69,7 @@ const STAGE_LABELS: Record<string, string> = {
     MatIconModule,
     MatListModule,
     MatProgressSpinnerModule,
-    MatTabsModule,
+    MatTooltipModule,
     SkelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -274,6 +283,46 @@ export class FixtureDetailComponent {
     }
     return rows;
   });
+
+  // --- vertical icon-rail tabs -----------------------------------------------
+
+  /** The tabs the rail shows, top to bottom. Line-ups / Subs / Officials only
+   *  appear when their data is present; Info is always available (it's built
+   *  from the fixture). */
+  protected readonly availableTabs = computed<readonly DetailTab[]>(() => {
+    const tabs: DetailTab[] = [];
+    if (this.hasLineups()) tabs.push({ id: 'lineups', icon: 'groups', label: 'Line-ups' });
+    if (this.hasSubs()) tabs.push({ id: 'subs', icon: 'swap_horiz', label: 'Substitutions' });
+    if (this.hasReferees()) tabs.push({ id: 'officials', icon: 'sports', label: 'Officials' });
+    tabs.push({ id: 'info', icon: 'info', label: 'Match info' });
+    return tabs;
+  });
+
+  /** User's explicit pick; null until they tap a tab (then `activeId` falls
+   *  back to the first available one). */
+  private readonly selectedId = signal<TabId | null>(null);
+
+  /** The resolved active tab — the user's pick when it's still available,
+   *  otherwise the first tab in the rail. */
+  protected readonly activeId = computed<TabId>(() => {
+    const tabs = this.availableTabs();
+    const sel = this.selectedId();
+    if (sel && tabs.some((t) => t.id === sel)) return sel;
+    return tabs[0]?.id ?? 'info';
+  });
+
+  /** Direction the panel slides on the last switch — 'down' when moving to a
+   *  lower tab in the rail (content enters from below), 'up' otherwise. Drives
+   *  the vertical enter animation. */
+  protected readonly slideDir = signal<'up' | 'down'>('down');
+
+  protected selectTab(id: TabId): void {
+    const tabs = this.availableTabs();
+    const from = tabs.findIndex((t) => t.id === this.activeId());
+    const to = tabs.findIndex((t) => t.id === id);
+    this.slideDir.set(to >= from ? 'down' : 'up');
+    this.selectedId.set(id);
+  }
 
   /** Side ('home' badge column) for a given event team id. */
   protected sideOf(teamId: number | null): Side {
