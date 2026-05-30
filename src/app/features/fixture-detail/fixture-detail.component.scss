@@ -56,13 +56,30 @@
   padding-left: calc(var(--rail-w) + var(--rail-gap));
 }
 
-// ===== Competition chip =====
+// ===== Venue + competition chip =====
+
+.venue-line {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 0.7rem;
+  color: var(--mat-sys-on-surface-variant);
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+  }
+}
 
 .comp-chip {
   align-self: center;
   display: inline-flex;
   align-items: center;
-  padding: 3px 12px;
+  gap: 6px;
+  padding: 3px 12px 3px 8px;
   margin-bottom: 12px;
   border-radius: 999px;
   background: var(--mat-sys-secondary-container);
@@ -70,6 +87,12 @@
   font-size: 0.76rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+
+  .comp-logo {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
 }
 
 // ===== Scoreboard =====
@@ -144,6 +167,12 @@
       font-size: 1.2rem;
       text-transform: uppercase;
     }
+  }
+
+  .ht {
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--mat-sys-on-surface-variant);
   }
 
   .status {
@@ -424,7 +453,10 @@
     font-size: 0.78rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    // Background/foreground are set inline from each club's colours; the ring
+    // + shadow keep any colour legible against the green pitch.
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   }
 
   .mname {
@@ -437,17 +469,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  &.home .dot {
-    background: var(--mat-sys-primary);
-    color: var(--mat-sys-on-primary);
-    border: 2px solid rgba(255, 255, 255, 0.9);
-  }
-  &.away .dot {
-    background: #ffffff;
-    color: #14110e;
-    border: 2px solid rgba(0, 0, 0, 0.18);
   }
 }
 
@@ -472,15 +493,9 @@
 }
 
 .subs-col {
-  border-left: 3px solid transparent;
+  // Left accent colour is set inline from the team's colours.
+  border-left: 3px solid var(--mat-sys-outline-variant);
   padding-left: 10px;
-
-  &.home {
-    border-left-color: var(--mat-sys-primary);
-  }
-  &.away {
-    border-left-color: var(--mat-sys-tertiary);
-  }
 }
 
 .subs-team {

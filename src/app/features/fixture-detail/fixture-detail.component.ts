@@ -20,6 +20,7 @@ import { MatchDetail, MatchLineup, MatchPlayer } from '../../core/models/match-d
 import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { MatchDetailService } from '../../core/services/match-detail.service';
+import { TeamsService } from '../../core/services/teams.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 
 type Side = 'home' | 'away' | 'neutral';
@@ -88,6 +89,7 @@ export class FixtureDetailComponent {
   private readonly fixtures = inject(FixturesService);
   private readonly matchDetail = inject(MatchDetailService);
   private readonly competitions = inject(CompetitionsService);
+  private readonly teamsService = inject(TeamsService);
   private readonly snackBar = inject(MatSnackBar);
 
   /** football-data match id from the route (`/matches/:id`), bound via
@@ -145,6 +147,43 @@ export class FixtureDetailComponent {
     return this.competitions.byId(f.competitionId)?.name ?? f.competitionId;
   });
 
+  /** Competition logo for the chip. Falls back to football-data's
+   *  crest-by-code endpoint when the synced emblem is missing (e.g. CL). */
+  protected readonly competitionEmblem = computed<string | null>(() => {
+    const f = this.fixture();
+    if (!f) return null;
+    return (
+      this.competitions.byId(f.competitionId)?.emblem ??
+      `https://crests.football-data.org/${f.competitionId}.png`
+    );
+  });
+
+  /** Half-time score for the header sub-line. Null until detail loads. */
+  protected readonly halfTimeLabel = computed<string | null>(() => {
+    const ht = this.detail()?.score.halfTime;
+    if (!ht || ht.home === null || ht.away === null) return null;
+    return `${ht.home}–${ht.away}`;
+  });
+
+  /** Per-team marker colours, taken from each club's `clubColors`. The home
+   *  team uses its first listed colour, the away team its second (football's
+   *  "home/away kit" convention) — falling back to readable defaults that
+   *  contrast with the green pitch. `fg` is black/white picked for contrast. */
+  protected readonly teamColors = computed<{
+    home: { bg: string; fg: string };
+    away: { bg: string; fg: string };
+  }>(() => {
+    const f = this.fixture();
+    const resolve = (side: 'home' | 'away', fallback: string) => {
+      const teamId = side === 'home' ? f?.homeTeam.id : f?.awayTeam.id;
+      const colors = clubColorList(teamId != null ? this.teamsService.byExternalId(teamId)?.clubColors : null);
+      const name = (side === 'home' ? colors[0] : colors[1]) ?? colors[0];
+      const bg = (name && colorToHex(name)) || fallback;
+      return { bg, fg: textOn(bg) };
+    };
+    return { home: resolve('home', '#1565c0'), away: resolve('away', '#fafafa') };
+  });
+
   /** Whether the match has reached a terminal, result-bearing state — the
    *  only point where fetching detail (and showing the refresh button) makes
    *  sense, since events never change afterwards. */
@@ -153,11 +192,25 @@ export class FixtureDetailComponent {
     return s === 'FINISHED' || s === 'AWARDED';
   });
 
-  /** The 90-minute score we display (extra time / penalties shown separately).
-   *  Mirrors the fixture-row precedence: regularTime → live → fullTime. */
+  /**
+   * The headline score: the on-pitch result after 90 + any extra time, with
+   * penalties shown separately below. For a shootout we must rebuild it from
+   * the detail breakdown — the fixture's `fullTime` folds the shootout in
+   * (a 1–1 won on pens reads 5–4), so we use regularTime + extraTime (e.g.
+   * 1–1 + 0–0 = 1–1) instead. Non-shootout matches keep the fixture-row
+   * precedence: regularTime → live → fullTime.
+   */
   protected readonly displayScore = computed<{ home: number; away: number } | null>(() => {
     const f = this.fixture();
     if (!f) return null;
+    const d = this.detail();
+    if (d && d.score.duration === 'PENALTY_SHOOTOUT') {
+      const reg = d.score.regularTime;
+      if (reg && reg.home !== null && reg.away !== null) {
+        const et = d.score.extraTime;
+        return { home: reg.home + (et?.home ?? 0), away: reg.away + (et?.away ?? 0) };
+      }
+    }
     if (f.score?.regularTime) return f.score.regularTime;
     if (f.liveState === 'in' && f.liveScore) return f.liveScore;
     return f.score?.fullTime ?? null;
@@ -189,14 +242,18 @@ export class FixtureDetailComponent {
     });
   });
 
-  /** "After extra time" / "After penalties (4–3)" sub-line, from the detail
-   *  doc's score breakdown. Null for a match decided in regulation. */
+  /** "After extra time" / "After penalties (5–4)" sub-line. The penalties
+   *  figure is football-data's full-time aggregate (regulation + shootout,
+   *  e.g. a 1–1 won 4–3 on pens reads 5–4) — the headline above shows the
+   *  1–1. Null for a match decided in regulation. */
   protected readonly resultNote = computed<string | null>(() => {
     const d = this.detail();
     if (!d) return null;
     if (d.score.duration === 'PENALTY_SHOOTOUT') {
-      const p = d.score.penalties;
-      return p ? `After penalties (${p.home}–${p.away})` : 'After penalties';
+      const agg = d.score.fullTime ?? d.score.penalties;
+      return agg && agg.home !== null
+        ? `After penalties (${agg.home}–${agg.away})`
+        : 'After penalties';
     }
     if (d.score.duration === 'EXTRA_TIME') return 'After extra time';
     return null;
@@ -271,24 +328,33 @@ export class FixtureDetailComponent {
 
   protected readonly hasReferees = computed(() => (this.detail()?.referees.length ?? 0) > 0);
 
-  /** Match meta for the Info tab — competition, stage and kick-off moved to
-   *  the header, so only the contextual extras remain here. */
+  /** Match meta for the Info tab. Competition, stage, kick-off, venue and
+   *  half-time all live in the header now, so only the leftover extras
+   *  (group, attendance) remain here. */
   protected readonly infoRows = computed<readonly InfoRow[]>(() => {
     const f = this.fixture();
     if (!f) return [];
     const d = this.detail();
     const rows: InfoRow[] = [];
     if (f.group) rows.push({ icon: 'grid_view', label: 'Group', value: f.group });
-    const ht = d?.score.halfTime;
-    if (ht && ht.home !== null && ht.away !== null) {
-      rows.push({ icon: 'timelapse', label: 'Half-time', value: `${ht.home}–${ht.away}` });
-    }
-    if (d?.venue) rows.push({ icon: 'stadium', label: 'Venue', value: d.venue });
     if (typeof d?.attendance === 'number') {
       rows.push({ icon: 'groups', label: 'Attendance', value: d.attendance.toLocaleString() });
     }
     return rows;
   });
+
+  /** Marker background / text colour for a side, for inline binding. */
+  protected bg(side: 'home' | 'away'): string {
+    return side === 'home' ? this.teamColors().home.bg : this.teamColors().away.bg;
+  }
+  protected fg(side: 'home' | 'away'): string {
+    return side === 'home' ? this.teamColors().home.fg : this.teamColors().away.fg;
+  }
+
+  /** Hide the competition logo if its URL 404s, leaving just the name. */
+  protected hideBrokenEmblem(event: Event): void {
+    (event.target as HTMLImageElement).style.display = 'none';
+  }
 
   // --- pitch + substitutions (Line-ups tab) ----------------------------------
 
@@ -407,6 +473,66 @@ function sortKey(minute: number | null, injuryTime: number | null): number {
 function minuteLabel(minute: number | null, injuryTime: number | null): string {
   if (minute === null) return '';
   return injuryTime ? `${minute}+${injuryTime}'` : `${minute}'`;
+}
+
+/** Common football `clubColors` names → hex. football-data gives free text
+ *  like "Sky Blue / White"; we map the words we see, falling back to a
+ *  default for anything unrecognised. */
+const TEAM_COLORS: Record<string, string> = {
+  white: '#fafafa',
+  black: '#1b1b1b',
+  red: '#d32f2f',
+  'dark red': '#8e1616',
+  blue: '#1565c0',
+  'royal blue': '#1e50c8',
+  'navy blue': '#10204a',
+  navy: '#10204a',
+  'sky blue': '#6ca6dc',
+  'light blue': '#7fb1e0',
+  sky: '#6ca6dc',
+  yellow: '#f4c20d',
+  gold: '#d4a017',
+  amber: '#ffbf00',
+  green: '#2e8b3d',
+  'dark green': '#1b5e20',
+  orange: '#ef6c00',
+  tangerine: '#f28500',
+  maroon: '#7a1f2b',
+  claret: '#7a1f3d',
+  burgundy: '#800020',
+  bordeaux: '#5e1a2b',
+  purple: '#6a1b9a',
+  violet: '#7c3aed',
+  grey: '#9e9e9e',
+  gray: '#9e9e9e',
+  silver: '#c4c8cc',
+  brown: '#795548',
+  pink: '#e0518f',
+};
+
+/** Split a `clubColors` string ("Sky Blue / White / Red") into lower-cased,
+ *  trimmed colour words. */
+function clubColorList(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split('/')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function colorToHex(name: string): string | null {
+  return TEAM_COLORS[name] ?? null;
+}
+
+/** Black or white text for legibility on a given hex background. */
+function textOn(hex: string): string {
+  const c = hex.replace('#', '');
+  if (c.length < 6) return '#ffffff';
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#14110e' : '#ffffff';
 }
 
 /** Last word of a player's name — keeps the on-pitch label compact. */

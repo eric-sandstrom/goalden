@@ -9,9 +9,21 @@
     </mat-card>
   } @else if (fixture(); as f) {
     <mat-card appearance="outlined" class="match-card">
-      <!-- ===== Pinned header: competition + scoreboard + kick-off ===== -->
+      <!-- ===== Pinned header: venue + competition + scoreboard + kick-off ===== -->
       <div class="header">
-        <span class="comp-chip">{{ competitionName() }}</span>
+        @if (detail()?.venue; as venue) {
+          <span class="venue-line">
+            <mat-icon aria-hidden="true">stadium</mat-icon>
+            {{ venue }}
+          </span>
+        }
+
+        <span class="comp-chip">
+          @if (competitionEmblem(); as emblem) {
+            <img class="comp-logo" [src]="emblem" alt="" (error)="hideBrokenEmblem($event)" />
+          }
+          {{ competitionName() }}
+        </span>
 
         <div class="scoreboard">
           <div class="team home">
@@ -32,6 +44,9 @@
               </div>
             } @else {
               <div class="score vs"><span class="dash">vs</span></div>
+            }
+            @if (halfTimeLabel(); as ht) {
+              <span class="ht">HT {{ ht }}</span>
             }
             @if (resultNote(); as note) {
               <span class="result-note">{{ note }}</span>
@@ -185,7 +200,7 @@
                         [style.left.%]="m.x"
                         [style.top.%]="m.y"
                       >
-                        <span class="dot">{{ m.number }}</span>
+                        <span class="dot" [style.background-color]="bg(m.side)" [style.color]="fg(m.side)">{{ m.number }}</span>
                         <span class="mname">{{ m.name }}</span>
                       </div>
                     }
@@ -197,7 +212,7 @@
                   <div class="subs-grid">
                     @for (side of ['home', 'away']; track side) {
                       @if (subsFor($any(side)).length > 0) {
-                        <section class="subs-col" [class.home]="side === 'home'" [class.away]="side === 'away'">
+                        <section class="subs-col" [style.border-left-color]="bg($any(side))">
                           <h4 class="subs-team">{{ teamName($any(side)) }}</h4>
                           <ul class="subs">
                             @for (s of subsFor($any(side)); track s.key) {
