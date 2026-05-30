@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/eric-sandstrom/goalden/compare/v1.1.1...v1.2.0) (2026-05-30)
+
+
+### Features
+
+* **fixture-detail:** add /match/:fdid view with on-demand football-data detail ([#24](https://github.com/eric-sandstrom/goalden/issues/24)) ([687b629](https://github.com/eric-sandstrom/goalden/commit/687b629c796c53f5f6567c252d25e382b7b01930))
+
+
+### Improvements
+
+* **routing:** rename /predict to /matches, nest detail at /matches/:id ([#26](https://github.com/eric-sandstrom/goalden/issues/26)) ([fd0256b](https://github.com/eric-sandstrom/goalden/commit/fd0256b75b010fc601d7e69375dc7e9a964f86f1))
+
 ## [1.1.1](https://github.com/eric-sandstrom/goalden/compare/v1.1.0...v1.1.1) (2026-05-30)
 
 
