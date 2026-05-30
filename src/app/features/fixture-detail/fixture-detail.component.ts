@@ -1,4 +1,4 @@
-import { NgOptimizedImage } from '@angular/common';
+import { NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -15,10 +15,14 @@ import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Fixture } from '../../core/models/fixture.model';
-import { MatchDetail, MatchLineup } from '../../core/models/match-detail.model';
+import { MatchDetail, MatchLineup, MatchPlayer } from '../../core/models/match-detail.model';
+import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { MatchDetailService } from '../../core/services/match-detail.service';
+import { TeamsService } from '../../core/services/teams.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 
 type Side = 'home' | 'away' | 'neutral';
@@ -28,7 +32,7 @@ interface TimelineItem {
   readonly sortKey: number;
   readonly minuteLabel: string;
   readonly side: Side;
-  readonly kind: 'goal' | 'yellow' | 'red';
+  readonly kind: 'goal' | 'yellow' | 'red' | 'sub';
   readonly player: string;
   readonly note: string | null;
 }
@@ -39,22 +43,44 @@ interface InfoRow {
   readonly value: string;
 }
 
-const STAGE_LABELS: Record<string, string> = {
-  GROUP: 'Group stage',
-  REGULAR_SEASON: 'League',
-  LEAGUE_STAGE: 'League phase',
-  R32: 'Round of 32',
-  R16: 'Round of 16',
-  QF: 'Quarter-final',
-  SF: 'Semi-final',
-  F: 'Final',
-  THIRD_PLACE: 'Third-place play-off',
-};
+/** Goals / assists / cards a player recorded, for the on-pitch + bench badges. */
+interface PlayerEvents {
+  goals: number;
+  assists: number;
+  yellow: boolean;
+  red: boolean;
+}
+
+/** A starter placed on the pitch — coordinates are percentages of the pitch
+ *  box (x: 0 left … 100 right, y: 0 top … 100 bottom). */
+interface PitchMarker {
+  readonly key: string;
+  readonly x: number;
+  readonly y: number;
+  readonly number: string;
+  readonly name: string;
+  readonly side: 'home' | 'away';
+  /** Minute this starter was subbed off, if they were — drives the on-pitch
+   *  "subbed off" badge. Null if they played the whole match. */
+  readonly subOffMinute: number | null;
+  /** Goals/assists/cards this player recorded, or null if none. */
+  readonly events: PlayerEvents | null;
+}
+
+/** A bench player, with substitution info overlaid when they came on. */
+interface BenchEntry {
+  readonly player: MatchPlayer;
+  /** Minute they came on, or null if they stayed an unused sub. */
+  readonly onMinute: number | null;
+  /** Who they replaced, when they came on. */
+  readonly outName: string | null;
+}
 
 @Component({
   selector: 'app-fixture-detail',
   imports: [
     NgOptimizedImage,
+    NgTemplateOutlet,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -70,7 +96,11 @@ const STAGE_LABELS: Record<string, string> = {
 export class FixtureDetailComponent {
   private readonly fixtures = inject(FixturesService);
   private readonly matchDetail = inject(MatchDetailService);
+  private readonly competitions = inject(CompetitionsService);
+  private readonly teamsService = inject(TeamsService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   /** football-data match id from the route (`/matches/:id`), bound via
    *  withComponentInputBinding(). Aliased so the `:id` route param maps onto
@@ -119,6 +149,59 @@ export class FixtureDetailComponent {
 
   protected readonly refreshing = signal(false);
 
+  /** Competition display name for the header chip — resolved from the
+   *  catalogue, falling back to the bare shortcode until it loads. */
+  protected readonly competitionName = computed<string>(() => {
+    const f = this.fixture();
+    if (!f) return '';
+    return this.competitions.byId(f.competitionId)?.name ?? f.competitionId;
+  });
+
+  /** Competition logo for the chip. Falls back to football-data's
+   *  crest-by-code endpoint when the synced emblem is missing (e.g. CL). */
+  protected readonly competitionEmblem = computed<string | null>(() => {
+    const f = this.fixture();
+    if (!f) return null;
+    return (
+      this.competitions.byId(f.competitionId)?.emblem ??
+      `https://crests.football-data.org/${f.competitionId}.png`
+    );
+  });
+
+  /** Half-time score for the header sub-line. Null until detail loads. */
+  protected readonly halfTimeLabel = computed<string | null>(() => {
+    const ht = this.detail()?.score.halfTime;
+    if (!ht || ht.home === null || ht.away === null) return null;
+    return `${ht.home}–${ht.away}`;
+  });
+
+  /**
+   * Per-team marker colours from each club's two `clubColors`. Both teams use
+   * both colours, inverted so they stay distinct: the home marker is filled
+   * with colour 1 and ringed with colour 2; the away marker is filled with
+   * colour 2 and ringed with colour 1. `fg` is the black/white that reads on
+   * the fill. Falls back to a blue + its contrast when a club has no colours.
+   */
+  protected readonly teamColors = computed<{
+    home: { fill: string; ring: string; fg: string };
+    away: { fill: string; ring: string; fg: string };
+  }>(() => {
+    const f = this.fixture();
+    const pair = (teamId: number | null | undefined): { c1: string; c2: string } => {
+      const colors = clubColorList(teamId != null ? this.teamsService.byExternalId(teamId)?.clubColors : null);
+      const c1 = (colors[0] && colorToHex(colors[0])) || '#1565c0';
+      // Second colour, or a contrasting tone so the ring is always visible.
+      const c2 = (colors[1] && colorToHex(colors[1])) || textOn(c1);
+      return { c1, c2 };
+    };
+    const home = pair(f?.homeTeam.id);
+    const away = pair(f?.awayTeam.id);
+    return {
+      home: { fill: home.c1, ring: home.c2, fg: textOn(home.c1) },
+      away: { fill: away.c2, ring: away.c1, fg: textOn(away.c2) },
+    };
+  });
+
   /** Whether the match has reached a terminal, result-bearing state — the
    *  only point where fetching detail (and showing the refresh button) makes
    *  sense, since events never change afterwards. */
@@ -127,17 +210,32 @@ export class FixtureDetailComponent {
     return s === 'FINISHED' || s === 'AWARDED';
   });
 
-  /** The 90-minute score we display (extra time / penalties shown separately).
-   *  Mirrors the fixture-row precedence: regularTime → live → fullTime. */
+  /**
+   * The headline score: the on-pitch result after 90 + any extra time, with
+   * penalties shown separately below. For a shootout we must rebuild it from
+   * the detail breakdown — the fixture's `fullTime` folds the shootout in
+   * (a 1–1 won on pens reads 5–4), so we use regularTime + extraTime (e.g.
+   * 1–1 + 0–0 = 1–1) instead. Non-shootout matches keep the fixture-row
+   * precedence: regularTime → live → fullTime.
+   */
   protected readonly displayScore = computed<{ home: number; away: number } | null>(() => {
     const f = this.fixture();
     if (!f) return null;
+    const d = this.detail();
+    if (d && d.score.duration === 'PENALTY_SHOOTOUT') {
+      const reg = d.score.regularTime;
+      if (reg && reg.home !== null && reg.away !== null) {
+        const et = d.score.extraTime;
+        return { home: reg.home + (et?.home ?? 0), away: reg.away + (et?.away ?? 0) };
+      }
+    }
     if (f.score?.regularTime) return f.score.regularTime;
     if (f.liveState === 'in' && f.liveScore) return f.liveScore;
     return f.score?.fullTime ?? null;
   });
 
-  /** A short status line for the header (FT / live minute / kickoff). */
+  /** The status word shown under the score (Full time / Half-time / live
+   *  minute / Upcoming). Kick-off date+time sits on its own line below. */
   protected readonly statusLabel = computed<string>(() => {
     const f = this.fixture();
     if (!f) return '';
@@ -146,29 +244,41 @@ export class FixtureDetailComponent {
       return f.liveClock ?? (typeof f.minute === 'number' ? `${f.minute}'` : 'Live');
     }
     if (f.status === 'PAUSED') return 'Half-time';
+    return 'Upcoming';
+  });
+
+  /** Kick-off date + time, shown under the status label in the header. */
+  protected readonly kickoffLabel = computed<string>(() => {
+    const f = this.fixture();
+    if (!f) return '';
     return f.utcKickoff.toLocaleString(undefined, {
       weekday: 'short',
-      month: 'short',
       day: 'numeric',
+      month: 'short',
       hour: '2-digit',
       minute: '2-digit',
     });
   });
 
-  /** "After extra time" / "After penalties (4–3)" sub-line, from the detail
-   *  doc's score breakdown. Null for a match decided in regulation. */
+  /** "After extra time" / "After penalties (5–4)" sub-line. The penalties
+   *  figure is football-data's full-time aggregate (regulation + shootout,
+   *  e.g. a 1–1 won 4–3 on pens reads 5–4) — the headline above shows the
+   *  1–1. Null for a match decided in regulation. */
   protected readonly resultNote = computed<string | null>(() => {
     const d = this.detail();
     if (!d) return null;
     if (d.score.duration === 'PENALTY_SHOOTOUT') {
-      const p = d.score.penalties;
-      return p ? `After penalties (${p.home}–${p.away})` : 'After penalties';
+      const agg = d.score.fullTime ?? d.score.penalties;
+      return agg && agg.home !== null
+        ? `After penalties (${agg.home}–${agg.away})`
+        : 'After penalties';
     }
     if (d.score.duration === 'EXTRA_TIME') return 'After extra time';
     return null;
   });
 
-  /** Goals + cards merged into one chronological timeline for the top card. */
+  /** Goals + cards merged into one chronological timeline (shown in the Info
+   *  tab). */
   protected readonly timeline = computed<readonly TimelineItem[]>(() => {
     const d = this.detail();
     const f = this.fixture();
@@ -205,25 +315,32 @@ export class FixtureDetailComponent {
       });
     });
 
+    d.substitutions.forEach((s, i) => {
+      items.push({
+        key: `sub${i}`,
+        sortKey: sortKey(s.minute, null),
+        minuteLabel: minuteLabel(s.minute, null),
+        side: this.sideOf(s.teamId),
+        kind: 'sub',
+        player: s.playerIn?.name ?? 'Substitution',
+        note: s.playerOut?.name ? `for ${s.playerOut.name}` : null,
+      });
+    });
+
     return items.sort((a, b) => a.sortKey - b.sortKey);
   });
 
   protected readonly hasTimeline = computed(() => this.timeline().length > 0);
 
   /**
-   * True when the match is finished but the detail we hold is missing or
-   * incomplete — the cue to offer a refresh. "Incomplete" = fewer recorded
-   * goal events than the scoreline implies (e.g. a 2–1 with no scorers yet),
-   * which also covers a fixture that's never been fetched at all.
+   * True when we've never fetched the detail doc for this match — the cue to
+   * offer a refresh. Once fetched, we DON'T re-prompt even if the event list
+   * looks sparse: football-data simply doesn't carry goal/card events for
+   * some competitions (e.g. parts of the Champions League on the free tier),
+   * and a refetch wouldn't add anything — it would just leave the button
+   * showing forever on an already-loaded match.
    */
-  protected readonly detailMissing = computed<boolean>(() => {
-    const d = this.detail();
-    if (!d) return true;
-    const sc = this.fixture()?.score;
-    const ft = sc?.regularTime ?? sc?.fullTime ?? null;
-    const expectedGoals = ft ? ft.home + ft.away : 0;
-    return d.goals.length < expectedGoals;
-  });
+  protected readonly detailMissing = computed<boolean>(() => this.detail() === null);
 
   protected readonly showRefresh = computed<boolean>(
     () =>
@@ -233,47 +350,106 @@ export class FixtureDetailComponent {
       this.detailMissing(),
   );
 
-  // --- second card: tab data -------------------------------------------------
-
   protected readonly hasLineups = computed<boolean>(() => {
     const d = this.detail();
     if (!d) return false;
     return d.home.lineup.length > 0 || d.away.lineup.length > 0;
   });
 
-  protected readonly hasSubs = computed(() => (this.detail()?.substitutions.length ?? 0) > 0);
   protected readonly hasReferees = computed(() => (this.detail()?.referees.length ?? 0) > 0);
 
+  /** Match meta for the Info tab. Competition, stage, kick-off, venue and
+   *  half-time all live in the header now, so only the leftover extras
+   *  (group, attendance) remain here. */
   protected readonly infoRows = computed<readonly InfoRow[]>(() => {
     const f = this.fixture();
     if (!f) return [];
     const d = this.detail();
     const rows: InfoRow[] = [];
-    rows.push({ icon: 'emoji_events', label: 'Competition', value: f.competitionId });
-    rows.push({ icon: 'flag', label: 'Stage', value: STAGE_LABELS[f.stage] ?? f.stage });
     if (f.group) rows.push({ icon: 'grid_view', label: 'Group', value: f.group });
-    rows.push({
-      icon: 'schedule',
-      label: 'Kick-off',
-      value: f.utcKickoff.toLocaleString(undefined, {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-    });
-    const ht = d?.score.halfTime;
-    if (ht && ht.home !== null && ht.away !== null) {
-      rows.push({ icon: 'timelapse', label: 'Half-time', value: `${ht.home}–${ht.away}` });
-    }
-    if (d?.venue) rows.push({ icon: 'stadium', label: 'Venue', value: d.venue });
     if (typeof d?.attendance === 'number') {
       rows.push({ icon: 'groups', label: 'Attendance', value: d.attendance.toLocaleString() });
     }
     return rows;
   });
+
+  /** Marker fill / ring / text colour for a side, for inline binding. */
+  protected fill(side: 'home' | 'away'): string {
+    return side === 'home' ? this.teamColors().home.fill : this.teamColors().away.fill;
+  }
+  protected ring(side: 'home' | 'away'): string {
+    return side === 'home' ? this.teamColors().home.ring : this.teamColors().away.ring;
+  }
+  protected fg(side: 'home' | 'away'): string {
+    return side === 'home' ? this.teamColors().home.fg : this.teamColors().away.fg;
+  }
+
+  /** Hide the competition logo if its URL 404s, leaving just the name. */
+  protected hideBrokenEmblem(event: Event): void {
+    (event.target as HTMLImageElement).style.display = 'none';
+  }
+
+  // --- pitch + substitutions (Line-ups tab) ----------------------------------
+
+  /** Starting XIs placed on the pitch — home on the bottom half, away mirrored
+   *  on the top half, both laid out by their formation. Also returns a height
+   *  sized to the row count so rows never crowd. */
+  protected readonly pitch = computed<{ markers: readonly PitchMarker[]; height: number }>(() => {
+    const home = this.lineupFor('home');
+    const away = this.lineupFor('away');
+    const d = this.detail();
+    // playerOut id → minute, so a subbed-off starter gets its badge.
+    const offMap = new Map<number, number | null>();
+    if (d) {
+      for (const s of d.substitutions) {
+        if (s.playerOut?.id != null) offMap.set(s.playerOut.id, s.minute);
+      }
+    }
+    const events = this.eventsByPlayer();
+    const homeRows = home ? buildRows(home) : [];
+    const awayRows = away ? buildRows(away) : [];
+    const markers = [
+      ...markersForTeam(homeRows, 'home', offMap, events),
+      ...markersForTeam(awayRows, 'away', offMap, events),
+    ];
+    // ~60px per row keeps the dot + two-line name clear of its neighbours.
+    const height = Math.max(360, (homeRows.length + awayRows.length) * 60);
+    return { markers, height };
+  });
+
+  /**
+   * A team's bench, with substitution info overlaid: players who came on are
+   * tagged with the minute + who they replaced and sorted to the top (by
+   * minute), then the unused subs follow in their listed order.
+   */
+  protected benchFor(side: 'home' | 'away'): readonly BenchEntry[] {
+    const lu = this.lineupFor(side);
+    if (!lu) return [];
+    const d = this.detail();
+    const inMap = new Map<number, { minute: number | null; outName: string | null }>();
+    if (d) {
+      for (const s of d.substitutions) {
+        if (this.sideOf(s.teamId) === side && s.playerIn?.id != null) {
+          inMap.set(s.playerIn.id, { minute: s.minute, outName: s.playerOut?.name ?? null });
+        }
+      }
+    }
+    const entries = lu.bench.map<BenchEntry>((p) => {
+      const info = p.id != null ? inMap.get(p.id) : undefined;
+      return { player: p, onMinute: info?.minute ?? null, outName: info?.outName ?? null };
+    });
+    // Came-on first (by minute), then unused subs in their original order.
+    return entries
+      .map((e, i) => ({ e, i }))
+      .sort((a, b) => {
+        const ao = a.e.onMinute !== null;
+        const bo = b.e.onMinute !== null;
+        if (ao && bo) return (a.e.onMinute ?? 0) - (b.e.onMinute ?? 0);
+        if (ao !== bo) return ao ? -1 : 1;
+        return a.i - b.i;
+      })
+      .map((x) => x.e);
+  }
 
   /** Side ('home' badge column) for a given event team id. */
   protected sideOf(teamId: number | null): Side {
@@ -294,6 +470,92 @@ export class FixtureDetailComponent {
     const f = this.fixture();
     const t = side === 'home' ? f?.homeTeam : f?.awayTeam;
     return t?.name ?? t?.tla ?? (side === 'home' ? 'Home' : 'Away');
+  }
+
+  /** Manager name for a side's pitch bar, or null when unknown. */
+  protected coachName(side: 'home' | 'away'): string | null {
+    const c = this.lineupFor(side)?.coach;
+    return c && c.name ? c.name : null;
+  }
+
+  /** Goals / assists / cards per player id, from the match events. */
+  private readonly eventsByPlayer = computed<ReadonlyMap<number, PlayerEvents>>(() => {
+    const d = this.detail();
+    const m = new Map<number, PlayerEvents>();
+    if (!d) return m;
+    const slot = (id: number): PlayerEvents => {
+      let e = m.get(id);
+      if (!e) {
+        e = { goals: 0, assists: 0, yellow: false, red: false };
+        m.set(id, e);
+      }
+      return e;
+    };
+    for (const g of d.goals) {
+      if (g.type !== 'OWN' && g.scorer?.id != null) slot(g.scorer.id).goals++;
+      if (g.assist?.id != null) slot(g.assist.id).assists++;
+    }
+    for (const b of d.bookings) {
+      if (b.player?.id != null) {
+        const e = slot(b.player.id);
+        if (b.card === 'RED') e.red = true;
+        else e.yellow = true;
+      }
+    }
+    return m;
+  });
+
+  /** Goals/assists/cards for one player (for the bench badges), or null. */
+  protected playerEvents(id: number | null | undefined): PlayerEvents | null {
+    if (id == null) return null;
+    return this.eventsByPlayer().get(id) ?? null;
+  }
+
+  /** Surname for the compact (small-screen) bench chip. */
+  protected surname(name: string | null): string {
+    return lastName(name);
+  }
+
+  /** Short position code (CB, DM, LW…) for the compact bench chip. */
+  protected posAbbr(pos: string | null): string {
+    return positionAbbr(pos);
+  }
+
+  /** Formation string (e.g. "4-3-3") for a side, or null. */
+  protected formationOf(side: 'home' | 'away'): string | null {
+    return this.lineupFor(side)?.formation ?? null;
+  }
+
+  /** Humanise a football-data referee type, e.g. ASSISTANT_REFEREE_N2 →
+   *  "Assistant referee 2", VIDEO_ASSISTANT_REFEREE_N1 → "VAR 1". */
+  protected refRole(type: string | null): string {
+    if (!type) return 'Official';
+    const n = type.match(/_N(\d+)$/);
+    const suffix = n ? ` ${n[1]}` : '';
+    const base = type.replace(/_N\d+$/, '').replace(/_/g, ' ').trim().toLowerCase();
+    if (base === 'video assistant referee') return `VAR${suffix}`;
+    return base.charAt(0).toUpperCase() + base.slice(1) + suffix;
+  }
+
+  // --- tab selection, persisted in the `?tab=` query param -------------------
+
+  private readonly queryMap = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+
+  /** Active tab index, restored from `?tab=`. Line-ups is index 1 and only
+   *  exists once its data is loaded; anything else falls back to Events (0). */
+  protected readonly selectedTabIndex = computed<number>(() =>
+    this.queryMap().get('tab') === 'lineups' && this.hasLineups() ? 1 : 0,
+  );
+
+  protected onTabChange(index: number): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: index === 1 ? 'lineups' : 'events' },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   async refresh(): Promise<void> {
@@ -324,4 +586,204 @@ function sortKey(minute: number | null, injuryTime: number | null): number {
 function minuteLabel(minute: number | null, injuryTime: number | null): string {
   if (minute === null) return '';
   return injuryTime ? `${minute}+${injuryTime}'` : `${minute}'`;
+}
+
+/** Common football `clubColors` names → hex. football-data gives free text
+ *  like "Sky Blue / White"; we map the words we see, falling back to a
+ *  default for anything unrecognised. */
+const TEAM_COLORS: Record<string, string> = {
+  white: '#fafafa',
+  black: '#1b1b1b',
+  red: '#d32f2f',
+  'dark red': '#8e1616',
+  blue: '#1565c0',
+  'royal blue': '#1e50c8',
+  'navy blue': '#10204a',
+  navy: '#10204a',
+  'sky blue': '#6ca6dc',
+  'light blue': '#7fb1e0',
+  sky: '#6ca6dc',
+  yellow: '#f4c20d',
+  gold: '#d4a017',
+  amber: '#ffbf00',
+  green: '#2e8b3d',
+  'dark green': '#1b5e20',
+  orange: '#ef6c00',
+  tangerine: '#f28500',
+  maroon: '#7a1f2b',
+  claret: '#7a1f3d',
+  burgundy: '#800020',
+  bordeaux: '#5e1a2b',
+  purple: '#6a1b9a',
+  violet: '#7c3aed',
+  grey: '#9e9e9e',
+  gray: '#9e9e9e',
+  silver: '#c4c8cc',
+  brown: '#795548',
+  pink: '#e0518f',
+};
+
+/** Split a `clubColors` string ("Sky Blue / White / Red") into lower-cased,
+ *  trimmed colour words. */
+function clubColorList(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split('/')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function colorToHex(name: string): string | null {
+  return TEAM_COLORS[name] ?? null;
+}
+
+/** Black or white text for legibility on a given hex background. */
+function textOn(hex: string): string {
+  const c = hex.replace('#', '');
+  if (c.length < 6) return '#ffffff';
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#14110e' : '#ffffff';
+}
+
+/** Last word of a player's name — keeps the on-pitch label compact. */
+function lastName(name: string | null): string {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1];
+}
+
+/** Short code for a football-data position, e.g. "Centre-Back" → "CB". */
+function positionAbbr(pos: string | null): string {
+  const p = (pos ?? '').toLowerCase();
+  if (!p) return '';
+  if (p.includes('goal')) return 'GK';
+  if (p.includes('left') && p.includes('back')) return 'LB';
+  if (p.includes('right') && p.includes('back')) return 'RB';
+  if (p.includes('back')) return 'CB';
+  if (p === 'defence' || p.includes('defender')) return 'DEF';
+  if (p.includes('defensive mid')) return 'DM';
+  if (p.includes('attacking mid')) return 'AM';
+  if (p.includes('left') && p.includes('mid')) return 'LM';
+  if (p.includes('right') && p.includes('mid')) return 'RM';
+  if (p.includes('mid')) return 'CM';
+  if (p.includes('left') && p.includes('wing')) return 'LW';
+  if (p.includes('right') && p.includes('wing')) return 'RW';
+  if (p.includes('wing')) return 'WG';
+  if (p.includes('forward') || p.includes('strik') || p === 'offence') return 'FW';
+  return '';
+}
+
+/**
+ * Tactical depth of a position, 0 (goalkeeper) → 5 (striker). Drives which
+ * formation row a player lands in. football-data gives specific positions
+ * ("Centre-Back", "Left Winger", "Defensive Midfield"), so we rank by those
+ * rather than the lineup array order — which is NOT formation-ordered.
+ */
+function depthScore(pos: string | null): number {
+  const p = (pos ?? '').toLowerCase();
+  if (p.includes('goal')) return 0;
+  if (p.includes('back') || p === 'defence' || p.includes('defender')) return 1;
+  if (p.includes('defensive mid')) return 2;
+  if (p.includes('attacking mid')) return 4;
+  if (p.includes('mid')) return 3;
+  if (p.includes('wing')) return 4.5;
+  if (p.includes('forward') || p.includes('strik') || p === 'offence') return 5;
+  return 3;
+}
+
+/** Horizontal lean of a position: 0 left, 1 centre, 2 right — for ordering
+ *  players across a row. */
+function horizRank(pos: string | null): number {
+  const p = (pos ?? '').toLowerCase();
+  if (p.includes('left')) return 0;
+  if (p.includes('right')) return 2;
+  return 1;
+}
+
+/**
+ * Split a starting XI into rows, defensive → attacking. Players are assigned
+ * to rows by tactical depth (NOT array order — football-data's lineup array
+ * isn't formation-ordered): sort by depth, then fill the formation's line
+ * sizes (4-3-3 → 4, 3, 3). Each row is then ordered left → right. Falls back
+ * to defence/midfield/attack buckets when the formation doesn't add up.
+ */
+function buildRows(lu: MatchLineup): MatchPlayer[][] {
+  const players = lu.lineup;
+  if (players.length === 0) return [];
+  const gk = players.find((p) => depthScore(p.position) === 0) ?? players[0];
+  const outfield = players
+    .filter((p) => p !== gk)
+    .map((p, i) => ({ p, d: depthScore(p.position), i }))
+    .sort((a, b) => a.d - b.d || a.i - b.i)
+    .map((x) => x.p);
+
+  const counts = (lu.formation ?? '')
+    .split('-')
+    .map((n) => parseInt(n, 10))
+    .filter((n) => Number.isInteger(n) && n > 0);
+
+  let lines: MatchPlayer[][];
+  if (counts.length > 0 && counts.reduce((a, b) => a + b, 0) === outfield.length) {
+    lines = [];
+    let i = 0;
+    for (const c of counts) {
+      lines.push(outfield.slice(i, i + c));
+      i += c;
+    }
+  } else {
+    const def = outfield.filter((p) => depthScore(p.position) <= 1);
+    const mid = outfield.filter((p) => {
+      const d = depthScore(p.position);
+      return d > 1 && d < 4;
+    });
+    const fwd = outfield.filter((p) => depthScore(p.position) >= 4);
+    lines = [def, mid, fwd].filter((l) => l.length > 0);
+  }
+
+  // Order each line left → right.
+  lines = lines.map((line) =>
+    line
+      .map((p, i) => ({ p, h: horizRank(p.position), i }))
+      .sort((a, b) => a.h - b.h || a.i - b.i)
+      .map((x) => x.p),
+  );
+  return [[gk], ...lines];
+}
+
+/**
+ * Place a team's rows on the pitch as percentage coordinates. Home occupies
+ * the top half (GK at y≈5, attackers near the halfway line); away mirrors
+ * into the bottom half (GK deepest at y≈95). Players in a row spread evenly
+ * across the width. `offMap` tags starters who were later subbed off.
+ */
+function markersForTeam(
+  rows: MatchPlayer[][],
+  side: 'home' | 'away',
+  offMap: ReadonlyMap<number, number | null>,
+  events: ReadonlyMap<number, PlayerEvents>,
+): PitchMarker[] {
+  const markers: PitchMarker[] = [];
+  const rowCount = rows.length;
+  rows.forEach((row, ri) => {
+    const t = rowCount > 1 ? ri / (rowCount - 1) : 0; // 0 = GK row … 1 = most attacking
+    const y = side === 'home' ? 5 + t * 39 : 95 - t * 39;
+    const k = row.length;
+    row.forEach((p, j) => {
+      const subbed = p.id != null && offMap.has(p.id);
+      markers.push({
+        key: `${side}-${ri}-${j}`,
+        x: ((j + 1) / (k + 1)) * 100,
+        y,
+        number: p.shirtNumber != null ? String(p.shirtNumber) : '',
+        name: lastName(p.name),
+        side,
+        subOffMinute: subbed ? (offMap.get(p.id as number) ?? null) : null,
+        events: p.id != null ? (events.get(p.id) ?? null) : null,
+      });
+    });
+  });
+  return markers;
 }
