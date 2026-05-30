@@ -340,6 +340,12 @@
   max-width: 340px;
   margin: 8px auto;
 
+  // Away bar mirrors the home one: formation on the left, manager on the
+  // right, matching the away team's right-aligned column elsewhere.
+  &.away {
+    flex-direction: row-reverse;
+  }
+
   .mgr {
     display: inline-flex;
     align-items: center;
@@ -507,23 +513,11 @@
   }
 }
 
-.bench-team {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
 // Away bench mirrors the home one: shirt number on the right, names + heading
 // right-aligned, so the two columns read outward like a team sheet.
 .bench-col.away {
   text-align: right;
 
-  .bench-team {
-    flex-direction: row-reverse;
-  }
   .bench-row {
     flex-direction: row-reverse;
   }

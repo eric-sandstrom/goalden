@@ -180,8 +180,8 @@
           <mat-tab label="Line-ups">
             <div class="tab-content lineups-tab">
                 @if (pitch().markers.length > 0) {
-                  <!-- Away bar (above pitch): manager left, formation right. -->
-                  <div class="team-bar">
+                  <!-- Away bar (above pitch): mirrored — formation left, manager right. -->
+                  <div class="team-bar away">
                     <span class="mgr">
                       <span
                         class="team-dot"
@@ -250,14 +250,6 @@
                   @for (side of ['home', 'away']; track side) {
                     @if (lineupFor($any(side)); as lu) {
                       <section class="bench-col" [class.away]="side === 'away'">
-                        <h4 class="bench-team">
-                          <span
-                            class="team-dot"
-                            [style.background-color]="fill($any(side))"
-                            [style.border-color]="ring($any(side))"
-                          ></span>
-                          {{ teamName($any(side)) }}
-                        </h4>
                         @if (benchFor($any(side)).length > 0) {
                           <ul class="bench">
                             @for (b of benchFor($any(side)); track $index) {
