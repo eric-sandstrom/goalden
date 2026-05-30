@@ -35,6 +35,9 @@ $ErrorActionPreference = 'Stop'
 
 # This script lives in <root>/tools; resolve the main worktree root.
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+# Operate from a valid cwd: the caller may be inside a since-removed worktree,
+# which breaks git (empty/null output). $root is resolved from the script path.
+Set-Location $root
 $parent = Split-Path $root -Parent
 $slug = ($Name -replace '[^A-Za-z0-9._-]', '-').ToLower()
 $wtRoot = Join-Path $parent 'goalden-worktrees'

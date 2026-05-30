@@ -23,6 +23,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $toolsDir = $PSScriptRoot
 $root = (Resolve-Path (Join-Path $toolsDir '..')).Path
+# Run from a known-good directory. If gw is invoked from inside a worktree that
+# was since removed, the shell's cwd no longer exists and git calls fail with
+# empty/null output. $root comes from the script path, so it's always valid.
+Set-Location $root
 
 function Show-Worktrees {
   Write-Host 'Worktrees:' -ForegroundColor Cyan
