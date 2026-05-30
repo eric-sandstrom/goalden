@@ -10,84 +10,11 @@
       </header>
 
       <!-- ===================================================================
-           Competitions catalogue
+           Competitions catalogue (shared with the Admin page)
            Discovery via football-data's /competitions endpoint. Each
            entry has an active toggle that gates fixture polling.
       ==================================================================== -->
-      <mat-card appearance="outlined">
-        <mat-card-header>
-          <mat-icon matCardAvatar>emoji_events</mat-icon>
-          <mat-card-title>Competitions</mat-card-title>
-          <mat-card-subtitle>
-            {{ competitions().length }} discovered · {{ activeCount() }} active · sync from API to refresh
-          </mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          @if (competitions().length === 0) {
-            <p class="hint">
-              No competitions discovered yet. Click <strong>Sync from API</strong>
-              to fetch them from football-data.
-            </p>
-          } @else {
-            <ul class="comp-list">
-              @for (comp of competitions(); track comp.id) {
-                <li class="comp-row" [class.inactive]="!comp.active">
-                  @if (comp.emblem) {
-                    <img
-                      class="comp-emblem"
-                      [src]="comp.emblem"
-                      [alt]="comp.name + ' emblem'"
-                      width="32"
-                      height="32"
-                    />
-                  } @else {
-                    <div class="comp-emblem placeholder" aria-hidden="true">
-                      <mat-icon>sports_soccer</mat-icon>
-                    </div>
-                  }
-                  <div class="comp-meta">
-                    <div class="comp-name">{{ comp.name }}</div>
-                    <div class="comp-sub">
-                      <span class="comp-code">{{ comp.id }}</span>
-                      ·
-                      <span>{{ comp.area.name }}</span>
-                      ·
-                      <span>{{ comp.type === 'CUP' ? 'Cup' : 'League' }}</span>
-                    </div>
-                  </div>
-                  <mat-slide-toggle
-                    [checked]="comp.active"
-                    [disabled]="isTogglePending(comp.id)"
-                    (change)="toggleCompetitionActive(comp)"
-                    [attr.aria-label]="(comp.active ? 'Deactivate ' : 'Activate ') + comp.name"
-                  />
-                </li>
-              }
-            </ul>
-          }
-        </mat-card-content>
-        <mat-card-actions align="end">
-          <button
-            type="button"
-            mat-flat-button
-            color="primary"
-            [disabled]="running()"
-            (click)="syncCompetitions()"
-          >
-            @if (running()) {
-              <mat-progress-spinner mode="indeterminate" diameter="20" />
-            } @else {
-              <!-- mat-button uses content projection to slot the leading
-                   icon. Without the @else's projectable children being a
-                   single root node, the static analyzer can't pick the
-                   slot. The icon must sit alone here; text follows after
-                   the @if as plain content. -->
-              <mat-icon>sync</mat-icon>
-            }
-            <span>{{ running() ? 'Syncing…' : 'Sync from API' }}</span>
-          </button>
-        </mat-card-actions>
-      </mat-card>
+      <app-competition-catalogue-card />
 
       <!-- ===================================================================
            Multi-comp migration (one-shot at cutover)

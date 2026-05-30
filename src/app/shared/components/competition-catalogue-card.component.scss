@@ -1,0 +1,73 @@
+.hint {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+}
+
+.comp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.comp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.comp-row:last-child {
+  border-bottom: none;
+}
+/* Inactive comps get dimmed so the eye snaps to which ones are polling. */
+.comp-row.inactive .comp-emblem,
+.comp-row.inactive .comp-meta {
+  opacity: 0.55;
+}
+.comp-emblem {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.comp-emblem.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mat-sys-surface-container);
+  color: var(--mat-sys-on-surface-variant);
+}
+.comp-emblem.placeholder mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+.comp-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.comp-name {
+  font-weight: 500;
+  color: var(--mat-sys-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comp-sub {
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comp-code {
+  font-family: var(--mat-sys-code-font, monospace);
+  font-size: 0.78rem;
+  padding: 1px 4px;
+  background: var(--mat-sys-surface-container-high);
+  border-radius: 3px;
+}

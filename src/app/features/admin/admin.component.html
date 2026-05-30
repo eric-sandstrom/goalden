@@ -1,8 +1,70 @@
     <section class="page">
       <header class="hero">
         <h1>Admin</h1>
-        <p class="hint">Manage global leagues — visible to all matching users.</p>
+        <p class="hint">Operational tools — global leagues, scoring fixes, broadcasts.</p>
       </header>
+
+      <!-- ===================================================================
+           At-a-glance metrics
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>insights</mat-icon>
+          <mat-card-title>At a glance</mat-card-title>
+          <mat-card-subtitle>Live operational counts</mat-card-subtitle>
+          <button
+            type="button"
+            mat-icon-button
+            class="header-action"
+            [disabled]="metricsLoading()"
+            (click)="loadMetrics()"
+            aria-label="Refresh metrics"
+            matTooltip="Refresh"
+          >
+            @if (metricsLoading()) {
+              <mat-progress-spinner mode="indeterminate" diameter="20" />
+            } @else {
+              <mat-icon>refresh</mat-icon>
+            }
+          </button>
+        </mat-card-header>
+        <mat-card-content>
+          @if (metricsError()) {
+            <p class="hint">Couldn't load metrics. Try refresh.</p>
+          } @else if (metrics(); as m) {
+            <div class="tiles">
+              <div class="tile">
+                <span class="tile-value">{{ m.users }}</span>
+                <span class="tile-label">Users</span>
+              </div>
+              <div class="tile">
+                <span class="tile-value">{{ m.predictions }}</span>
+                <span class="tile-label">Match predictions</span>
+              </div>
+              <div class="tile">
+                <span class="tile-value">{{ m.leagues.total }}</span>
+                <span class="tile-label">
+                  Leagues ({{ m.leagues.global }}g / {{ m.leagues.public }}p / {{ m.leagues.private }}pr)
+                </span>
+              </div>
+              <div class="tile">
+                <span class="tile-value">{{ m.competitions.active }}/{{ m.competitions.total }}</span>
+                <span class="tile-label">Comps active</span>
+              </div>
+              <div class="tile">
+                <span class="tile-value tile-time">{{ formatTime(m.lastFixturePoll) }}</span>
+                <span class="tile-label">Last fixture poll</span>
+              </div>
+              <div class="tile">
+                <span class="tile-value tile-time">{{ formatTime(m.lastLeaderboardRebuild) }}</span>
+                <span class="tile-label">Last leaderboard rebuild</span>
+              </div>
+            </div>
+          } @else {
+            <p class="hint">Loading…</p>
+          }
+        </mat-card-content>
+      </mat-card>
 
       <!-- ===================================================================
            Create global league
@@ -11,13 +73,38 @@
         <mat-card-header>
           <mat-icon matCardAvatar>add_circle</mat-icon>
           <mat-card-title>Create global league</mat-card-title>
-          <mat-card-subtitle>All matching users are auto-enrolled immediately</mat-card-subtitle>
+          <mat-card-subtitle>Named after the competition · matching users auto-enrolled</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
           <form [formGroup]="createForm" class="form" (ngSubmit)="submit()">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Name</mat-label>
-              <input matInput formControlName="name" maxlength="60" />
+              <mat-label>Competition</mat-label>
+              <mat-select formControlName="competitionId">
+                @if (groupedComps().cups.length > 0) {
+                  <mat-optgroup label="Tournaments">
+                    @for (c of groupedComps().cups; track c.id) {
+                      <mat-option [value]="c.id">
+                        {{ c.name }}
+                        @if (c.hasGlobalLeague) {
+                          <span class="opt-hint">· has global</span>
+                        }
+                      </mat-option>
+                    }
+                  </mat-optgroup>
+                }
+                @if (groupedComps().leagues.length > 0) {
+                  <mat-optgroup label="Domestic Leagues">
+                    @for (c of groupedComps().leagues; track c.id) {
+                      <mat-option [value]="c.id">
+                        {{ c.name }}
+                        @if (c.hasGlobalLeague) {
+                          <span class="opt-hint">· has global</span>
+                        }
+                      </mat-option>
+                    }
+                  </mat-optgroup>
+                }
+              </mat-select>
             </mat-form-field>
 
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -90,6 +177,7 @@
                   <div class="league-meta">
                     <span class="league-name">{{ league.name }}</span>
                     <span class="league-sub">
+                      {{ league.competitionId }} {{ league.season }} ·
                       {{ league.memberCount }} members ·
                       {{ leagueConditionLabel(league) }} ·
                       {{ league.globalConfig?.allowLeave ? 'leavable' : 'mandatory' }}
@@ -118,6 +206,112 @@
               }
             </div>
           }
+        </mat-card-content>
+      </mat-card>
+
+      <!-- ===================================================================
+           Competition catalogue (shared with Dev tools)
+      ==================================================================== -->
+      <app-competition-catalogue-card />
+
+      <!-- ===================================================================
+           Manual score correction
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>scoreboard</mat-icon>
+          <mat-card-title>Correct a final score</mat-card-title>
+          <mat-card-subtitle>Fix a wrong/late result and re-score every prediction</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <form [formGroup]="correctForm" class="form" (ngSubmit)="correctScore()">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Competition</mat-label>
+              <mat-select [value]="correctCompId()" (selectionChange)="selectCorrectComp($event.value)">
+                @for (c of compChoices(); track c.id) {
+                  <mat-option [value]="c.id">{{ c.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Finished fixture</mat-label>
+              <mat-select formControlName="matchId">
+                @if (finishedFixtureOptions().length === 0) {
+                  <mat-option disabled>No finished fixtures in this competition</mat-option>
+                } @else {
+                  @for (f of finishedFixtureOptions(); track f.matchId) {
+                    <mat-option [value]="f.matchId">{{ f.label }}</mat-option>
+                  }
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <div class="score-row">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Home</mat-label>
+                <input matInput type="number" min="0" formControlName="homeScore" />
+              </mat-form-field>
+              <span class="filter-equals" aria-hidden="true">–</span>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Away</mat-label>
+                <input matInput type="number" min="0" formControlName="awayScore" />
+              </mat-form-field>
+            </div>
+
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="correctForm.invalid || correcting()"
+            >
+              @if (correcting()) {
+                <mat-progress-spinner mode="indeterminate" diameter="20" />
+              } @else {
+                Apply correction
+              }
+            </button>
+          </form>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- ===================================================================
+           Broadcast notification
+      ==================================================================== -->
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon matCardAvatar>campaign</mat-icon>
+          <mat-card-title>Broadcast notification</mat-card-title>
+          <mat-card-subtitle>Push an announcement to every registered device</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <form [formGroup]="broadcastForm" class="form" (ngSubmit)="broadcast()">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Title</mat-label>
+              <input matInput formControlName="title" maxlength="60" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Body</mat-label>
+              <input matInput formControlName="body" maxlength="160" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Link (optional)</mat-label>
+              <input matInput formControlName="link" placeholder="/" />
+            </mat-form-field>
+
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="broadcastForm.invalid || broadcasting()"
+            >
+              @if (broadcasting()) {
+                <mat-progress-spinner mode="indeterminate" diameter="20" />
+              } @else {
+                Send to everyone
+              }
+            </button>
+          </form>
         </mat-card-content>
       </mat-card>
     </section>

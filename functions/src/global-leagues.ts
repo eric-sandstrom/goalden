@@ -277,6 +277,7 @@ export const deleteGlobalLeague = onCall(
     if (leagueSnap.data()!['type'] !== 'global') {
       throw new HttpsError('failed-precondition', 'Not a global league. Use deleteLeague for private leagues.');
     }
+    const competitionId = leagueSnap.data()!['competitionId'];
 
     const membersRef = leagueRef.collection('members');
     const members = await membersRef.get();
@@ -293,6 +294,28 @@ export const deleteGlobalLeague = onCall(
     }
     batch.delete(leagueRef);
     await batch.commit();
+
+    // Clear the catalogue's hasGlobalLeague flag so the comp can host a
+    // new global league again — but only if no OTHER global league still
+    // covers it (filtered globals can legitimately coexist per comp).
+    if (typeof competitionId === 'string' && competitionId.length > 0) {
+      const remaining = await db
+        .collection('leagues')
+        .where('type', '==', 'global')
+        .where('competitionId', '==', competitionId)
+        .limit(1)
+        .get();
+      if (remaining.empty) {
+        try {
+          await db.collection('competitions').doc(competitionId).update({ hasGlobalLeague: false });
+        } catch (e: unknown) {
+          // Comp doc may have been removed from the catalogue — non-fatal.
+          logger.warn(`Could not clear hasGlobalLeague on ${competitionId}`, {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    }
 
     logger.info(`Global league ${leagueId} deleted by ${uid}`);
     return { ok: true };

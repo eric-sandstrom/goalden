@@ -47,4 +47,5 @@ export {
 } from './global-leagues';
 export { generatePredictorPersonality } from './personality';
 export { generateTheme } from './theme-ai';
-export { sendTestNotification } from './notifications';
+export { sendTestNotification, broadcastNotification } from './notifications';
+export { correctFixtureScore, getAdminMetrics } from './admin-tools';

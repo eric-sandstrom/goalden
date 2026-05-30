@@ -11,7 +11,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FUNCTIONS } from '../../core/firebase/firebase.providers';
 import { Competition } from '../../core/models/competition.model';
@@ -19,15 +18,9 @@ import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { PredictionsService } from '../../core/services/predictions.service';
 import { UserService } from '../../core/services/user.service';
+import { CompetitionCatalogueCardComponent } from '../../shared/components/competition-catalogue-card.component';
 
 type FixtureStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED';
-
-interface SyncResult {
-  ok: boolean;
-  discovered: number;
-  created: number;
-  updated: number;
-}
 
 @Component({
   selector: 'app-dev-tools',
@@ -43,7 +36,7 @@ interface SyncResult {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
-    MatSlideToggleModule,
+    CompetitionCatalogueCardComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dev-tools.component.html',
@@ -60,22 +53,9 @@ export class DevToolsComponent {
 
   protected readonly running = signal(false);
 
-  /** Per-comp pending state for the active toggle row buttons. Keeps
-   *  one comp's spinner from disabling every other comp's toggle. */
-  protected readonly togglePending = signal<ReadonlySet<string>>(new Set());
-
   /** Owners see the role-management card; everyone else doesn't. The
    *  callables behind the buttons re-check the role server-side. */
   protected readonly isOwner = this.userService.isOwner;
-
-  /** Discovered competitions, exposed through CompetitionsService so the
-   *  Predict tab, create-league dialog, and league detail page all read
-   *  from the same live listener. */
-  protected readonly competitions = this.competitionsService.competitions;
-
-  protected readonly activeCount = computed(
-    () => this.competitionsService.activeCompetitions().length,
-  );
 
   /**
    * Competition the fixture tools (Fixture state / Move kickoff / Scenarios)
@@ -159,66 +139,6 @@ export class DevToolsComponent {
   protected readonly fakeUsersForm = this.fb.nonNullable.group({
     count: [20, [Validators.required, Validators.min(1), Validators.max(200)]],
   });
-
-  // --------------------------------------------------------------------------
-  // Competitions
-  // --------------------------------------------------------------------------
-
-  protected async syncCompetitions(): Promise<void> {
-    this.running.set(true);
-    try {
-      const call = httpsCallable<unknown, SyncResult>(
-        this.functions,
-        'syncCompetitionsFromApi',
-      );
-      const res = await call({});
-      const { discovered, created, updated } = res.data;
-      this.snackBar.open(
-        `Discovered ${discovered} competitions · ${created} new · ${updated} updated`,
-        undefined,
-        { duration: 3500 },
-      );
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Sync failed';
-      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
-      console.error('syncCompetitionsFromApi failed', e);
-    } finally {
-      this.running.set(false);
-    }
-  }
-
-  protected async toggleCompetitionActive(comp: Competition): Promise<void> {
-    // Mark just this comp as pending so the rest of the list stays
-    // interactive while this one's request is in flight.
-    this.togglePending.update((s) => new Set([...s, comp.id]));
-    const next = !comp.active;
-    try {
-      const call = httpsCallable<unknown, { ok: boolean }>(
-        this.functions,
-        'setCompetitionActive',
-      );
-      await call({ compId: comp.id, active: next });
-      this.snackBar.open(
-        next ? `${comp.name} activated` : `${comp.name} deactivated`,
-        undefined,
-        { duration: 1800 },
-      );
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Toggle failed';
-      this.snackBar.open(message, 'Dismiss', { duration: 5000 });
-      console.error('setCompetitionActive failed', e);
-    } finally {
-      this.togglePending.update((s) => {
-        const copy = new Set(s);
-        copy.delete(comp.id);
-        return copy;
-      });
-    }
-  }
-
-  protected isTogglePending(compId: string): boolean {
-    return this.togglePending().has(compId);
-  }
 
   // --------------------------------------------------------------------------
   // Multi-comp migration
