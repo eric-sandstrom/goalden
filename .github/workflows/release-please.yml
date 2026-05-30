@@ -11,10 +11,12 @@
 #      release PR on their own, but ride along in the next one.
 #   2. You review the release PR; merging it lands the version bump + changelog
 #      on main and creates the GitHub release + git tag (e.g. v1.1.0).
-#   3. That merge is itself a push to main, so deploy.yml runs: `npm run build`
+#   3. When the release PR merges, release-please reports releases_created=true
+#      and this workflow's `deploy` job calls deploy.yml. Its `npm run build`
 #      fires the `prebuild` hook (sync-changelog.mjs), which parses the freshly
-#      merged CHANGELOG.md into ngsw-config.json's appData. The deployed build
-#      then surfaces the accumulated changes in the in-app "What's new" dialog.
+#      merged CHANGELOG.md into ngsw-config.json's appData — so the deployed
+#      build surfaces the accumulated changes in the in-app "What's new" dialog.
+#      Ordinary (non-release) merges to main no longer deploy.
 #
 # Source of truth: PR titles. Because PRs are squash-merged, the squash commit
 # subject is the PR title — so PR titles MUST be conventional commits
@@ -45,10 +47,25 @@ jobs:
   release-please:
     name: Maintain release PR
     runs-on: ubuntu-latest
+    outputs:
+      # 'true' (string) only on the run where a release PR was merged.
+      releases_created: ${{ steps.release.outputs.releases_created }}
     steps:
       - name: Run release-please
+        id: release
         uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # Defaults to release-please-config.json + .release-please-manifest.json
           # at the repo root.
+
+  # Deploy only when a release was actually cut. We call deploy.yml as a
+  # reusable workflow (rather than triggering it off the release tag) because
+  # tags pushed by the default GITHUB_TOKEN don't start other workflows.
+  # `secrets: inherit` hands deploy.yml the Firebase service-account secret.
+  deploy:
+    name: Deploy release
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
