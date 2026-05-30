@@ -272,12 +272,14 @@ const MATCH_LOOKAHEAD_MS = 15 * 60 * 1000;
  *  (90' + stoppage + extra time + penalties + provider lag before it
  *  flips to FINISHED). Past this, a still-non-terminal fixture is treated
  *  as stale rather than live, so a stuck doc can't pin us in fast cadence
- *  forever. */
-const MAX_MATCH_DURATION_MS = 3 * 60 * 60 * 1000;
+ *  forever. Exported so the stuck-fixture reconciler shares the exact same
+ *  boundary (it picks up where this window leaves off). */
+export const MAX_MATCH_DURATION_MS = 3 * 60 * 60 * 1000;
 
 /** Statuses meaning a fixture won't change again — they don't keep the
- *  poller in its live cadence. */
-const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
+ *  poller in its live cadence. Exported for the reconciler, which inverts
+ *  this set to find fixtures still wrongly "live". */
+export const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
   'FINISHED',
   'CANCELLED',
   'AWARDED',
