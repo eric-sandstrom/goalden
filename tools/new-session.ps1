@@ -114,6 +114,12 @@ $cfgPath = Join-Path $dest '.worktree.json'
 
 # --- dependencies ------------------------------------------------------------
 if ($LinkModules) {
+  # The worktree junctions main's node_modules, so main MUST be fully installed
+  # first: a junction to an incomplete main makes ng serve fail with missing
+  # packages. npm install is a fast no-op when main is already up to date.
+  Write-Host 'Ensuring main dependencies are installed (npm install in main)...' -ForegroundColor Cyan
+  Push-Location $root
+  try { npm install } finally { Pop-Location }
   Write-Host 'Linking node_modules (junction)...' -ForegroundColor Cyan
   New-Item -ItemType Junction -Path (Join-Path $dest 'node_modules') `
     -Target (Join-Path $root 'node_modules') | Out-Null
