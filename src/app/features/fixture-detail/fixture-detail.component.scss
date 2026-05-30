@@ -480,48 +480,74 @@
   }
 }
 
-// ===== Goal / assist / card badges (pitch + bench) =====
+// ===== Goal / assist / card badges, positioned on the number disc =====
 
+// No box of its own — its badges position absolutely against the disc wrap
+// (.dot-wrap / .shirt-wrap, both position:relative).
 .contrib {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  margin-top: 2px;
-  line-height: 1;
+  display: contents;
 }
 
-.ind {
+// Goal: white pill (ball + optional count) at the disc's bottom-right.
+.ind.goal {
+  position: absolute;
+  bottom: -5px;
+  right: -7px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 1px;
+  height: 14px;
+  padding: 0 2px;
+  border-radius: 7px;
+  background: #fff;
+  color: #14110e;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 
   mat-icon {
-    font-size: 13px;
-    width: 13px;
-    height: 13px;
+    font-size: 11px;
+    width: 11px;
+    height: 11px;
   }
 }
 
+// Assist: small pill with "A" at the bottom-left.
 .ind.assist {
-  font-size: 0.62rem;
+  position: absolute;
+  bottom: -5px;
+  left: -7px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  border-radius: 7px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  border: 1px solid var(--mat-sys-surface);
+  font-size: 0.6rem;
   font-weight: 700;
+  line-height: 1;
 }
 
 .ind-count {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   font-weight: 700;
 }
 
-// Smaller card chips when used as a contribution badge.
-.contrib .card {
+// Card chip at the disc's top-left.
+.ind-card {
+  position: absolute;
+  top: -5px;
+  left: -6px;
+  z-index: 2;
   width: 9px;
   height: 12px;
-}
-
-// On the pitch the badges sit over the green — render them light.
-.marker .contrib {
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  border: 1px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 // ===== Section heading + team swatch =====

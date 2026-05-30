@@ -8,7 +8,7 @@
       </div>
     </mat-card>
   } @else if (fixture(); as f) {
-    <!-- Reusable goal/assist/card badges for a player (pitch + bench). -->
+    <!-- Reusable goal/assist/card badges, positioned on the number disc. -->
     <ng-template #contrib let-e>
       @if (e.goals > 0) {
         <span class="ind goal" aria-label="Goal">
@@ -17,12 +17,13 @@
         </span>
       }
       @if (e.assists > 0) {
-        <span class="ind assist" aria-label="Assist">
-          A@if (e.assists > 1) { <span class="ind-count">{{ e.assists }}</span> }
-        </span>
+        <span class="ind assist" aria-label="Assist">A@if (e.assists > 1) {{{ e.assists }}}</span>
       }
-      @if (e.yellow) { <span class="card yellow" aria-label="Yellow card"></span> }
-      @if (e.red) { <span class="card red" aria-label="Red card"></span> }
+      @if (e.red) {
+        <span class="card red ind-card" aria-label="Red card"></span>
+      } @else if (e.yellow) {
+        <span class="card yellow ind-card" aria-label="Yellow card"></span>
+      }
     </ng-template>
 
     <mat-card appearance="outlined" class="match-card">
@@ -242,13 +243,13 @@
                               <mat-icon aria-hidden="true">south</mat-icon>
                             </span>
                           }
+                          @if (m.events; as ev) {
+                            <span class="contrib">
+                              <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
+                            </span>
+                          }
                         </span>
                         <span class="mname">{{ m.name }}</span>
-                        @if (m.events; as ev) {
-                          <span class="contrib">
-                            <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
-                          </span>
-                        }
                       </div>
                     }
                   </div>
@@ -291,6 +292,11 @@
                                       <mat-icon aria-hidden="true">arrow_upward</mat-icon>
                                     </span>
                                   }
+                                  @if (playerEvents(b.player.id); as ev) {
+                                    <span class="contrib">
+                                      <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
+                                    </span>
+                                  }
                                 </span>
                                 <span class="bench-text">
                                   <span class="bench-line">
@@ -305,11 +311,6 @@
                                     <span class="bench-sub">
                                       <mat-icon aria-hidden="true">arrow_upward</mat-icon>
                                       {{ b.onMinute }}'@if (b.outName) { · {{ b.outName }} }
-                                    </span>
-                                  }
-                                  @if (playerEvents(b.player.id); as ev) {
-                                    <span class="contrib">
-                                      <ng-container *ngTemplateOutlet="contrib; context: { $implicit: ev }" />
                                     </span>
                                   }
                                 </span>
