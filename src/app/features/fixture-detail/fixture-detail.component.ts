@@ -15,6 +15,8 @@ import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Fixture } from '../../core/models/fixture.model';
 import { MatchDetail, MatchLineup, MatchPlayer } from '../../core/models/match-detail.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
@@ -86,6 +88,8 @@ export class FixtureDetailComponent {
   private readonly competitions = inject(CompetitionsService);
   private readonly teamsService = inject(TeamsService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   /** football-data match id from the route (`/matches/:id`), bound via
    *  withComponentInputBinding(). Aliased so the `:id` route param maps onto
@@ -476,6 +480,27 @@ export class FixtureDetailComponent {
     const base = type.replace(/_N\d+$/, '').replace(/_/g, ' ').trim().toLowerCase();
     if (base === 'video assistant referee') return `VAR${suffix}`;
     return base.charAt(0).toUpperCase() + base.slice(1) + suffix;
+  }
+
+  // --- tab selection, persisted in the `?tab=` query param -------------------
+
+  private readonly queryMap = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+
+  /** Active tab index, restored from `?tab=`. Line-ups is index 1 and only
+   *  exists once its data is loaded; anything else falls back to Events (0). */
+  protected readonly selectedTabIndex = computed<number>(() =>
+    this.queryMap().get('tab') === 'lineups' && this.hasLineups() ? 1 : 0,
+  );
+
+  protected onTabChange(index: number): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: index === 1 ? 'lineups' : 'events' },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   async refresh(): Promise<void> {

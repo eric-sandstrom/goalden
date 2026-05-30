@@ -86,6 +86,8 @@
         mat-align-tabs="center"
         [mat-stretch-tabs]="false"
         animationDuration="220ms"
+        [selectedIndex]="selectedTabIndex()"
+        (selectedIndexChange)="onTabChange($event)"
       >
         <mat-tab label="Events">
           <div class="tab-content">
