@@ -23,6 +23,33 @@
   min-width: 0;
   overflow-x: auto;
 }
+/* Loading placeholder: mirror the real mat-button-toggle-group — an
+   outlined, pill-ended row of connected cells with dividers — so the
+   border is visible while loading and the swap to real toggles is
+   near-seamless. Outline colour / radius / height match the live group. */
+.comp-tabs-skel {
+  /* Match the real toggle group: fill the bar's width (cells sit on the
+     left, empty space to the right inside the pill). */
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  height: 40px;
+  border: 1px solid var(--mat-sys-outline);
+  border-radius: 28px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.comp-tab-skel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  border-right: 1px solid var(--mat-sys-outline);
+  &:last-child {
+    border-right: none;
+  }
+}
 .comp-tabs .mat-button-toggle,
 .comp-tabs .mat-button-toggle .mat-button-toggle-button {
   height: 40px;
@@ -41,14 +68,6 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
-}
-.show-all-toggle {
-  flex: 0 0 auto;
-  /* When the show-all expansion is active, tint the icon so the user
-     can tell at a glance that they're in 'see comps I'm not in' mode. */
-  &.active {
-    color: var(--mat-sys-primary);
-  }
 }
 
 .fixtures-card {

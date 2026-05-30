@@ -6,6 +6,7 @@ import {
   redirectIfAuthenticatedGuard,
   requiresAuthGuard,
 } from './core/guards/auth.guard';
+import { predictLastLocationGuard } from './features/predict/predict-view-storage';
 
 export const routes: Routes = [
   {
@@ -42,6 +43,29 @@ export const routes: Routes = [
         path: 'predict',
         loadComponent: () =>
           import('./features/predict/predict.component').then((m) => m.PredictComponent),
+        // Two componentless child routes carry the view's state in the URL so
+        // a refresh restores it: `:comp` is the selected competition's
+        // `${compId}_${season}` key, `:tab` is the lower-cased filter chip.
+        // Neither renders anything — PredictComponent reads them off the
+        // activated route and writes them back on selection.
+        children: [
+          {
+            // A bare /predict redirects to the last-viewed comp + tab so
+            // pressing "Predict" returns you where you left off. Falls
+            // through to the component (which picks a default) on a first
+            // visit with nothing saved.
+            path: '',
+            canActivate: [predictLastLocationGuard],
+            children: [],
+          },
+          {
+            path: ':comp',
+            // Empty `children` keeps `:tab` a valid componentless route
+            // (Angular rejects a leaf with no component/children/redirect)
+            // while still rendering nothing — it only carries the param.
+            children: [{ path: ':tab', children: [] }],
+          },
+        ],
       },
       // /leaderboard merged into /leagues. Keep the path as a redirect so
       // existing bookmarks / shared links still land on the right page.

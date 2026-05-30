@@ -5,8 +5,15 @@ import {
   effect,
   inject,
   resource,
-  signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import {
+  ActivatedRoute,
+  ActivatedRouteSnapshot,
+  NavigationEnd,
+  Router,
+} from '@angular/router';
+import { filter as rxFilter, map } from 'rxjs/operators';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -20,8 +27,24 @@ import { LeaguesService } from '../../core/services/leagues.service';
 import { PredictionsService } from '../../core/services/predictions.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { FixtureRowComponent } from './fixture-row.component';
+import {
+  readSelectedComp,
+  readSelectedTab,
+  writeSelectedComp,
+  writeSelectedTab,
+} from './predict-view-storage';
 
 type Filter = 'ALL' | 'UPCOMING' | 'LIVE' | 'FINISHED' | 'GROUP' | 'KNOCKOUTS';
+
+/** Every filter value, used to validate the `:tab` URL segment. */
+const FILTERS: readonly Filter[] = [
+  'ALL',
+  'UPCOMING',
+  'LIVE',
+  'FINISHED',
+  'GROUP',
+  'KNOCKOUTS',
+];
 
 interface DateGroup {
   readonly label: string;
@@ -36,11 +59,6 @@ interface CompTab {
   readonly season: string;
   readonly key: string; // `${comp.id}_${season}` — used as the tab value
 }
-
-/** localStorage key persisting the last-viewed comp across sessions so
- *  reopening the app lands the user on the tab they were on. Stored as
- *  the `${compId}_${season}` key. */
-const STORAGE_KEY_SELECTED_COMP = 'goalden:predict-selected-comp';
 
 @Component({
   selector: 'app-predict',
@@ -62,20 +80,32 @@ export class PredictComponent {
   private readonly predictionsService = inject(PredictionsService);
   private readonly competitionsService = inject(CompetitionsService);
   private readonly leagues = inject(LeaguesService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
-  protected readonly filter = signal<Filter>('UPCOMING');
+  /** `{ comp, tab }` read off the two componentless child routes. Re-reads
+   *  on every completed navigation; seeded synchronously so the first
+   *  render already reflects a deep-linked / refreshed URL. */
+  private readonly urlParams = toSignal(
+    this.router.events.pipe(
+      rxFilter((e) => e instanceof NavigationEnd),
+      map(() => readChildParams(this.route)),
+    ),
+    { initialValue: readChildParams(this.route) },
+  );
+
   protected readonly skelRows = [0, 1, 2, 3, 4, 5];
 
-  /** "Show all" mode flips the visible-comps source from "comps I have
-   *  a league in" to "every selectable comp". Lets users predict in
-   *  comps before joining a league for them. */
-  protected readonly showAll = signal(false);
+  /** Label-placeholder widths for the comp-bar skeleton — a few short
+   *  shimmer bars sat inside outlined toggle cells, shown while leagues
+   *  load so the bar reserves its space instead of popping in. */
+  protected readonly compTabSkels = ['44px', '32px', '38px'];
 
-  /** Selected tab key — `${compId}_${season}`. Hydrated from localStorage
-   *  on init so reopening the app lands on the tab the user left. Cleared
-   *  back to null when the persisted comp isn't in the current visible set
-   *  (e.g. user left a league, or the comp's season ended). */
-  private readonly _selectedKey = signal<string | null>(readSelectedKey());
+  /** Active filter chip, driven by the `:tab` URL segment. Defaults to
+   *  UPCOMING when the segment is absent or unrecognised. */
+  protected readonly filter = computed<Filter>(
+    () => parseFilter(this.urlParams().tab) ?? 'UPCOMING',
+  );
 
   /** Comps the user is in (one entry per unique competitionId+season
    *  across their league memberships). Defaults the tab set unless the
@@ -94,8 +124,8 @@ export class PredictComponent {
   });
 
   /** Every comp users are allowed to predict in (filtered by future
-   *  endDate — same filter the create-league picker uses). The
-   *  "show all" mode source. */
+   *  endDate — same filter the create-league picker uses). Used as the
+   *  fallback tab set for users who aren't in any league yet. */
   private readonly allSelectableComps = computed<readonly CompTab[]>(() => {
     return this.competitionsService
       .selectableCompetitions()
@@ -108,16 +138,12 @@ export class PredictComponent {
   });
 
   /**
-   * The tab set the bar actually renders. Three modes:
-   *   - "show all" mode → every selectable comp
+   * The tab set the bar actually renders. Two modes:
    *   - user has at least one league → that league's comps
    *   - user has no leagues → fall back to all selectable so the page
    *     still shows something predictable
    */
   protected readonly visibleComps = computed<readonly CompTab[]>(() => {
-    // "Show all" is an explicit user toggle — honour it immediately,
-    // regardless of league-load state.
-    if (this.showAll()) return this.allSelectableComps();
     // Until memberships AND every per-league doc have settled, return an
     // empty set so the bar starts at zero tabs and fills in once with the
     // user's comps — rather than flashing every selectable comp and then
@@ -128,14 +154,15 @@ export class PredictComponent {
     return this.allSelectableComps();
   });
 
-  /** The active tab, resolved from the persisted key against the
-   *  current visible set. Falls back to the first tab when the
-   *  persisted key isn't in scope any more (joined/left leagues,
-   *  season rolled over). */
+  /** The active comp, resolved from the URL `:comp` segment against the
+   *  current visible set. Key precedence: URL → last-viewed (localStorage,
+   *  for a bare entry before the URL carries a comp) → first visible tab.
+   *  Falls back to the first tab when the requested key isn't in scope any
+   *  more (joined/left leagues, season rolled over). */
   protected readonly selectedComp = computed<CompTab | null>(() => {
     const visible = this.visibleComps();
     if (visible.length === 0) return null;
-    const key = this._selectedKey();
+    const key = this.urlParams().comp ?? readSelectedComp();
     if (key) {
       const match = visible.find((c) => c.key === key);
       if (match) return match;
@@ -144,27 +171,23 @@ export class PredictComponent {
   });
 
   /**
-   * Competition bar visibility. Show it when there's more than one
-   * competition the user can reach:
-   *   - they're already viewing multiple (their leagues span comps, or
-   *     "show all" is on), OR
-   *   - "show all" would reveal selectable comps beyond their current set.
-   *
-   * That second clause is the important one: the show-all toggle lives
-   * *inside* this bar, so gating purely on `visibleComps().length > 1`
-   * traps a user who's in a single league (e.g. just the auto-enrolled
-   * WC global league) — they'd have no affordance to reach any other
-   * competition. Only when the catalogue genuinely has nothing else to
-   * switch to do we hide the bar entirely.
+   * Competition bar visibility. Show it only when there's more than one
+   * competition to switch between — a single-comp bar is just a static
+   * label, so we hide it.
    */
   protected readonly showTabBar = computed(() => {
     // Keep the bar hidden until the visible set is settled, so it never
-    // flashes empty (or half-populated) while leagues load. "Show all"
-    // resolves its set synchronously, so it's exempt from the gate.
-    if (!this.showAll() && !this.leagues.fullyLoaded()) return false;
-    if (this.visibleComps().length > 1) return true;
-    return this.allSelectableComps().length > this.visibleComps().length;
+    // flashes empty (or half-populated) while leagues load.
+    if (!this.leagues.fullyLoaded()) return false;
+    return this.visibleComps().length > 1;
   });
+
+  /** While leagues are still loading we can't know the real tabs yet — but
+   *  rather than leave a gap that pops in late, render a placeholder bar
+   *  with skeleton chips. Mirrors `showTabBar`'s load gate, so the
+   *  placeholder hands straight over to the real bar (or to nothing, when
+   *  there's only one comp and the bar stays hidden). */
+  protected readonly compBarLoading = computed(() => !this.leagues.fullyLoaded());
 
   /**
    * Fixtures for the selected comp, loaded via an Angular `resource`.
@@ -206,7 +229,7 @@ export class PredictComponent {
    *  still resolving (so we never flash an empty state before the tabs
    *  appear) and while the selected comp's resource is fetching. */
   protected readonly loaded = computed(() => {
-    if (!this.showAll() && !this.leagues.fullyLoaded()) return false;
+    if (!this.leagues.fullyLoaded()) return false;
     if (!this.selectedComp()) return true; // settled with no comp to load
     return !this.fixturesResource.isLoading();
   });
@@ -240,24 +263,52 @@ export class PredictComponent {
   });
 
   constructor() {
-    // Persist the selected tab to localStorage whenever it changes, so
-    // a refresh / reopen lands on the same comp. Reads via the resolved
-    // signal so we capture the actual chosen value even when it falls
-    // back from a stale persisted key.
     effect(() => {
       const sel = this.selectedComp();
-      if (sel) writeSelectedKey(sel.key);
+      if (!sel) return;
+      const url = this.urlParams();
+      // Remember the resolved comp + the active tab so a future bare
+      // /predict restores both. Only persist the tab when it's actually in
+      // the URL — never the UPCOMING default a bare entry resolves to, or
+      // we'd clobber the saved value before we get to use it below.
+      writeSelectedComp(sel.key);
+      if (url.tab) writeSelectedTab(url.tab);
+      // Canonicalise the URL when it doesn't already name the resolved comp:
+      //   - bare /predict (no :comp) — the guard handles the common case,
+      //     but a first-ever visit with nothing saved still lands here;
+      //   - a stale/unknown :comp the user can't see any more (left the
+      //     league, season rolled over) — selectedComp fell back to the
+      //     first tab, so realign the URL to it.
+      // replaceUrl keeps these out of history; once the URL matches it's a
+      // no-op. A bare entry restores the saved tab; a stale-comp realign
+      // keeps whatever tab the URL already carries.
+      if (url.comp !== sel.key) {
+        const tab =
+          url.comp === null ? parseFilter(readSelectedTab()) ?? 'UPCOMING' : this.filter();
+        void this.navigateTo(sel.key, tab, { replaceUrl: true });
+      }
     });
   }
 
-  /** Called by the tab bar's (change) event. Persistence happens via the
-   *  effect above — this just updates the signal. */
+  /** Called by the tab bar's (change) event — pushes the comp into the URL
+   *  (keeping the current filter). The signals follow from the navigation. */
   protected selectComp(key: string): void {
-    this._selectedKey.set(key);
+    void this.navigateTo(key, this.filter());
   }
 
-  protected toggleShowAll(): void {
-    this.showAll.update((v) => !v);
+  /** Called by the filter chips — pushes the filter into the URL (keeping
+   *  the current comp). No-op until a comp has resolved. */
+  protected selectFilter(f: Filter): void {
+    const key = this.selectedComp()?.key;
+    if (key) void this.navigateTo(key, f);
+  }
+
+  private navigateTo(
+    compKey: string,
+    f: Filter,
+    extras?: { replaceUrl: boolean },
+  ): Promise<boolean> {
+    return this.router.navigate(['/predict', compKey, f.toLowerCase()], extras);
   }
 
   /** Re-run the fixtures resource loader after a failed load. */
@@ -267,6 +318,21 @@ export class PredictComponent {
 
   protected predictionFor(matchId: string) {
     return this.predictionsService.matchPredictions().get(matchId) ?? null;
+  }
+
+  /** Competition crest URL. Falls back to football-data's crest-by-code
+   *  endpoint when the synced `emblem` is missing (e.g. CL, whose API
+   *  record has a null emblem) — the API hosts standard crests at
+   *  `/<CODE>.png`. `hideBrokenCrest` removes the <img> if the derived URL
+   *  404s, so a comp with no resolvable crest just shows its label. */
+  protected crestFor(comp: Competition): string {
+    return comp.emblem ?? `https://crests.football-data.org/${comp.id}.png`;
+  }
+
+  /** Hide a crest <img> whose src failed to load (a derived fallback URL
+   *  that doesn't exist), leaving just the comp label. */
+  protected hideBrokenCrest(event: Event): void {
+    (event.target as HTMLImageElement).style.display = 'none';
   }
 
   /** `matchId → leg position` for the comp's two-legged knockout ties, so each
@@ -329,21 +395,37 @@ function seasonFromComp(comp: Competition | null): string | null {
   return startDate.slice(0, 4);
 }
 
-function readSelectedKey(): string | null {
-  if (typeof localStorage === 'undefined') return null;
-  try {
-    return localStorage.getItem(STORAGE_KEY_SELECTED_COMP);
-  } catch {
-    return null;
+/** Walk the route-snapshot chain below PredictComponent and pick up the
+ *  `comp` (from the `:comp` route) and `tab` (from the `:tab` route)
+ *  params. Walking the *snapshot* tree (rather than the `ActivatedRoute`
+ *  objects) is safe at construction time — the snapshot tree is fully built
+ *  during route recognition, before child `ActivatedRoute.snapshot`s are
+ *  populated. Reading each off its own snapshot keeps this independent of
+ *  the router's param-inheritance strategy. Returns nulls for a bare
+ *  `/predict` (no child routes matched). */
+function readChildParams(route: ActivatedRoute): {
+  comp: string | null;
+  tab: string | null;
+} {
+  let comp: string | null = null;
+  let tab: string | null = null;
+  for (
+    let snap: ActivatedRouteSnapshot | null = route.snapshot;
+    snap;
+    snap = snap.firstChild
+  ) {
+    const pm = snap.paramMap;
+    if (pm.has('comp')) comp = pm.get('comp');
+    if (pm.has('tab')) tab = pm.get('tab');
   }
+  return { comp, tab };
 }
 
-function writeSelectedKey(key: string): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY_SELECTED_COMP, key);
-  } catch {
-    // localStorage disabled / quota exceeded — fine, signal still drives
-    // current-session behaviour, only persistence is lost.
-  }
+/** Parse a `:tab` segment back to a Filter, case-insensitively. Returns
+ *  null for an absent or unrecognised value so callers can default. */
+function parseFilter(raw: string | null): Filter | null {
+  if (!raw) return null;
+  const up = raw.toUpperCase();
+  return (FILTERS as readonly string[]).includes(up) ? (up as Filter) : null;
 }
+
