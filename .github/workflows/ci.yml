@@ -1,0 +1,56 @@
+# Build gate for pull requests targeting main.
+#
+# Why: `ng build` (production) only ran at deploy time (deploy.yml), which
+# fires AFTER a release PR merges. So a build failure — most notably a bundle /
+# component-style budget overage (see angular.json `budgets`) — wouldn't surface
+# until release/deploy, long after the offending PR landed on main. This
+# workflow runs the same production build on every PR, so the build must be
+# green BEFORE the PR merges (and therefore before release-please ever opens or
+# updates its release PR, which it does on push to main).
+#
+# `npm run build` runs the `prebuild` hook (sync-changelog.mjs) then `ng build`,
+# which defaults to the production configuration in angular.json — the only
+# config where budgets are enforced. This mirrors deploy.yml's Angular build.
+#
+# Uses `pull_request` (not `pull_request_target`): building PR-authored code
+# needs no secrets, so the no-secret-exposure trigger is the safe choice.
+#
+# To make this a merge requirement: Settings -> Branches -> branch protection
+# for `main` -> require the "Build Angular app" status check.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+# A burst of pushes to a PR branch should only build the latest commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Angular app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `ng build` defaults to the production configuration, which enforces the
+      # bundle + component-style budgets in angular.json. A budget ERROR (or any
+      # build failure) fails the check and blocks the merge.
+      - name: Build Angular app
+        run: npm run build

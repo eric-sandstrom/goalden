@@ -1,0 +1,564 @@
+:host {
+  display: block;
+}
+
+// Yellow / red card chip — base for the on-disc card badge below.
+.card {
+  width: 12px;
+  height: 16px;
+  border-radius: 2px;
+  flex: none;
+
+  &.yellow {
+    background: #f6c700;
+  }
+  &.red {
+    background: #d32f2f;
+  }
+}
+
+// ===== Line-ups: pitch =====
+
+// Manager (left) + formation (right) bar, above the away XI and below home.
+.team-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  max-width: 340px;
+  margin: 8px auto;
+
+  // Away bar mirrors the home one: formation on the left, manager on the
+  // right, matching the away team's right-aligned column elsewhere.
+  &.away {
+    flex-direction: row-reverse;
+  }
+
+  .mgr {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .form {
+    flex: none;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--mat-sys-surface-variant);
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.pitch {
+  position: relative;
+  width: 100%;
+  // Cap it so the field doesn't blow up to panel width on wide screens.
+  // Height is set inline, sized to the row count so rows never crowd.
+  max-width: 340px;
+  margin: 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    0deg,
+    #2f8a3e 0,
+    #2f8a3e 12.5%,
+    #2b8139 12.5%,
+    #2b8139 25%
+  );
+  // Pitch outline.
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.pitch-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.pitch-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+}
+
+.marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 64px;
+  pointer-events: none;
+
+  .dot-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  // Small red "subbed off" badge at the disc's top-right corner.
+  .sub-off {
+    position: absolute;
+    top: -5px;
+    right: -7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #d32f2f;
+    color: #fff;
+    border: 1px solid #fff;
+
+    mat-icon {
+      font-size: 12px;
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  .dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    // Fill, ring (border-color) and text are all set inline from the club's
+    // two colours; the shadow keeps any colour legible against the pitch.
+    border: 2px solid transparent;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  .mname {
+    max-width: 64px;
+    font-size: 0.6rem;
+    line-height: 1.05;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    // Wrap long names to two lines (breaking a long single surname if needed)
+    // instead of ellipsis-clipping them.
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+}
+
+// ===== Goal / assist / card badges, positioned on the number disc =====
+
+// No box of its own — its badges position absolutely against the disc wrap
+// (.dot-wrap / .shirt-wrap, both position:relative).
+.contrib {
+  display: contents;
+}
+
+// Goal: white pill (ball + optional count) at the disc's bottom-right.
+.ind.goal {
+  position: absolute;
+  bottom: -1px;
+  right: -6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 14px;
+  padding: 0 2px;
+  border-radius: 7px;
+  background: #fff;
+  color: #14110e;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+
+  mat-icon {
+    font-size: 11px;
+    width: 11px;
+    height: 11px;
+  }
+}
+
+// Assist: small pill with "A" at the bottom-left.
+.ind.assist {
+  position: absolute;
+  bottom: -1px;
+  left: -6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  border-radius: 7px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  border: 1px solid var(--mat-sys-surface);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ind-count {
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+// Card chip at the disc's top-left, sitting on the circle.
+.ind-card {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  z-index: 2;
+  width: 9px;
+  height: 12px;
+  border: 1px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+// Slightly smaller card on the pitch markers.
+.marker .ind-card {
+  width: 7px;
+  height: 10px;
+}
+
+// ===== Section heading + team swatch =====
+
+.section-h {
+  margin: 16px 0 4px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// Small two-tone swatch tying a column to its team's pitch markers
+// (fill + ring set inline, matching the dots).
+.team-dot {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+
+// ===== Line-ups: benches =====
+
+.benches {
+  display: grid;
+  // Home left, away right at every width.
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.bench-col {
+  padding: 0 12px;
+}
+
+// Vertical divider down the middle, between the two columns.
+.bench-col.away {
+  border-left: 1px solid var(--mat-sys-outline-variant);
+}
+
+// Both columns grow OUTWARD from the centre line, discs (numbers) nearest it:
+// the home column hugs the line on its right (disc on the right, content
+// right-aligned); the away column hugs the line on its left and keeps the
+// default order (disc on the left).
+.bench-col.home {
+  text-align: right;
+
+  .bench-row {
+    flex-direction: row-reverse;
+  }
+  .bench-text {
+    align-items: flex-end;
+  }
+  .bench-line {
+    flex-direction: row-reverse;
+  }
+  .bench-sub {
+    flex-direction: row-reverse;
+  }
+}
+
+.bench {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bench-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  // Uniform height so came-on rows (name + sub line) and unused subs (name
+  // only) line up row-by-row across the two columns.
+  min-height: 42px;
+
+  // A used sub stands out from the unused ones below it.
+  &.came-on .bench-name {
+    font-weight: 600;
+  }
+}
+
+.bench-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+// Name + position, side by side on wide screens.
+.bench-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bench-name {
+  min-width: 0;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bench-pos {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.bench-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--mat-sys-on-surface-variant);
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: #2e8b3d;
+  }
+}
+
+// Shirt-number disc, coloured per team (fill / ring / text set inline).
+.shirt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.shirt-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+// Green "came on" badge on the disc, shown only in the compact chip layout
+// (the wide layout shows the sub minute on its own line instead).
+.on-badge {
+  display: none;
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #2e8b3d;
+  color: #fff;
+  border: 1px solid var(--mat-sys-surface);
+
+  mat-icon {
+    font-size: 11px;
+    width: 11px;
+    height: 11px;
+  }
+}
+
+// The compact last-name is off on wide screens (which show the full name).
+.bench-last {
+  display: none;
+}
+
+// ===== Small screens: bench/subs become compact vertical chips =====
+
+@media (max-width: 599.98px) {
+  .bench-col {
+    padding: 0 8px;
+  }
+
+  .bench {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px 8px;
+  }
+  // Cluster each team's chips toward the centre divider.
+  .bench-col.home .bench {
+    justify-content: flex-end;
+  }
+  .bench-col.away .bench {
+    justify-content: flex-start;
+  }
+
+  .bench-col.home .bench-row,
+  .bench-col.away .bench-row {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+    width: 60px;
+    min-height: 58px;
+    text-align: center;
+  }
+
+  // Each chip: number disc, last name, position — hide the wide-layout fields.
+  .bench-name,
+  .bench-sub {
+    display: none;
+  }
+  .on-badge {
+    display: inline-flex;
+  }
+
+  .bench-col.home .bench-text,
+  .bench-col.away .bench-text {
+    align-items: center;
+    flex: none;
+    min-width: 0;
+    max-width: 60px;
+  }
+
+  // Stack last name over position in the chip (override the wide row).
+  .bench-col.home .bench-line,
+  .bench-col.away .bench-line {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .bench-last {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60px;
+  }
+
+  .came-on .bench-last {
+    font-weight: 600;
+  }
+
+  .bench-pos {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+// ===== Officials =====
+
+.officials {
+  list-style: none;
+  // Centre the whole list as one block (fit-content + auto margins) so every
+  // row is left-aligned to the same edge — the icons line up in a column.
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.official {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ref-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--mat-sys-surface-variant);
+  color: var(--mat-sys-on-surface-variant);
+
+  mat-icon {
+    margin: 0;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.ref-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ref-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.ref-role {
+  font-size: 0.72rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.muted {
+  margin: 4px 0 0 16px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}
