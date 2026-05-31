@@ -29,8 +29,9 @@
 #       reuse it so there's only one set of CI credentials to rotate.
 #
 # Required Firebase Functions secret (set once locally, separate from GitHub):
-#   FOOTBALL_DATA_TOKEN        Used by the deployed pollFootballData and
-#                              pollTeams crons. Set with
+#   FOOTBALL_DATA_TOKEN        Used by the deployed pollFootballData cron plus
+#                              the activation-driven sync (setCompetitionActive,
+#                              resyncCompetition) and scoreMatch. Set with
 #                              `firebase functions:secrets:set FOOTBALL_DATA_TOKEN`.
 
 name: Deploy to Firebase
@@ -100,8 +101,15 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GOALDEN_693DC }}
 
       - name: Deploy to Firebase
+        # --force auto-confirms deletion of Cloud Functions that no longer
+        # exist in source. Without it, --non-interactive aborts the whole
+        # deploy whenever a function is retired (rather than prompting), e.g.
+        # pollTeams / pollStandings removed in #46. Function exports are
+        # PR-reviewed and deploys only run on release/dispatch, so letting CI
+        # reconcile deletions is the intended source-of-truth behaviour.
         run: |
           npx firebase-tools@latest deploy \
             --only hosting,functions,firestore:rules,firestore:indexes \
             --project goalden-693dc \
-            --non-interactive
+            --non-interactive \
+            --force
