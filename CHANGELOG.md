@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/eric-sandstrom/goalden/compare/v1.7.1...v1.7.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* stabilise match-detail rendering (no layout shift, no software-renderer jank) ([#44](https://github.com/eric-sandstrom/goalden/issues/44)) ([8e73640](https://github.com/eric-sandstrom/goalden/commit/8e7364032c0ea4cb058bb70e6135f5a0170ebb87))
+
 ## [1.7.1](https://github.com/eric-sandstrom/goalden/compare/v1.7.0...v1.7.1) (2026-05-31)
 
 
