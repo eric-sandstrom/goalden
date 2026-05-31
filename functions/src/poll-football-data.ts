@@ -469,11 +469,16 @@ async function patchRollup(
   );
 }
 
-/** Minimum gap between full per-comp syncs. The bulk live poll keeps in-window
- *  matches fresh every minute; the full sync only needs to run often enough to
- *  pick up newly-scheduled fixtures, reschedules, and knockout team fill-ins —
- *  none of which move minute-to-minute. */
-const FULL_SYNC_INTERVAL_MS = 15 * 60 * 1000;
+/** Minimum gap between full per-comp syncs. The full sync is the expensive READ
+ *  path: it `getAll`s EVERY match of EVERY active comp (a full league season is
+ *  240-380 docs) just to diff. The bulk live poll already ingests/refreshes any
+ *  fixture in the [-1d, +2d] window every minute (new in-window matches
+ *  included), so the full sync only needs to catch far-future new/rescheduled
+ *  fixtures and knockout fill-ins -- none of which move minute-to-minute. At the
+ *  old 15-min cadence that season-wide getAll dominated Firestore reads; a few
+ *  hours is plenty. Tunable: lower if far-future schedule changes must surface
+ *  faster. */
+const FULL_SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000;
 
 /** True when the last full sync is older than FULL_SYNC_INTERVAL_MS (or never
  *  ran). Tracked in `cache/poll-meta` so the cadence survives cold starts. */

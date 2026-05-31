@@ -32,11 +32,20 @@ export function extractSeason(currentSeason: unknown): string | null {
   return startDate.slice(0, 4);
 }
 
+/** The active-competition set changes rarely (only via setCompetitionActive /
+ *  syncCompetitionsFromApi), yet the fixtures poller resolves it every minute.
+ *  Cache the resolved contexts in module scope for a short TTL so the
+ *  every-minute path costs N reads per TTL instead of N reads per minute.
+ *  Per function instance (a cold start just re-queries); the explicit-compId
+ *  path is never cached. A comp toggle takes effect within ACTIVE_TTL_MS. */
+let activeContextsCache: { at: number; contexts: readonly CompetitionContext[] } | null = null;
+const ACTIVE_TTL_MS = 5 * 60 * 1000;
+
 /**
  * Resolves the list of (compId, season) contexts to poll. Two paths:
  *   - explicit `compId`: read that single doc; if missing or no
  *     currentSeason, return empty so the caller surfaces the warning.
- *   - implicit: list `competitions/` where `active == true`.
+ *   - implicit: list `competitions/` where `active == true` (cached, see above).
  *
  * Comps without a `currentSeason` are filtered out — football-data
  * returns null for these during the between-seasons window and there's
@@ -46,6 +55,10 @@ export async function resolveCompetitionContexts(
   db: FirebaseFirestore.Firestore,
   compId: string | undefined,
 ): Promise<readonly CompetitionContext[]> {
+  if (!compId && activeContextsCache && Date.now() - activeContextsCache.at < ACTIVE_TTL_MS) {
+    return activeContextsCache.contexts;
+  }
+
   const snap = compId
     ? await db.collection('competitions').doc(compId).get().then((d) => (d.exists ? [d] : []))
     : (await db.collection('competitions').where('active', '==', true).get()).docs;
@@ -61,6 +74,8 @@ export async function resolveCompetitionContexts(
     const fdId = typeof data['fdId'] === 'number' ? (data['fdId'] as number) : null;
     contexts.push({ id: doc.id, fdId, season });
   }
+
+  if (!compId) activeContextsCache = { at: Date.now(), contexts };
   return contexts;
 }
 

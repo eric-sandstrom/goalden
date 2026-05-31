@@ -143,6 +143,21 @@ export interface FixtureDoc {
   liveDetail?: string | null;
   /** When the overlay was last refreshed from ESPN. */
   liveSyncedAt?: Timestamp;
+
+  // --- Detail-poll capture flags (set by runPollLiveDetail) ----------------
+  // Gate flags so the detail poll can decide whether to (re)fetch a fixture's
+  // rich detail WITHOUT reading its detail/full subdoc: once a lineup is
+  // captured (TIMED) or the final is captured (FINISHED/AWARDED), nothing more
+  // needs fetching for it. Kept on the lean fixture doc, which the detail
+  // poll's window query already reads — replacing the per-minute getAll of
+  // EVERY candidate's detail subdoc with one read only for the few it fetches.
+  // Absent until first capture; mapFixture never sets them and fixtureChanged
+  // ignores them, so the live/full poll's merge-writes preserve them and never
+  // churn the rollup.
+  /** True once a lineup has been captured into detail/full. */
+  lineupCaptured?: boolean;
+  /** True once the closing/final detail has been captured. */
+  finalCaptured?: boolean;
 }
 
 /** Context the polling loop passes to mapFixture so the produced doc
