@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/eric-sandstrom/goalden/compare/v1.8.0...v1.9.0) (2026-05-31)
+
+
+### Features
+
+* material symbols icons, logo favicon, and matches polish ([#49](https://github.com/eric-sandstrom/goalden/issues/49)) ([00deab0](https://github.com/eric-sandstrom/goalden/commit/00deab02a77427404c8913f357494c5d98f53975))
+
 ## [1.8.0](https://github.com/eric-sandstrom/goalden/compare/v1.7.2...v1.8.0) (2026-05-31)
 
 
