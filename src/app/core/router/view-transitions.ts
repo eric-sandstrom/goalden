@@ -38,6 +38,13 @@ function isAncestorOf(prefix: string[], path: string[]): boolean {
 
 type RouteDirection = 'forward' | 'back';
 
+/** The match-detail leaf, `/matches/:id` → segments `['matches', '<id>']`.
+ *  Its transition to/from the list is a fade-down rather than the iOS-style
+ *  side slide the other parent/child routes use. */
+function isMatchesDetail(segments: string[]): boolean {
+  return segments.length === 2 && segments[0] === 'matches';
+}
+
 function directionFor(from: string[], to: string[]): RouteDirection | null {
   // Into a sub-route of where we are → forward. The `from.length` guard keeps
   // the empty root path ('') from being treated as everyone's parent, so plain
@@ -61,7 +68,19 @@ export function onRouteViewTransition({ transition, from, to }: ViewTransitionIn
   const samePath =
     fromSegs.length === toSegs.length && fromSegs.every((s, i) => s === toSegs[i]);
 
-  const direction = samePath ? 'none' : directionFor(fromSegs, toSegs);
+  // The match-detail page opts out of the side slide: opening or leaving
+  // `/matches/:id` fades the page down/up instead, so the shared-element morph
+  // (crest/name/score flying into the scoreboard) reads as the page settling
+  // into place rather than sliding past. Applies whenever the detail is an
+  // endpoint; query-param-only nav (tab switches) still stamps 'none'.
+  let direction: 'forward' | 'back' | 'fade-down' | 'none' | null;
+  if (samePath) {
+    direction = 'none';
+  } else if (isMatchesDetail(fromSegs) || isMatchesDetail(toSegs)) {
+    direction = 'fade-down';
+  } else {
+    direction = directionFor(fromSegs, toSegs);
+  }
 
   if (direction) {
     root.setAttribute('data-route-direction', direction);
