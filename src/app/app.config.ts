@@ -18,6 +18,7 @@ import {
 
 import { environment } from '../environments/environment';
 import { onRouteViewTransition } from './core/router/view-transitions';
+import { markRendererCapability } from './core/router/software-renderer';
 import { provideFirebase } from './core/firebase/firebase.providers';
 import { AppUpdateService } from './core/services/app-update.service';
 import { NotificationsService } from './core/services/notifications.service';
@@ -65,6 +66,9 @@ export const appConfig: ApplicationConfig = {
     // Boot the SwUpdate listener immediately so users see a "Reload" toast
     // when a new build is deployed mid-session.
     provideAppInitializer(() => {
+      // Flag software rendering so the view transitions degrade to instant
+      // (full-screen bitmap fades jank on a CPU rasterizer).
+      markRendererCapability();
       inject(AppUpdateService).start();
       // Re-arm push for users who already opted in (refreshes the token and
       // re-binds the foreground message handler). No-op until permission is
