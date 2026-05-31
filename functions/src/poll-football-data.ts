@@ -65,6 +65,7 @@ export interface PollSummary {
 export async function runPollFootballData(
   token: string,
   compId?: string,
+  reconcile = false,
 ): Promise<PollSummary> {
   const db = getFirestore();
   const contexts = await resolveCompetitionContexts(db, compId);
@@ -84,7 +85,7 @@ export async function runPollFootballData(
   for (let i = 0; i < contexts.length; i++) {
     const ctx = contexts[i];
     try {
-      const result = await pollOneCompetition(token, ctx);
+      const result = await pollOneCompetition(token, ctx, reconcile);
       perComp.push(result);
       totalFetched += result.fetched;
       totalWritten += result.written;
@@ -154,6 +155,7 @@ export async function runPollFootballData(
 async function pollOneCompetition(
   token: string,
   ctx: CompetitionContext,
+  reconcile: boolean,
 ): Promise<CompetitionPollResult> {
   const res = await fetch(
     `https://api.football-data.org/v4/competitions/${ctx.fdId ?? ctx.id}/matches`,
@@ -176,11 +178,32 @@ async function pollOneCompetition(
   logger.info(`[${ctx.id}] received ${matches.length} matches`);
 
   const db = getFirestore();
-  const refs = matches.map((m) => db.collection('fixtures').doc(`fd-${m.id}`));
-  const snapshots = refs.length > 0 ? await db.getAll(...refs) : [];
+
+  // Build the "existing" set to diff against. Normally (reconcile === false) we
+  // read the per-comp ROLLUP doc -- ONE read -- instead of getAll-ing every
+  // match doc, so the full sync stops re-reading hundreds of unchangeable
+  // finished/far-future fixtures each run. A NEW fixture is absent from the
+  // rollup, so fixtureChanged(undefined, ...) forces its canonical write below:
+  // every fixture is still PULLED to its canonical doc at least once, and a
+  // missing rollup (a fresh/just-activated comp) leaves `existing` empty so ALL
+  // matches count as new -> a full pull. The periodic reconcile (reconcile ===
+  // true) reads the canonical docs directly to self-heal any drift and
+  // guarantee completeness.
   const existing = new Map<string, FixtureDoc>();
-  for (const s of snapshots) {
-    if (s.exists) existing.set(s.id, s.data() as FixtureDoc);
+  if (reconcile) {
+    const refs = matches.map((m) => db.collection('fixtures').doc(`fd-${m.id}`));
+    const snapshots = refs.length > 0 ? await db.getAll(...refs) : [];
+    for (const s of snapshots) {
+      if (s.exists) existing.set(s.id, s.data() as FixtureDoc);
+    }
+  } else {
+    const rollupSnap = await db.collection('cache').doc(`fixtures-${ctx.id}`).get();
+    const arr = rollupSnap.exists ? rollupSnap.data()?.['fixtures'] : null;
+    if (Array.isArray(arr)) {
+      for (const f of arr as Array<FixtureDoc & { id?: unknown }>) {
+        if (typeof f.id === 'string') existing.set(f.id, f);
+      }
+    }
   }
 
   const batch = db.batch();
@@ -496,6 +519,28 @@ async function markFullSync(db: FirebaseFirestore.Firestore): Promise<void> {
     .set({ fixturesFullSyncAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
+/** Full-reconcile cadence. Most full syncs diff against the per-comp rollup (one
+ *  read); on this slower cadence the sync instead does a true getAll over every
+ *  match doc -- self-healing any drift and guaranteeing every fixture is pulled
+ *  to its canonical doc. Daily is ample (canonical docs are never deleted in
+ *  normal operation; this is a belt-and-suspenders completeness pass). Tracked
+ *  in `cache/poll-meta`. */
+const RECONCILE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+async function reconcileDue(db: FirebaseFirestore.Firestore): Promise<boolean> {
+  const snap = await db.collection('cache').doc('poll-meta').get();
+  const ts = snap.exists ? snap.data()?.['fixturesReconcileAt'] : null;
+  const lastMs = ts && typeof ts.toMillis === 'function' ? ts.toMillis() : 0;
+  return Date.now() - lastMs >= RECONCILE_INTERVAL_MS;
+}
+
+async function markReconcile(db: FirebaseFirestore.Firestore): Promise<void> {
+  await db
+    .collection('cache')
+    .doc('poll-meta')
+    .set({ fixturesReconcileAt: FieldValue.serverTimestamp() }, { merge: true });
+}
+
 /** How far ahead of kickoff the poller wakes. Set to the line-up window
  *  (~75 min before kickoff) so the per-match detail poll can capture line-ups
  *  as soon as football-data publishes them — must stay >= the detail poll's
@@ -710,8 +755,13 @@ export const pollFootballData = onSchedule(
     // (newly scheduled matches, reschedules, knockout team fill-ins) and
     // rebuilds rollups wholesale. Throttled so it isn't the every-minute cost.
     if (doFullSync) {
-      await runPollFootballData(token);
+      // Most full syncs diff against the per-comp rollup (one read); ~once a day
+      // do a true getAll reconcile instead, to self-heal drift and guarantee
+      // every fixture is pulled to its canonical doc at least once.
+      const reconcile = await reconcileDue(db);
+      await runPollFootballData(token, undefined, reconcile);
       await markFullSync(db);
+      if (reconcile) await markReconcile(db);
     }
   },
 );

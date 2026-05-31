@@ -36,7 +36,10 @@ export const devPollFixturesNow = onCall(
       throw new HttpsError('invalid-argument', 'compId must be a non-empty string when provided');
     }
 
-    const result = await runPollFootballData(token, compId);
+    // reconcile = true: a manual "poll now" does a full getAll reconcile (not
+    // the cheap rollup diff), so it always pulls every fixture to its canonical
+    // doc -- the point of this button (e.g. seeding before a tournament).
+    const result = await runPollFootballData(token, compId, true);
     logger.info('devPollFixturesNow finished', {
       compId: compId ?? '(all active)',
       fetched: result.fetched,
