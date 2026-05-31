@@ -65,8 +65,28 @@ foreach ($e in $entries) {
   if (-not $base) { $skipped += "$branch (no recorded base - keeping to be safe)"; continue }
   if ((git -C $root rev-parse "$branch").Trim() -eq $base) { $skipped += "$branch (no commits yet)"; continue }
 
-  $unmerged = (git -C $root rev-list "$branch" --not origin/main --count).Trim()
-  if ($unmerged -ne '0') { $skipped += "$branch ($unmerged unmerged commit(s))"; continue }
+  # Merged into origin/main? Handles BOTH a normal/ff merge (branch is an ancestor)
+  # AND a squash merge (this repo squash-merges, so the branch is NOT an ancestor;
+  # instead check whether the branch's combined diff is already in main). The
+  # squash test builds a virtual commit of the branch's tree on its merge-base and
+  # asks `git cherry` if that patch is already applied to origin/main (a leading
+  # '-' means yes). This is the standard squash-merge detection.
+  $merged = $false
+  git -C $root merge-base --is-ancestor "$branch" origin/main 2>$null
+  if ($LASTEXITCODE -eq 0) {
+    $merged = $true
+  } else {
+    $mb = (git -C $root merge-base origin/main "$branch" 2>$null)
+    $tr = (git -C $root rev-parse "$branch^{tree}" 2>$null)
+    if ($mb -and $tr) {
+      $virt = (git -C $root commit-tree $tr.Trim() -p $mb.Trim() -m '_' 2>$null)
+      if ($virt) {
+        $cherry = git -C $root cherry origin/main $virt.Trim() 2>$null
+        if (($cherry | Select-Object -First 1) -match '^-') { $merged = $true }
+      }
+    }
+  }
+  if (-not $merged) { $skipped += "$branch (unmerged - work not yet in origin/main)"; continue }
 
   if ($DryRun) { $removed += "$branch  ->  would remove $path"; continue }
 
