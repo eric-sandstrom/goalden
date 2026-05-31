@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/eric-sandstrom/goalden/compare/v1.7.2...v1.8.0) (2026-05-31)
+
+
+### Features
+
+* activation-driven match ingest with unfolded live detail ([#46](https://github.com/eric-sandstrom/goalden/issues/46)) ([5c965f2](https://github.com/eric-sandstrom/goalden/commit/5c965f2c9edc1a08dfd54c686504a61cd1fb0d3b))
+
 ## [1.7.2](https://github.com/eric-sandstrom/goalden/compare/v1.7.1...v1.7.2) (2026-05-31)
 
 
