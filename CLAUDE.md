@@ -353,6 +353,7 @@ Versioning and the in-app "What's new" dialog are automated via **release-please
 - **Subjects are lowercase**, e.g. `feat: add bracket tiebreaker view` (not `feat: Add …`). Scope optional: `feat(bracket): …`.
 - **Merge via squash only** (enforced at the repo level): the squash commit subject *is* the PR title, which is what release-please reads.
 - **Flow:** merge feature PRs → release-please maintains a standing `chore(main): release X.Y.Z` PR that bumps the version + regenerates `CHANGELOG.md` → merging *that* PR tags `vX.Y.Z` and deploys. The `prebuild` hook (`tools/sync-changelog.mjs`) parses `CHANGELOG.md` into `ngsw-config.json` `appData.releases`, which feeds the "What's new" dialog.
+- **Release PRs need the `RELEASE_PLEASE_TOKEN` secret** — a fine-grained PAT (this repo: Contents R/W + Pull requests R/W) referenced as `token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}`. Without it the release PR is `GITHUB_TOKEN`-authored, GitHub's anti-recursion skips every workflow on it, and the required checks (`Build Angular app` / `Validate conventional title`) never report — so it can only merge via owner-bypass. The PAT **expires**; when it does the flow silently falls back to `GITHUB_TOKEN` (bypass-only again), so rotate it before expiry.
 - Deciding *when* to merge the release PR (i.e. cut a release) is a human call — everything else is automatic.
 
 ## Phase 1 plan (May 26 → June 11)
