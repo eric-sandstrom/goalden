@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/eric-sandstrom/goalden/compare/v1.6.0...v1.7.0) (2026-05-31)
+
+
+### Features
+
+* pin match-detail header height and always show all tabs ([#38](https://github.com/eric-sandstrom/goalden/issues/38)) ([6344b71](https://github.com/eric-sandstrom/goalden/commit/6344b713a56ac5b0ddef8f114349b596916d4998))
+
 ## [1.6.0](https://github.com/eric-sandstrom/goalden/compare/v1.5.0...v1.6.0) (2026-05-31)
 
 
