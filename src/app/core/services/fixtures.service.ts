@@ -679,11 +679,11 @@ export class FixturesService {
       stage: (data['stage'] as FixtureStage) ?? 'GROUP',
       group: data['group'] ?? null,
       score: data['score'] ?? null,
-      // Authoritative live clock from football-data; the row anchors these to
-      // lastSyncedAt and ticks. football-data sends `minute` as a STRING
-      // ("45", "90"), so coerce it — a bare `=== 'number'` check would drop it
-      // and the clock would fall back to a pure wall-clock estimate. Absent
-      // outside live play → null.
+      // Authoritative live minute from football-data, shown as-is (the row no
+      // longer extrapolates it off the device clock). football-data sends
+      // `minute` as a STRING ("45", "90"), so coerce it — a bare `=== 'number'`
+      // check would drop it and the row would fall back to ESPN's clock / a
+      // bare "Live". Absent outside live play → null.
       minute: toMinute(data['minute']),
       injuryTime: typeof data['injuryTime'] === 'number' ? data['injuryTime'] : null,
       lastSyncedAt: toDate(data['lastSyncedAt']),

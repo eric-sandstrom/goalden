@@ -203,34 +203,44 @@ export class FixtureRowComponent {
   /**
    * Which half + the match minute for an actively-playing match.
    *
-   * Primary source is football-data's authoritative `minute` (+ `injuryTime`),
-   * which covers every competition. The match clock runs in real time within a
-   * half, so we anchor that value to `lastSyncedAt` and tick it forward off
-   * `nowTick` — giving a smooth clock that stays accurate through stoppage and
-   * extra time, self-correcting on each ~2-min poll. See `formatLiveMinute`.
+   * Shows the authoritative minute as last synced by the poller — there is NO
+   * client-clock extrapolation. (An earlier version anchored football-data's
+   * `minute` to `lastSyncedAt` and ticked it forward off the device clock for a
+   * "smooth" count, but that drifts and depends on the device clock being
+   * correct — it's not the real match time.) Source precedence mirrors the
+   * detail view's `statusLabel`, so the row and the open match agree:
    *
-   * Fallback (a feed/comp without a minute, or a doc predating it): a kickoff
-   * estimate capped at each half's nominal end ("45+" / "90+"), so we never
-   * invent a precise stoppage figure we can't know (which once read "90+27"
-   * for a match at 90+4). Null unless mid-play — `liveStatus` routes half-time
-   * and full-time.
+   *   1. football-data's authoritative `minute` (+ `injuryTime` stoppage) —
+   *      caps at 45/90/120, so the value alone picks the half;
+   *   2. ESPN's display clock (`liveClock`, e.g. "67'") when football-data has
+   *      no minute — the half is derived from its leading number.
+   *
+   * Both refresh on each ~2-min poll via the live `onSnapshot`. Null when
+   * neither source has a value (the template falls back to a bare "Live") and
+   * whenever not mid-play — `liveStatus` routes half-time and full-time.
    */
   protected readonly liveProgress = computed<{ half: string; minute: string } | null>(() => {
     if (this.liveStatus()?.tone !== 'live') return null;
     const f = this.fixture();
 
     if (typeof f.minute === 'number') {
-      const syncedAt = f.lastSyncedAt?.getTime();
-      const ticked =
-        syncedAt != null ? Math.max(0, Math.floor((this.nowTick() - syncedAt) / 60000)) : 0;
-      return formatLiveMinute(f.minute, f.injuryTime ?? 0, ticked);
+      return formatLiveMinute(f.minute, f.injuryTime ?? 0);
     }
 
-    const e = Math.max(0, Math.floor((this.nowTick() - f.utcKickoff.getTime()) / 60000));
-    if (e <= 45) return { half: '1st half', minute: `${Math.max(1, e)}'` };
-    if (e <= 48) return { half: '1st half', minute: `45+'` };
-    const second = e - 15; // discount the ~15-minute half-time interval
-    return { half: '2nd half', minute: second <= 90 ? `${Math.max(46, second)}'` : `90+'` };
+    const clock = (f.liveClock ?? '').trim();
+    if (clock) {
+      const n = parseInt(clock, 10);
+      const half = !Number.isFinite(n)
+        ? 'Live'
+        : n <= 45
+          ? '1st half'
+          : n <= 90
+            ? '2nd half'
+            : 'Extra time';
+      return { half, minute: clock.endsWith("'") ? clock : `${clock}'` };
+    }
+
+    return null;
   });
 
   /**
@@ -346,29 +356,14 @@ export class FixtureRowComponent {
 }
 
 /**
- * Formats football-data's `minute`/`injuryTime` (anchored value) plus the
- * minutes elapsed since it was synced into a half label + display minute.
+ * Formats football-data's authoritative `minute`/`injuryTime` into a half label
+ * + display minute, exactly as last synced (no extrapolation).
  *
- * - `base` caps at the half's nominal end (45/90/120) with stoppage carried in
- *   `injury`, so `base` alone picks the half.
- * - In stoppage (`injury > 0`) the base is frozen and the added time ticks, so
- *   we advance `injury`: 90+4 → 90+5 a minute later.
- * - In normal play the minute itself ticks, but we never roll past the half's
- *   nominal end — we can't know the real stoppage length, so we cap and show
- *   "+N", which the next poll's authoritative value corrects.
+ * `base` caps at the half's nominal end (45/90/120) with stoppage carried in
+ * `injury`, so `base` alone picks the half: e.g. base 90 + injury 4 → "90+4'"
+ * in the 2nd half.
  */
-function formatLiveMinute(
-  base: number,
-  injury: number,
-  ticked: number,
-): { half: string; minute: string } {
+function formatLiveMinute(base: number, injury: number): { half: string; minute: string } {
   const half = base <= 45 ? '1st half' : base <= 90 ? '2nd half' : 'Extra time';
-  if (injury > 0) {
-    return { half, minute: `${base}+${injury + ticked}'` };
-  }
-  const nominalEnd = base <= 45 ? 45 : base <= 90 ? 90 : 120;
-  const m = base + ticked;
-  return m <= nominalEnd
-    ? { half, minute: `${m}'` }
-    : { half, minute: `${nominalEnd}+${m - nominalEnd}'` };
+  return { half, minute: injury > 0 ? `${base}+${injury}'` : `${base}'` };
 }
