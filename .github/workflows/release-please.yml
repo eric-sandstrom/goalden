@@ -27,6 +27,16 @@
 # "Workflow permissions" -> tick "Allow GitHub Actions to create and approve
 # pull requests". Without it, release-please can't open the release PR using the
 # default GITHUB_TOKEN.
+#
+# Required secret (one-time): RELEASE_PLEASE_TOKEN — a fine-grained PAT (or
+# GitHub App token) with this repo's Contents: R/W + Pull requests: R/W. The
+# release PR is authored with it INSTEAD of GITHUB_TOKEN so that opening the PR
+# triggers the required status checks (ci.yml / pr-title-lint.yml). GitHub does
+# not start workflows for events caused by GITHUB_TOKEN (anti-recursion), so a
+# GITHUB_TOKEN-authored release PR sits forever BLOCKED on "Build Angular app" /
+# "Validate conventional title" never reporting. Until the secret is set the
+# token below falls back to GITHUB_TOKEN (the old, blocked-but-functional
+# behaviour), so merging this change is safe on its own.
 
 name: Release Please
 
@@ -55,7 +65,10 @@ jobs:
         id: release
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Author the release PR with a PAT (not the default GITHUB_TOKEN) so
+          # opening it triggers the required checks — see the header note. Falls
+          # back to GITHUB_TOKEN when the secret isn't configured.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           # Defaults to release-please-config.json + .release-please-manifest.json
           # at the repo root.
 
