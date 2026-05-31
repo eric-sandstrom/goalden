@@ -270,6 +270,34 @@ app-bottom-nav {
   animation: route-slide-in-left 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+// --- Match detail: fade down (no side slide) ---------------------------------
+//
+// `/matches/:id` opts out of the horizontal push/pop. Opening or leaving the
+// detail fades the page in from slightly above (and the outgoing page drifts
+// down a touch as it fades), so the shared-element morph reads as the page
+// settling into place rather than sliding past. Stamped 'fade-down' by
+// onRouteViewTransition whenever the detail is an endpoint.
+
+@keyframes route-fade-down-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes route-fade-down-in {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+
+:root[data-route-direction='fade-down']::view-transition-old(root) {
+  animation: route-fade-down-out 160ms ease-in both;
+}
+:root[data-route-direction='fade-down']::view-transition-new(root) {
+  animation: route-fade-down-in 260ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
 // Query-param-only navigation (same path) — no animation. Used for in-view
 // state changes like the fixture-detail tab or the Matches comp/filter, so
 // they don't cross-fade the whole page.
