@@ -79,3 +79,41 @@ export interface MatchDetail {
   /** When the detail was last fetched from football-data; null on legacy docs. */
   readonly detailSyncedAt: Date | null;
 }
+
+// --- Head-to-head ----------------------------------------------------------
+// Client-side shape of `fixtures/{matchId}/detail/head2head`, written once by
+// the poller when a match's line-up first appears. Mirrors the backend
+// `Head2HeadDoc` (functions/src/lib/head2head-mapper.ts) — keep in sync.
+
+/** One team's record across the prior encounters. */
+export interface H2HTeamRecord {
+  readonly id: number | null;
+  readonly name: string | null;
+  readonly wins: number | null;
+  readonly draws: number | null;
+  readonly losses: number | null;
+}
+
+export interface H2HAggregates {
+  readonly numberOfMatches: number | null;
+  readonly totalGoals: number | null;
+  readonly home: H2HTeamRecord;
+  readonly away: H2HTeamRecord;
+}
+
+/** A trimmed previous encounter between the two teams. */
+export interface H2HMatch {
+  readonly id: number | null;
+  readonly utcDate: string | null;
+  readonly competition: string | null;
+  readonly homeTeam: string | null;
+  readonly awayTeam: string | null;
+  readonly winner: string | null;
+  readonly home: number | null;
+  readonly away: number | null;
+}
+
+export interface Head2Head {
+  readonly aggregates: H2HAggregates | null;
+  readonly matches: readonly H2HMatch[];
+}

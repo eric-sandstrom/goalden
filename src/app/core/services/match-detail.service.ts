@@ -1,8 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { Timestamp, doc, getDoc } from 'firebase/firestore';
+import { Timestamp, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { FIRESTORE, FUNCTIONS } from '../firebase/firebase.providers';
 import {
+  Head2Head,
   MatchBooking,
   MatchDetail,
   MatchGoal,
@@ -27,11 +28,35 @@ export class MatchDetailService {
   private readonly functions = inject(FUNCTIONS);
 
   /** One-shot read of the detail doc. Returns null when it hasn't been
-   *  fetched yet. */
+   *  fetched yet. Backs the fixture-detail view's `resource()` for non-live
+   *  matches. */
   async loadDetail(matchId: string): Promise<MatchDetail | null> {
     const snap = await getDoc(doc(this.db, 'fixtures', matchId, 'detail', 'full'));
     if (!snap.exists()) return null;
     return mapDetail(snap.data());
+  }
+
+  /**
+   * Live subscription to `detail/full` — fires on every poller write, so the
+   * timeline and line-ups tick in as goals/cards/subs land during a match.
+   * Returns the unsubscribe; the caller owns the lifecycle and should only
+   * listen while the match is live (a listener costs a read per write). The
+   * one-shot `loadDetail` stays the path for matches that aren't live.
+   */
+  subscribeDetail(matchId: string, onChange: (detail: MatchDetail | null) => void): () => void {
+    return onSnapshot(
+      doc(this.db, 'fixtures', matchId, 'detail', 'full'),
+      (snap) => onChange(snap.exists() ? mapDetail(snap.data()) : null),
+      (err) => console.error('[MatchDetailService] detail listener failed:', err),
+    );
+  }
+
+  /** One-shot read of the head-to-head doc. Returns null until the poller has
+   *  captured it (it writes once, when the match's line-up first appears). */
+  async loadHead2Head(matchId: string): Promise<Head2Head | null> {
+    const snap = await getDoc(doc(this.db, 'fixtures', matchId, 'detail', 'head2head'));
+    if (!snap.exists()) return null;
+    return mapHead2Head(snap.data());
   }
 
   /**
@@ -80,6 +105,17 @@ function mapLineup(value: unknown): MatchLineup {
     lineup: players(o['lineup']),
     bench: players(o['bench']),
   };
+}
+
+/** Adapts the raw Firestore head2head doc into the typed `Head2Head`. The
+ *  backend mapper already produced the final shape, so this just narrows
+ *  types defensively (legacy/partial docs map to null / []). */
+function mapHead2Head(data: Record<string, unknown>): Head2Head {
+  const agg = (data['aggregates'] ?? null) as Head2Head['aggregates'];
+  const matches = Array.isArray(data['matches'])
+    ? (data['matches'] as Head2Head['matches'])
+    : [];
+  return { aggregates: agg, matches };
 }
 
 /** Adapts the raw Firestore detail doc into the typed `MatchDetail`. The

@@ -2,6 +2,11 @@ import { Timestamp } from 'firebase-admin/firestore';
 
 export interface FootballDataMatch {
   readonly id: number;
+  /** Present on the cross-competition `/v4/matches` list (and the single-match
+   *  endpoint) but NOT on the per-comp `/competitions/{id}/matches` list. The
+   *  bulk live poll reads `competition.id` to map each match back to its
+   *  (comp, season) context; the per-comp poller already knows the comp. */
+  readonly competition?: { readonly id: number };
   readonly utcDate: string;
   readonly status: string;
   readonly stage: string;
@@ -231,8 +236,19 @@ export function mapFixture(
  *  which a `minute`/`injuryTime` change is worth a write. */
 const LIVE_STATUSES: ReadonlySet<string> = new Set(['IN_PLAY', 'PAUSED']);
 
-/** Returns true if the relevant subset of the doc has changed. */
-export function fixtureChanged(existing: FixtureDoc | undefined, next: FixtureDoc): boolean {
+/**
+ * Returns true if a list-facing field changed — status, raw apiStatus,
+ * kickoff, or score. Deliberately EXCLUDES the live match clock
+ * (`minute`/`injuryTime`), which ticks every poll. Use this to decide whether
+ * the denormalised rollup (and anything the list view reads) needs rewriting:
+ * the rollup never shows the live clock (the client overlays live matches from
+ * the live `onSnapshot` listeners), so churning it on every clock tick is pure
+ * waste. The full `fixtureChanged` below adds the clock for the canonical doc.
+ */
+export function fixtureListFieldsChanged(
+  existing: FixtureDoc | undefined,
+  next: FixtureDoc,
+): boolean {
   if (!existing) return true;
   if (existing.status !== next.status) return true;
   // Persist raw-status changes too (e.g. CANCELLED→POSTPONED) so the
@@ -250,12 +266,20 @@ export function fixtureChanged(existing: FixtureDoc | undefined, next: FixtureDo
   // extra time — persist it so scoring and the UI pick it up.
   if ((a.regularTime?.home ?? null) !== (b.regularTime?.home ?? null)) return true;
   if ((a.regularTime?.away ?? null) !== (b.regularTime?.away ?? null)) return true;
+  return false;
+}
+
+/** Returns true if the relevant subset of the doc has changed — the list-facing
+ *  fields plus, while live, the match clock. Gates the canonical doc write. */
+export function fixtureChanged(existing: FixtureDoc | undefined, next: FixtureDoc): boolean {
+  if (fixtureListFieldsChanged(existing, next)) return true;
   // While a match is live, the minute/stoppage tick every poll — persist them
   // so the client clock stays fresh (and `lastSyncedAt` re-anchors). Gated to
   // live statuses so finished/scheduled fixtures (whose minute is a stable
   // 90/null) never churn the doc. This is the one place we accept a per-poll
-  // write during a match, in exchange for an accurate live clock.
-  if (LIVE_STATUSES.has(next.status)) {
+  // write during a match, in exchange for an accurate live clock. `existing` is
+  // defined here — a missing one already returned true above.
+  if (existing && LIVE_STATUSES.has(next.status)) {
     if ((existing.minute ?? null) !== (next.minute ?? null)) return true;
     if ((existing.injuryTime ?? null) !== (next.injuryTime ?? null)) return true;
   }
