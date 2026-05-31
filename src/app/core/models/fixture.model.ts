@@ -62,17 +62,17 @@ export interface Fixture {
   readonly score: FixtureScore | null;
 
   // --- Live match clock (authoritative, from football-data) ----------------
-  // Refreshed every poll while live. The UI anchors `minute`/`injuryTime` to
-  // `lastSyncedAt` and ticks forward in real time for an accurate live clock
-  // (incl. stoppage/extra time) across every competition. Display-only.
+  // Refreshed every poll while live. The UI shows `minute`/`injuryTime` exactly
+  // as last synced (no client-clock extrapolation), so the displayed time is
+  // the real match minute, updating on each poll. Display-only.
   /** Current match minute while live (caps at 45/90/120; stoppage in
    *  `injuryTime`). Null outside live play. */
   readonly minute?: number | null;
   /** Added (stoppage) minutes on top of `minute`, e.g. 90 + 4. Null when not
    *  in stoppage. */
   readonly injuryTime?: number | null;
-  /** When the fixture was last written by the poller — the anchor the live
-   *  clock ticks from. Null on docs/rollups without it. */
+  /** When the fixture was last written by the poller. Null on docs/rollups
+   *  without it. */
   readonly lastSyncedAt?: Date | null;
 
   // --- ESPN live overlay (display-only) ------------------------------------

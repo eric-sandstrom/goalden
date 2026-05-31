@@ -26,6 +26,9 @@
 }
 :host(.compact) .meta {
   margin-top: 0.25rem;
+  /* No chevron in the compact embed (it's hidden), so drop the side padding
+     that reserves room for it. */
+  padding: 0;
 }
 :host(.compact) .status {
   font-size: 0.76rem;
@@ -243,20 +246,29 @@ a.team-link:focus-visible {
   flex-wrap: wrap;
   gap: 0.4rem 0.6rem;
   margin-top: 0.5rem;
+  /* Anchor for the absolutely-positioned chevron below, so the status cluster
+     can centre in the FULL row width rather than being shoved left by the
+     chevron consuming the trailing free space. */
+  position: relative;
+  /* Reserve room on both sides so a centred status never slides under the
+     chevron — symmetric padding keeps the cluster optically centred. */
+  padding: 0 2rem;
 }
-/* "Open match detail" affordance — a quiet chevron pushed to the row's
+/* "Open match detail" affordance — a quiet chevron pinned to the row's
    trailing edge. A plain link (not a form control) so it never collides with
-   the score inputs / steppers; margin-left:auto sends it right of the
-   centred status cluster. */
+   the score inputs / steppers. Taken out of flow (absolute) so it doesn't
+   offset the centred status cluster beside it. */
 .details-link {
-  margin-left: auto;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--mat-sys-on-surface-variant);
   border-radius: 999px;
   text-decoration: none;
-  position: relative;
   z-index: 1;
 }
 .details-link:hover {

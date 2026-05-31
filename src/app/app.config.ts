@@ -10,6 +10,7 @@ import {
   MAT_SNACK_BAR_DEFAULT_OPTIONS,
   MatSnackBarConfig,
 } from '@angular/material/snack-bar';
+import { MAT_ICON_DEFAULT_OPTIONS } from '@angular/material/icon';
 import {
   provideRouter,
   withComponentInputBinding,
@@ -63,6 +64,11 @@ export const appConfig: ApplicationConfig = {
             registrationStrategy: 'registerWhenStable:30000'
           }),
     { provide: MAT_SNACK_BAR_DEFAULT_OPTIONS, useValue: SNACK_BAR_DEFAULTS },
+    // Render every <mat-icon> with the Material Symbols (Rounded) font instead
+    // of the classic Material Icons font loaded by default. The ligature names
+    // are shared between the two families, so existing icon usages are
+    // unchanged — only the glyph style (modern, rounded) differs.
+    { provide: MAT_ICON_DEFAULT_OPTIONS, useValue: { fontSet: 'material-symbols-rounded' } },
     // Boot the SwUpdate listener immediately so users see a "Reload" toast
     // when a new build is deployed mid-session.
     provideAppInitializer(() => {
