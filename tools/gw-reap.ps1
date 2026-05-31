@@ -21,6 +21,27 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
+# Is $ref already in origin/main? Handles BOTH a normal/ff merge (the ref is an
+# ancestor of origin/main) AND a squash merge (this repo squash-merges, so the
+# ref is NOT an ancestor; instead check whether its combined diff is already in
+# main). The squash test builds a virtual commit of the ref's tree on its
+# merge-base and asks `git cherry` if that patch is already applied to
+# origin/main (a leading '-' means yes). Standard squash-merge detection.
+function Test-Merged([string]$ref) {
+  git -C $root merge-base --is-ancestor "$ref" origin/main 2>$null
+  if ($LASTEXITCODE -eq 0) { return $true }
+  $mb = (git -C $root merge-base origin/main "$ref" 2>$null)
+  $tr = (git -C $root rev-parse "$ref^{tree}" 2>$null)
+  if ($mb -and $tr) {
+    $virt = (git -C $root commit-tree $tr.Trim() -p $mb.Trim() -m '_' 2>$null)
+    if ($virt) {
+      $cherry = git -C $root cherry origin/main $virt.Trim() 2>$null
+      if (($cherry | Select-Object -First 1) -match '^-') { return $true }
+    }
+  }
+  return $false
+}
+
 # Only act from the primary worktree (belt-and-suspenders for manual runs).
 $commonDir = git -C $root rev-parse --path-format=absolute --git-common-dir
 $top = git -C $root rev-parse --path-format=absolute --show-toplevel
@@ -65,28 +86,8 @@ foreach ($e in $entries) {
   if (-not $base) { $skipped += "$branch (no recorded base - keeping to be safe)"; continue }
   if ((git -C $root rev-parse "$branch").Trim() -eq $base) { $skipped += "$branch (no commits yet)"; continue }
 
-  # Merged into origin/main? Handles BOTH a normal/ff merge (branch is an ancestor)
-  # AND a squash merge (this repo squash-merges, so the branch is NOT an ancestor;
-  # instead check whether the branch's combined diff is already in main). The
-  # squash test builds a virtual commit of the branch's tree on its merge-base and
-  # asks `git cherry` if that patch is already applied to origin/main (a leading
-  # '-' means yes). This is the standard squash-merge detection.
-  $merged = $false
-  git -C $root merge-base --is-ancestor "$branch" origin/main 2>$null
-  if ($LASTEXITCODE -eq 0) {
-    $merged = $true
-  } else {
-    $mb = (git -C $root merge-base origin/main "$branch" 2>$null)
-    $tr = (git -C $root rev-parse "$branch^{tree}" 2>$null)
-    if ($mb -and $tr) {
-      $virt = (git -C $root commit-tree $tr.Trim() -p $mb.Trim() -m '_' 2>$null)
-      if ($virt) {
-        $cherry = git -C $root cherry origin/main $virt.Trim() 2>$null
-        if (($cherry | Select-Object -First 1) -match '^-') { $merged = $true }
-      }
-    }
-  }
-  if (-not $merged) { $skipped += "$branch (unmerged - work not yet in origin/main)"; continue }
+  # Merged into origin/main? (handles ff/normal merge AND this repo's squash merges)
+  if (-not (Test-Merged $branch)) { $skipped += "$branch (unmerged - work not yet in origin/main)"; continue }
 
   if ($DryRun) { $removed += "$branch  ->  would remove $path"; continue }
 
@@ -124,12 +125,39 @@ if (-not $DryRun) {
     }
     foreach ($d in (Get-ChildItem $wtRoot -Directory -Force)) {
       if ((Resolve-Path $d.FullName).Path -in $reg) { continue }       # a live worktree - leave it
+      # Kill any dev server still running in this husk first. Without this, the
+      # server locks the dir so Remove-Item fails, the husk survives, the server
+      # keeps running off it - and the two keep each other alive across every reap.
+      $pb = ($d.FullName -replace '/', '\')
+      $killed = $false
+      Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like "*$pb*" } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $killed = $true }
+      if ($killed) { Start-Sleep -Milliseconds 600 }   # let the OS release the file handles
       $nm = Join-Path $d.FullName 'node_modules'
       if ((Test-Path $nm) -and ((Get-Item $nm -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { cmd /c rmdir "$nm" | Out-Null }
       try { Remove-Item $d.FullName -Recurse -Force -ErrorAction Stop } catch {}   # still locked - try again next reap
     }
     if (-not (Get-ChildItem $wtRoot -Force)) { Remove-Item $wtRoot -Force }
   }
+}
+
+# Prune merged local branches of ANY prefix, so finished work (leftover ci/*,
+# feat/*, chore/* branches, and husk session/* branches whose worktree is already
+# gone) doesn't pile up beyond the session/* worktrees handled above. Strictly
+# guarded: never main, never a branch checked out in some worktree, and only when
+# its patch is already in origin/main - unmerged work is always kept.
+$checkedOut = @()
+foreach ($l in (git -C $root worktree list --porcelain)) {
+  if ($l -like 'branch *') { $checkedOut += ($l.Substring(7) -replace '^refs/heads/', '') }
+}
+foreach ($b in (git -C $root for-each-ref --format='%(refname:short)' refs/heads)) {
+  $b = "$b".Trim()
+  if (-not $b -or $b -eq 'main' -or ($checkedOut -contains $b)) { continue }
+  if (-not (Test-Merged $b)) { continue }
+  if ($DryRun) { $removed += "$b  ->  would delete merged branch"; continue }
+  git -C $root branch -D $b 2>$null
+  $removed += "$b  (merged branch deleted)"
 }
 
 # Report.
