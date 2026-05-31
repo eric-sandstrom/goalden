@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/eric-sandstrom/goalden/compare/v1.3.1...v1.4.0) (2026-05-31)
+
+
+### Features
+
+* shared-element view transitions from match list to detail ([#32](https://github.com/eric-sandstrom/goalden/issues/32)) ([19419f6](https://github.com/eric-sandstrom/goalden/commit/19419f6b62119d01230f514dff9f5e2d317ef147))
+
 ## [1.3.1](https://github.com/eric-sandstrom/goalden/compare/v1.3.0...v1.3.1) (2026-05-30)
 
 

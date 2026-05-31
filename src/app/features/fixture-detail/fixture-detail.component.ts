@@ -22,6 +22,7 @@ import { Head2Head, MatchDetail } from '../../core/models/match-detail.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { MatchDetailService } from '../../core/services/match-detail.service';
+import { MatchTransitionService } from '../../core/services/match-transition.service';
 import { SkelComponent } from '../../shared/components/skel.component';
 import { MatchHead2HeadComponent } from './match-head2head.component';
 import { MatchPitchComponent } from './match-pitch.component';
@@ -52,8 +53,14 @@ export class FixtureDetailComponent {
   private readonly snackBar = inject(MatSnackBar);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly matchTransition = inject(MatchTransitionService);
 
   constructor() {
+    // Keep this match marked as the shared-transition participant so leaving
+    // the detail back to the list morphs the scoreboard into the right row
+    // (covers browser-back and deep-link → back paths the forward click can't).
+    effect(() => this.matchTransition.activate(this.fdid()));
+
     // Stream detail/full live while the match is in play, so goals/cards/subs
     // tick into the timeline + line-ups without a manual refresh. Only while
     // live — a listener costs a read per write, and line-ups/finals don't
@@ -82,6 +89,26 @@ export class FixtureDetailComponent {
 
   protected readonly matchId = computed(() => `fd-${this.fdid()}`);
 
+  /**
+   * Full fixture handed over in router state by the originating list row.
+   *
+   * It lets the scoreboard paint on the component's FIRST render, before the
+   * async fixture read resolves. This is load-bearing for the shared-element
+   * view transition: on a cold entry (e.g. a fresh load straight onto
+   * `/matches`), the fixture isn't in the warm `fixturesById` store yet and the
+   * `resource()` is still loading, so without a seed the first render is the
+   * skeleton — which carries no `view-transition-name`s. The router snapshots
+   * the incoming view right after that first render, so the morph has nothing
+   * to pair with and only the page slide plays. Seeding paints the named
+   * scoreboard immediately, so the snapshot includes the shared elements.
+   *
+   * Null on a deep link / refresh (no originating navigation state), where
+   * there's no row to morph from anyway — that path falls back to the resource.
+   */
+  private readonly seededFixture =
+    (this.router.getCurrentNavigation()?.extras.state?.['vtFixture'] as Fixture | undefined) ??
+    null;
+
   /** Canonical fixture read, keyed on the route id — resolves the fixture
    *  even when its competition isn't in the shared store (a deep link). */
   private readonly fixtureResource = resource<Fixture | null, string>({
@@ -97,6 +124,7 @@ export class FixtureDetailComponent {
     return (
       this.fixtures.liveFixturesById().get(id) ??
       this.fixtures.fixturesById().get(id) ??
+      this.seededFixture ??
       this.fixtureResource.value()
     );
   });

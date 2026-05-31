@@ -29,11 +29,18 @@
         <div class="scoreboard">
           <div class="team home">
             @if (f.homeTeam.crest) {
-              <img [ngSrc]="f.homeTeam.crest" width="56" height="56" priority [alt]="teamName('home') + ' crest'" />
+              <img
+                [ngSrc]="f.homeTeam.crest"
+                width="56"
+                height="56"
+                priority
+                [alt]="teamName('home') + ' crest'"
+                style="view-transition-name: mvt-home-crest"
+              />
             } @else {
               <mat-icon class="crest-fallback" aria-hidden="true">shield</mat-icon>
             }
-            <span class="team-name">{{ teamName('home') }}</span>
+            <span class="team-name" style="view-transition-name: mvt-home-name">{{ teamName('home') }}</span>
           </div>
 
           <div class="centre">
@@ -41,7 +48,7 @@
               <span class="ht">HT {{ ht }}</span>
             }
             @if (displayScore(); as s) {
-              <div class="score">
+              <div class="score" style="view-transition-name: mvt-score">
                 <span class="num">{{ s.home }}</span>
                 <span class="dash">–</span>
                 <span class="num">{{ s.away }}</span>
@@ -57,11 +64,18 @@
 
           <div class="team away">
             @if (f.awayTeam.crest) {
-              <img [ngSrc]="f.awayTeam.crest" width="56" height="56" priority [alt]="teamName('away') + ' crest'" />
+              <img
+                [ngSrc]="f.awayTeam.crest"
+                width="56"
+                height="56"
+                priority
+                [alt]="teamName('away') + ' crest'"
+                style="view-transition-name: mvt-away-crest"
+              />
             } @else {
               <mat-icon class="crest-fallback" aria-hidden="true">shield</mat-icon>
             }
-            <span class="team-name">{{ teamName('away') }}</span>
+            <span class="team-name" style="view-transition-name: mvt-away-name">{{ teamName('away') }}</span>
           </div>
         </div>
 

@@ -278,12 +278,38 @@ app-bottom-nav {
   animation: none !important;
 }
 
+// --- Shared-element morph: Matches list ⇄ match detail -----------------------
+//
+// The clicked fixture row (FixtureRowComponent) and the detail scoreboard
+// (FixtureDetailComponent) paint matching `view-transition-name`s on the team
+// crest, team name, and score. Same name in the old + new DOM → the browser
+// lifts each into its own snapshot and tweens position/size/content, so those
+// three elements appear to fly from the row into the scoreboard (and back)
+// while the rest of the page runs the directional slide above.
+//
+// Only ever one row carries these names at a time (MatchTransitionService keeps
+// the active fixture unique), so the names stay unique per page as the API
+// requires. Match the slide's duration + easing so the morph travels in step.
+::view-transition-group(mvt-home-crest),
+::view-transition-group(mvt-away-crest),
+::view-transition-group(mvt-home-name),
+::view-transition-group(mvt-away-name),
+::view-transition-group(mvt-score) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 // Honour the user's reduced-motion preference: cut every transition animation
 // (the `!important` overrides the directional rules above) so navigations
 // resolve instantly. The bottom-nav stays lifted out either way — harmless.
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-new(root),
+  ::view-transition-group(mvt-home-crest),
+  ::view-transition-group(mvt-away-crest),
+  ::view-transition-group(mvt-home-name),
+  ::view-transition-group(mvt-away-name),
+  ::view-transition-group(mvt-score) {
     animation: none !important;
   }
 }

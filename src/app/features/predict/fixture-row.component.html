@@ -3,6 +3,7 @@
     <div
       class="crest-bg home"
       [style.background-image]="'url(' + fixture().homeTeam.crest + ')'"
+      [style.view-transition-name]="sharedTransition() ? 'mvt-home-crest' : null"
       aria-hidden="true"
     ></div>
   }
@@ -10,6 +11,7 @@
     <div
       class="crest-bg away"
       [style.background-image]="'url(' + fixture().awayTeam.crest + ')'"
+      [style.view-transition-name]="sharedTransition() ? 'mvt-away-crest' : null"
       aria-hidden="true"
     ></div>
   }
@@ -19,11 +21,19 @@
         class="team home team-link"
         [routerLink]="['/teams', 'fd-' + fixture().homeTeam.id]"
       >
-        <span class="name">{{ fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'TBD' }}</span>
+        <span
+          class="name"
+          [style.view-transition-name]="sharedTransition() ? 'mvt-home-name' : null"
+          >{{ fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'TBD' }}</span
+        >
       </a>
     } @else {
       <div class="team home">
-        <span class="name">{{ fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'TBD' }}</span>
+        <span
+          class="name"
+          [style.view-transition-name]="sharedTransition() ? 'mvt-home-name' : null"
+          >{{ fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'TBD' }}</span
+        >
       </div>
     }
 
@@ -32,6 +42,7 @@
         class="result-board"
         [class.live]="liveStatus()?.tone === 'live'"
         [class.final]="liveStatus()?.tone === 'final'"
+        [style.view-transition-name]="sharedTransition() ? 'mvt-score' : null"
       >
         <span class="result-num">{{ actual.home }}</span>
         <span class="result-sep">–</span>
@@ -112,11 +123,19 @@
         class="team away team-link"
         [routerLink]="['/teams', 'fd-' + fixture().awayTeam.id]"
       >
-        <span class="name">{{ fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'TBD' }}</span>
+        <span
+          class="name"
+          [style.view-transition-name]="sharedTransition() ? 'mvt-away-name' : null"
+          >{{ fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'TBD' }}</span
+        >
       </a>
     } @else {
       <div class="team away">
-        <span class="name">{{ fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'TBD' }}</span>
+        <span
+          class="name"
+          [style.view-transition-name]="sharedTransition() ? 'mvt-away-name' : null"
+          >{{ fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'TBD' }}</span
+        >
       </div>
     }
   </div>
@@ -205,6 +224,8 @@
       <a
         class="details-link"
         [routerLink]="['/matches', detailFdid()]"
+        [state]="{ vtFixture: fixture() }"
+        (click)="openDetail()"
         [attr.aria-label]="
           'Match details: ' + (fixture().homeTeam.name ?? fixture().homeTeam.tla ?? 'home') +
           ' versus ' + (fixture().awayTeam.name ?? fixture().awayTeam.tla ?? 'away')
