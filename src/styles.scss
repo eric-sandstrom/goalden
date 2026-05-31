@@ -327,9 +327,13 @@ app-bottom-nav {
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-// Honour the user's reduced-motion preference: cut every transition animation
-// (the `!important` overrides the directional rules above) so navigations
-// resolve instantly. The bottom-nav stays lifted out either way — harmless.
+// Cut every transition animation (the `!important` overrides the directional
+// rules above) so navigations resolve instantly. Two triggers:
+//   - the user's reduced-motion preference;
+//   - `<html class="no-gpu">`, stamped at startup when we detect a software
+//     rasterizer (core/router/software-renderer.ts) — full-screen bitmap fades
+//     jank on the CPU, so we skip the animation rather than drop frames.
+// The bottom-nav stays lifted out either way — harmless.
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
   ::view-transition-new(root),
@@ -338,6 +342,18 @@ app-bottom-nav {
   ::view-transition-group(mvt-home-name),
   ::view-transition-group(mvt-away-name),
   ::view-transition-group(mvt-score) {
+    animation: none !important;
+  }
+}
+
+.no-gpu {
+  &::view-transition-old(root),
+  &::view-transition-new(root),
+  &::view-transition-group(mvt-home-crest),
+  &::view-transition-group(mvt-away-crest),
+  &::view-transition-group(mvt-home-name),
+  &::view-transition-group(mvt-away-name),
+  &::view-transition-group(mvt-score) {
     animation: none !important;
   }
 }
