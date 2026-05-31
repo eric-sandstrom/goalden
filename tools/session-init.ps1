@@ -22,22 +22,32 @@ $cfg = Join-Path $top '.worktree.json'
 if (Test-Path $cfg) { try { $port = (Get-Content $cfg -Raw | ConvertFrom-Json).port } catch {} }
 if (-not $port) { exit 0 }
 
-# Already serving on that port? (fast, non-blocking TCP probe)
-$listening = $false
+# Is a dev server already running (or starting) for this worktree? Check BOTH the
+# bound port AND a live ng-serve process for this worktree path. ng doesn't bind
+# the port until ~15s into compiling, so a port-only check races with the eager
+# start in new-session and spawns a SECOND server on the same port.
+$running = $false
 try {
   $client = New-Object Net.Sockets.TcpClient
   $iar = $client.BeginConnect('127.0.0.1', [int]$port, $null, $null)
-  if ($iar.AsyncWaitHandle.WaitOne(300)) { $client.EndConnect($iar); $listening = $client.Connected }
+  if ($iar.AsyncWaitHandle.WaitOne(300)) { $client.EndConnect($iar); $running = $client.Connected }
   $client.Close()
 } catch {}
+if (-not $running) {
+  $pb = ($top -replace '/', '\')
+  if (Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like "*$pb*" -and $_.CommandLine -like '*ng.js*' }) {
+    $running = $true
+  }
+}
 
-if (-not $listening) {
+if (-not $running) {
   # Detached, minimized, its own window. cmd /c (not /k) so the window closes
   # when the server stops/is killed, releasing the dir lock cleanly at teardown.
   Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm start' -WorkingDirectory $top -WindowStyle Minimized | Out-Null
 }
 
-$state = if ($listening) { 'is already running' } else { 'is starting now (ng serve compiles in ~15s)' }
+$state = if ($running) { 'is already running' } else { 'is starting now (ng serve compiles in ~15s)' }
 Write-Output "[goalden worktree session] Frontend dev server $state at http://localhost:$port"
 Write-Output "Before other frontend work, open it in Playwright first: call browser_navigate to http://localhost:$port -- if it returns a connection error the server is still compiling, so wait a few seconds and retry."
 exit 0
