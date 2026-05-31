@@ -1,7 +1,10 @@
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import * as logger from 'firebase-functions/logger';
 import { getFirestore } from 'firebase-admin/firestore';
 import { FixtureDoc } from './lib/fixture-mapper';
 import { applyMatchScoring } from './lib/match-scoring';
+import { FOOTBALL_DATA_TOKEN } from './poll-football-data';
+import { runPollStandings } from './poll-standings';
 
 /**
  * Scores every prediction for a match the moment it reaches a final result.
@@ -30,6 +33,7 @@ export const scoreMatch = onDocumentUpdated(
   {
     document: 'fixtures/{matchId}',
     region: 'europe-west1',
+    secrets: [FOOTBALL_DATA_TOKEN],
     timeoutSeconds: 120,
   },
   async (event) => {
@@ -44,5 +48,21 @@ export const scoreMatch = onDocumentUpdated(
     if (!isFinal(after.status) || isFinal(before?.status)) return;
 
     await applyMatchScoring(getFirestore(), matchId, after, { force: false });
+
+    // A finished match changes its competition's table, so refresh standings
+    // now that the standalone standings scheduler is retired. Best-effort: the
+    // poll gates writes on a content signature, and any failure must never
+    // affect scoring (already committed above).
+    const token = FOOTBALL_DATA_TOKEN.value();
+    if (token) {
+      const compId = after.competitionId ?? 'WC';
+      try {
+        await runPollStandings(token, compId);
+      } catch (e: unknown) {
+        logger.warn(`[${compId}] standings refresh after ${matchId} failed (non-fatal)`, {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
   },
 );

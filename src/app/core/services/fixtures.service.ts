@@ -680,8 +680,11 @@ export class FixturesService {
       group: data['group'] ?? null,
       score: data['score'] ?? null,
       // Authoritative live clock from football-data; the row anchors these to
-      // lastSyncedAt and ticks. Absent outside live play → null.
-      minute: typeof data['minute'] === 'number' ? data['minute'] : null,
+      // lastSyncedAt and ticks. football-data sends `minute` as a STRING
+      // ("45", "90"), so coerce it — a bare `=== 'number'` check would drop it
+      // and the clock would fall back to a pure wall-clock estimate. Absent
+      // outside live play → null.
+      minute: toMinute(data['minute']),
       injuryTime: typeof data['injuryTime'] === 'number' ? data['injuryTime'] : null,
       lastSyncedAt: toDate(data['lastSyncedAt']),
       // ESPN live overlay (display-only). Absent on docs ESPN hasn't
@@ -693,6 +696,22 @@ export class FixturesService {
       espnEventId: (data['espnEventId'] as string) ?? null,
     };
   }
+}
+
+/**
+ * Coerces football-data's live match minute to a number. The provider sends it
+ * as a STRING ("45", "90"); the live clock gates on `typeof minute === 'number'`,
+ * so an uncoerced string would be dropped and the clock would extrapolate off
+ * the wall clock instead. Accepts a number too (post-fix canonical docs).
+ * Empty / non-numeric / missing (outside live play) → null.
+ */
+function toMinute(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
 /**

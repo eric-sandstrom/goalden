@@ -1,7 +1,5 @@
 import * as logger from 'firebase-functions/logger';
-import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { FOOTBALL_DATA_TOKEN } from './poll-football-data';
 import {
   CompetitionContext,
   resolveCompetitionContexts,
@@ -191,26 +189,7 @@ export async function runPollTeams(
   return { ok, fetched: allById.size, written: writes, competitions: perComp };
 }
 
-/**
- * Hourly scheduled fetch of every active competition's teams — name, crest,
- * coach, full squad with positions and shirt numbers. One API call per comp
- * returns all of that comp's teams with squads included. Diff-skips unchanged
- * teams to avoid useless Firestore writes.
- */
-export const pollTeams = onSchedule(
-  {
-    schedule: 'every 1 hours',
-    region: 'europe-west1',
-    secrets: [FOOTBALL_DATA_TOKEN],
-    maxInstances: 1,
-    timeoutSeconds: 120,
-  },
-  async () => {
-    const token = FOOTBALL_DATA_TOKEN.value();
-    if (!token) {
-      logger.error('FOOTBALL_DATA_TOKEN secret missing');
-      return;
-    }
-    await runPollTeams(token);
-  },
-);
+// The hourly `pollTeams` scheduler was retired: team data (full squads +
+// crests) is now pulled by `runPollTeams(token, compId)` as one step of the
+// competition-activation / re-sync ingest (see sync-competitions.ts), and the
+// `devPollTeamsNow` dev callable still wraps the same helper for on-demand runs.

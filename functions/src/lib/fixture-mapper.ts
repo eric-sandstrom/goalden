@@ -12,9 +12,10 @@ export interface FootballDataMatch {
   readonly stage: string;
   readonly group: string | null;
   /** Current match minute while IN_PLAY/PAUSED (caps at the half's nominal
-   *  end — 45/90/120 — with stoppage carried in `injuryTime`). Null/absent
-   *  outside live play. */
-  readonly minute?: number | null;
+   *  end — 45/90/120 — with stoppage carried in `injuryTime`). football-data
+   *  sends this as a STRING ("45", "90"), not a number — see `parseMinute`.
+   *  Null/absent outside live play. */
+  readonly minute?: string | number | null;
   /** Added (stoppage) minutes on top of `minute`, e.g. `minute:90,
    *  injuryTime:4` → "90+4". Null/absent when not in stoppage. */
   readonly injuryTime?: number | null;
@@ -174,6 +175,19 @@ const DEFAULT_CONTEXT: FixtureMapContext = {
   season: '2026',
 };
 
+/**
+ * football-data returns the live match minute as a STRING ("45", "90") — with
+ * stoppage carried separately in the numeric `injuryTime`. The rest of the
+ * pipeline (and the client clock, which gates on `typeof minute === 'number'`)
+ * expects a number, so coerce it here at ingestion. Null/absent/empty/non-
+ * numeric (outside live play, or a malformed payload) → null.
+ */
+export function parseMinute(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function mapWinner(w: string | null): 'HOME' | 'AWAY' | 'DRAW' | null {
   if (w === 'HOME_TEAM') return 'HOME';
   if (w === 'AWAY_TEAM') return 'AWAY';
@@ -242,7 +256,7 @@ export function mapFixture(
       regularTime,
       winner: mapWinner(m.score.winner),
     },
-    minute: m.minute ?? null,
+    minute: parseMinute(m.minute),
     injuryTime: m.injuryTime ?? null,
   };
 }

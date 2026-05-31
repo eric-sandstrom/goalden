@@ -237,7 +237,14 @@ export class FixtureDetailComponent {
     if (!f) return '';
     if (f.status === 'FINISHED' || f.status === 'AWARDED') return 'Full time';
     if (f.status === 'IN_PLAY' || f.liveState === 'in') {
-      return f.liveClock ?? (typeof f.minute === 'number' ? `${f.minute}'` : 'Live');
+      // Prefer football-data's authoritative `/matches` minute (caps at the
+      // half end with stoppage in `injuryTime`); fall back to ESPN's display
+      // clock, then a bare "Live", only when the minute is absent.
+      if (typeof f.minute === 'number') {
+        const inj = f.injuryTime ?? 0;
+        return inj > 0 ? `${f.minute}+${inj}'` : `${f.minute}'`;
+      }
+      return f.liveClock ?? 'Live';
     }
     if (f.status === 'PAUSED') return 'Half-time';
     return 'Upcoming';

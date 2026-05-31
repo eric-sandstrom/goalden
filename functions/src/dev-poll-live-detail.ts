@@ -6,11 +6,12 @@ import { requireAdminOrEmulator } from './lib/admin-check';
 
 /**
  * Force the frequent live pipeline immediately instead of waiting for the next
- * scheduled minute — the bulk score poll (`runPollLiveWindow`) followed by the
- * per-match detail/head2head depth pass (`runPollLiveDetail`). Runs
- * unconditionally (no isMatchWindow gate), so it's the way to exercise/verify
- * the live + detail + head2head writes on demand — e.g. after using the dev
- * tools to push a fixture IN_PLAY or set its kickoff near now.
+ * scheduled minute — the bulk poll (`runPollLiveWindow`, which now writes the
+ * lean fixture doc AND the rich detail/full split from the unfolded payload)
+ * followed by the head2head pass (`runPollLiveDetail`). Runs unconditionally
+ * (no isMatchWindow gate), so it's the way to exercise/verify the live + detail
+ * + head2head writes on demand — e.g. after using the dev tools to push a
+ * fixture IN_PLAY or set its kickoff near now.
  *
  * Gated by `requireAdminOrEmulator` so it's usable in the emulator and by
  * admins in production during testing.
