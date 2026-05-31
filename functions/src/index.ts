@@ -10,8 +10,6 @@ setGlobalOptions({
 
 export { pollFootballData } from './poll-football-data';
 export { reconcileStuckFixtures } from './reconcile-stuck-fixtures';
-export { pollStandings } from './poll-standings';
-export { pollTeams } from './poll-teams';
 export { scoreMatch } from './score-match';
 export {
   rebuildLeaderboard,
@@ -30,7 +28,11 @@ export { devPollTeamsNow } from './dev-poll-teams';
 export { devPollFixturesNow } from './dev-poll-fixtures';
 export { devPollLiveDetailNow } from './dev-poll-live-detail';
 export { devPollStandingsNow } from './dev-poll-standings';
-export { syncCompetitionsFromApi, setCompetitionActive } from './sync-competitions';
+export {
+  syncCompetitionsFromApi,
+  setCompetitionActive,
+  resyncCompetition,
+} from './sync-competitions';
 export { migrateToMultiComp } from './migrate-to-multi-comp';
 export {
   createLeague,

@@ -71,3 +71,11 @@
   background: var(--mat-sys-surface-container-high);
   border-radius: 3px;
 }
+/* Re-sync icon button sits just left of the active toggle; keep it from
+   shrinking and centre its in-place spinner. */
+.comp-resync {
+  flex-shrink: 0;
+}
+.comp-resync mat-progress-spinner {
+  margin: auto;
+}

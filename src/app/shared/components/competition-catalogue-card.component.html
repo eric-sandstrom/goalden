@@ -39,6 +39,21 @@
                 <span>{{ comp.type === 'CUP' ? 'Cup' : 'League' }}</span>
               </div>
             </div>
+            <button
+              type="button"
+              mat-icon-button
+              class="comp-resync"
+              [disabled]="isResyncPending(comp.id) || isTogglePending(comp.id)"
+              (click)="resyncFixtures(comp)"
+              matTooltip="Re-sync fixtures, teams & standings"
+              [attr.aria-label]="'Re-sync ' + comp.name"
+            >
+              @if (isResyncPending(comp.id)) {
+                <mat-progress-spinner mode="indeterminate" diameter="18" />
+              } @else {
+                <mat-icon>cloud_sync</mat-icon>
+              }
+            </button>
             <mat-slide-toggle
               [checked]="comp.active"
               [disabled]="isTogglePending(comp.id)"

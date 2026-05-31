@@ -6,7 +6,6 @@ import {
   FixtureDoc,
   FootballDataMatch,
   FootballDataResponse,
-  fixtureChanged,
   fixtureListFieldsChanged,
   mapFixture,
 } from './lib/fixture-mapper';
@@ -22,7 +21,17 @@ import {
   mapEspnEvent,
   naturalKey,
 } from './lib/espn-live';
+import {
+  matchHeaders,
+  matchNeedsDetail,
+  readDetailDocs,
+  stageMatchWrite,
+} from './lib/match-ingest';
 import { runPollLiveDetail } from './poll-live-detail';
+
+/** Firestore caps a write batch at 500 ops; stage/commit chunks of fixtures
+ *  (each match stages up to two writes — lean + detail) under that ceiling. */
+const BATCH_OP_LIMIT = 450;
 
 export const FOOTBALL_DATA_TOKEN = defineSecret('FOOTBALL_DATA_TOKEN');
 
@@ -159,7 +168,7 @@ async function pollOneCompetition(
 ): Promise<CompetitionPollResult> {
   const res = await fetch(
     `https://api.football-data.org/v4/competitions/${ctx.fdId ?? ctx.id}/matches`,
-    { headers: { 'X-Auth-Token': token } },
+    { headers: matchHeaders(token) },
   );
   if (!res.ok) {
     const body = await res.text();
@@ -206,30 +215,51 @@ async function pollOneCompetition(
     }
   }
 
-  const batch = db.batch();
+  const mapCtx = { competitionId: ctx.id, season: ctx.season };
+
+  // Read the existing detail docs only for matches that will actually write
+  // detail (terminal / with content) — a season of empty future fixtures costs
+  // no detail reads. Used to dedup the detail/full writes via detailChanged.
+  const detailIds = matches
+    .filter(
+      (m) =>
+        existing.get(`fd-${m.id}`)?.finalCaptured !== true &&
+        matchNeedsDetail(m as FootballDataMatch, mapCtx),
+    )
+    .map((m) => `fd-${m.id}`);
+  const existingDetail = await readDetailDocs(db, detailIds);
+
+  // Stage lean (fixtures/{id}) + rich (detail/full) writes, committing in
+  // chunks so a full season (≈ 2 writes/match) stays under the batch cap.
+  let batch = db.batch();
+  let ops = 0;
   let writes = 0;
   for (const m of matches) {
-    const next = mapFixture(m as FootballDataMatch, {
-      competitionId: ctx.id,
-      season: ctx.season,
-    });
     const id = `fd-${m.id}`;
-    if (fixtureChanged(existing.get(id), next)) {
-      batch.set(
-        db.collection('fixtures').doc(id),
-        { ...next, lastSyncedAt: FieldValue.serverTimestamp() },
-        { merge: true },
-      );
-      writes++;
+    const r = stageMatchWrite(
+      db,
+      batch,
+      id,
+      m as FootballDataMatch,
+      mapCtx,
+      existing.get(id),
+      existingDetail.get(id) ?? null,
+    );
+    ops += (r.leanWritten ? 1 : 0) + (r.detailWritten ? 1 : 0);
+    if (r.leanWritten) writes++;
+    if (ops >= BATCH_OP_LIMIT) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
     }
   }
+  if (ops > 0) await batch.commit();
 
-  // Per-comp rollup, refreshed only when a fixture actually changed. With
-  // writes === 0 the stored rollup already matches the canonical docs, so
-  // rewriting it would be a pure waste; any future change rebuilds it in
-  // full from the API response below.
+  // Per-comp rollup, refreshed only when a fixture's lean fields actually
+  // changed. With writes === 0 the stored rollup already matches the canonical
+  // docs, so rewriting it would be a pure waste; any change rebuilds it in full
+  // from the API response below.
   if (writes > 0) {
-    await batch.commit();
     logger.info(`[${ctx.id}] updated ${writes} fixtures`);
 
     const rollup = matches.map((m) => ({
@@ -357,7 +387,7 @@ export async function runPollLiveWindow(token: string): Promise<PollSummary> {
     `https://api.football-data.org/v4/matches?competitions=${comps}` +
     `&dateFrom=${dateFrom}&dateTo=${dateTo}`;
 
-  const res = await fetch(url, { headers: { 'X-Auth-Token': token } });
+  const res = await fetch(url, { headers: matchHeaders(token) });
   if (!res.ok) {
     const body = await res.text();
     logger.error('Live poll bulk fetch failed', { status: res.status, body });
@@ -372,16 +402,28 @@ export async function runPollLiveWindow(token: string): Promise<PollSummary> {
 
   const data = (await res.json()) as FootballDataResponse;
   const matches = data.matches ?? [];
+  // Only matches belonging to a comp we actively track; the rest are ignored.
+  const tracked = matches.filter((m) => m.competition && ctxByFdId.has(m.competition.id));
 
-  // Bulk-read the canonical docs we might touch so the diff is one round-trip.
-  const refs = matches.map((m) => db.collection('fixtures').doc(`fd-${m.id}`));
+  // Bulk-read the canonical docs we might touch so the diff is one round-trip,
+  // plus the existing detail docs for the matches that will write detail.
+  const refs = tracked.map((m) => db.collection('fixtures').doc(`fd-${m.id}`));
   const snapshots = refs.length > 0 ? await db.getAll(...refs) : [];
   const existing = new Map<string, FixtureDoc>();
   for (const s of snapshots) {
     if (s.exists) existing.set(s.id, s.data() as FixtureDoc);
   }
+  const detailIds = tracked
+    .filter(
+      (m) =>
+        existing.get(`fd-${m.id}`)?.finalCaptured !== true &&
+        matchNeedsDetail(m as FootballDataMatch),
+    )
+    .map((m) => `fd-${m.id}`);
+  const existingDetail = await readDetailDocs(db, detailIds);
 
-  const batch = db.batch();
+  let batch = db.batch();
+  let ops = 0;
   let writes = 0;
   // Changed fixtures grouped by comp, so we patch each rollup once.
   const changedByComp = new Map<
@@ -389,29 +431,27 @@ export async function runPollLiveWindow(token: string): Promise<PollSummary> {
     { ctx: CompetitionContext; entries: Array<{ id: string; doc: FixtureDoc }> }
   >();
 
-  for (const m of matches) {
-    const ctx = m.competition ? ctxByFdId.get(m.competition.id) : undefined;
-    if (!ctx) continue; // a match for a comp we don't actively track — ignore
+  for (const m of tracked) {
+    const ctx = ctxByFdId.get((m.competition as { id: number }).id) as CompetitionContext;
     const id = `fd-${m.id}`;
     const prev = existing.get(id);
-    const next = mapFixture(m as FootballDataMatch, {
-      competitionId: ctx.id,
-      season: ctx.season,
-    });
-    if (!fixtureChanged(prev, next)) continue;
+    const mapCtx = { competitionId: ctx.id, season: ctx.season };
 
-    // Always write the canonical doc — a live clock tick (the common case for
-    // an in-play match) re-anchors the client clock and feeds the live
-    // listeners.
-    batch.set(
-      db.collection('fixtures').doc(id),
-      { ...next, lastSyncedAt: FieldValue.serverTimestamp() },
-      { merge: true },
-    );
-    writes++;
+    // Stage the lean doc (clock tick re-anchors the client + feeds listeners)
+    // and the rich detail/full split, each gated independently inside.
+    const r = stageMatchWrite(db, batch, id, m as FootballDataMatch, mapCtx, prev, existingDetail.get(id) ?? null);
+    ops += (r.leanWritten ? 1 : 0) + (r.detailWritten ? 1 : 0);
+    if (r.leanWritten) writes++;
+    if (ops >= BATCH_OP_LIMIT) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
 
     // Only patch the rollup when a field the LIST shows changed (status, score,
-    // kickoff) — not for a pure clock tick, which the rollup never displays.
+    // kickoff) — not for a pure clock tick or detail-only change, which the
+    // rollup never displays.
+    const next = mapFixture(m as FootballDataMatch, mapCtx);
     if (fixtureListFieldsChanged(prev, next)) {
       let bucket = changedByComp.get(ctx.id);
       if (!bucket) {
@@ -422,8 +462,22 @@ export async function runPollLiveWindow(token: string): Promise<PollSummary> {
     }
   }
 
+  if (ops > 0) await batch.commit();
+
+  // Best-effort ESPN live overlay for the active comps, reusing the contexts we
+  // already resolved. No-ops without an ESPN slug or an in-window fixture, so
+  // this is cheap on idle minutes. Isolated so a failure can't fail the poll.
+  for (const ctx of pollable) {
+    try {
+      await pollEspnLive(db, ctx);
+    } catch (e: unknown) {
+      logger.warn(`[${ctx.id}] ESPN live overlay failed (non-fatal)`, {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
   if (writes > 0) {
-    await batch.commit();
     for (const { ctx, entries } of changedByComp.values()) {
       await patchRollup(db, ctx, entries);
     }
@@ -490,55 +544,6 @@ async function patchRollup(
     },
     { merge: true },
   );
-}
-
-/** Minimum gap between full per-comp syncs. The full sync is the expensive READ
- *  path: it `getAll`s EVERY match of EVERY active comp (a full league season is
- *  240-380 docs) just to diff. The bulk live poll already ingests/refreshes any
- *  fixture in the [-1d, +2d] window every minute (new in-window matches
- *  included), so the full sync only needs to catch far-future new/rescheduled
- *  fixtures and knockout fill-ins -- none of which move minute-to-minute. At the
- *  old 15-min cadence that season-wide getAll dominated Firestore reads; a few
- *  hours is plenty. Tunable: lower if far-future schedule changes must surface
- *  faster. */
-const FULL_SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000;
-
-/** True when the last full sync is older than FULL_SYNC_INTERVAL_MS (or never
- *  ran). Tracked in `cache/poll-meta` so the cadence survives cold starts. */
-async function fullSyncDue(db: FirebaseFirestore.Firestore): Promise<boolean> {
-  const snap = await db.collection('cache').doc('poll-meta').get();
-  const ts = snap.exists ? snap.data()?.['fixturesFullSyncAt'] : null;
-  const lastMs = ts && typeof ts.toMillis === 'function' ? ts.toMillis() : 0;
-  return Date.now() - lastMs >= FULL_SYNC_INTERVAL_MS;
-}
-
-async function markFullSync(db: FirebaseFirestore.Firestore): Promise<void> {
-  await db
-    .collection('cache')
-    .doc('poll-meta')
-    .set({ fixturesFullSyncAt: FieldValue.serverTimestamp() }, { merge: true });
-}
-
-/** Full-reconcile cadence. Most full syncs diff against the per-comp rollup (one
- *  read); on this slower cadence the sync instead does a true getAll over every
- *  match doc -- self-healing any drift and guaranteeing every fixture is pulled
- *  to its canonical doc. Daily is ample (canonical docs are never deleted in
- *  normal operation; this is a belt-and-suspenders completeness pass). Tracked
- *  in `cache/poll-meta`. */
-const RECONCILE_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-async function reconcileDue(db: FirebaseFirestore.Firestore): Promise<boolean> {
-  const snap = await db.collection('cache').doc('poll-meta').get();
-  const ts = snap.exists ? snap.data()?.['fixturesReconcileAt'] : null;
-  const lastMs = ts && typeof ts.toMillis === 'function' ? ts.toMillis() : 0;
-  return Date.now() - lastMs >= RECONCILE_INTERVAL_MS;
-}
-
-async function markReconcile(db: FirebaseFirestore.Firestore): Promise<void> {
-  await db
-    .collection('cache')
-    .doc('poll-meta')
-    .set({ fixturesReconcileAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
 /** How far ahead of kickoff the poller wakes. Set to the line-up window
@@ -713,18 +718,18 @@ function liveOverlayChanged(fx: FixtureDoc, ev: MappedEspnEvent): boolean {
 
 export const pollFootballData = onSchedule(
   {
-    // Wake every minute, but the isMatchWindow gate below means we only do
-    // real work when a match is live or imminent. The frequent work is now a
-    // single bulk request (runPollLiveWindow); the expensive per-comp full
-    // fetch is throttled to FULL_SYNC_INTERVAL_MS via fullSyncDue.
+    // Wake every minute, but the isMatchWindow gate below means we only do real
+    // work when a match is live or imminent. The frequent work is one bulk
+    // /v4/matches request (runPollLiveWindow) — with the unfold headers it now
+    // carries full detail, so it writes BOTH the lean fixture doc and the rich
+    // detail/full split, plus the ESPN overlay. The full per-comp season fetch
+    // is no longer on a timer: it runs on competition activation / manual
+    // re-sync (sync-competitions) and the stuck-fixture reconciler.
     schedule: 'every 1 minutes',
     region: 'europe-west1',
     secrets: [FOOTBALL_DATA_TOKEN],
     maxInstances: 1,
-    // A full sync still polls every comp sequentially with a 200ms pause +
-    // Firestore writes, which can push past a minute — keep the wide timeout
-    // for the polls where fullSyncDue fires.
-    timeoutSeconds: 540,
+    timeoutSeconds: 120,
   },
   async () => {
     const token = FOOTBALL_DATA_TOKEN.value();
@@ -738,30 +743,14 @@ export const pollFootballData = onSchedule(
       return;
     }
 
-    // Frequent path: one bulk request refreshes every in-window match across
-    // all comps. Live scores reach clients via the live onSnapshot listeners;
-    // the rollup patches keep the list view current for finals.
+    // One bulk request refreshes every in-window match across all comps — lean
+    // doc + detail/full split + ESPN overlay. Live data reaches clients via the
+    // onSnapshot listeners; rollup patches keep the list view current.
     await runPollLiveWindow(token);
 
-    // Depth pass: per-match lineups (pre-kickoff) + events (live) + head2head
-    // (once) into the detail subcollection. Budgeted so detail + the bulk poll
-    // (+ the full sync when it runs) stay under the account's req/min cap —
-    // leave more headroom on a full-sync minute since that fires ~1 req/comp.
-    const doFullSync = await fullSyncDue(db);
-    const detailBudget = doFullSync ? 10 : 25;
-    await runPollLiveDetail(token, detailBudget);
-
-    // Periodic path: the full per-comp fetch ingests new/out-of-window fixtures
-    // (newly scheduled matches, reschedules, knockout team fill-ins) and
-    // rebuilds rollups wholesale. Throttled so it isn't the every-minute cost.
-    if (doFullSync) {
-      // Most full syncs diff against the per-comp rollup (one read); ~once a day
-      // do a true getAll reconcile instead, to self-heal drift and guarantee
-      // every fixture is pulled to its canonical doc at least once.
-      const reconcile = await reconcileDue(db);
-      await runPollFootballData(token, undefined, reconcile);
-      await markFullSync(db);
-      if (reconcile) await markReconcile(db);
-    }
+    // Head2head is the one rich subresource NOT in the list payload, so it
+    // still needs a per-match call (once, when a lineup appears). Budgeted to
+    // stay under the account's req/min cap alongside the bulk request.
+    await runPollLiveDetail(token, 25);
   },
 );

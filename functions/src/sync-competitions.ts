@@ -1,7 +1,9 @@
 import * as logger from 'firebase-functions/logger';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { FOOTBALL_DATA_TOKEN } from './poll-football-data';
+import { FOOTBALL_DATA_TOKEN, runPollFootballData } from './poll-football-data';
+import { runPollTeams } from './poll-teams';
+import { runPollStandings } from './poll-standings';
 import { requireAdminOrEmulator } from './lib/admin-check';
 
 /**
@@ -200,15 +202,68 @@ export const syncCompetitionsFromApi = onCall(
   },
 );
 
+/** Outcome of a one-shot competition ingest, returned to the admin UI. */
+export interface IngestResult {
+  /** Fixtures (+ detail/full split + rollups), or null if that step threw. */
+  fixtures: { ok: boolean; fetched: number; written: number } | null;
+  /** True once the teams pull (full squads + crests) succeeded. */
+  teams: boolean;
+  /** True once the standings pull succeeded (some comps have none — see errors). */
+  standings: boolean;
+  /** Per-step error messages; empty on full success. */
+  errors: string[];
+}
+
 /**
- * Admin toggle for the `active` flag on a competition doc. Flipping
- * to `true` makes the next pollFootballData cycle start fetching this
- * competition's fixtures. Flipping to `false` stops polling but does
- * NOT delete the competition's fixtures (in case we want to flip it
- * back on later or migrate to a different system).
+ * One-shot full ingest for a single competition: its whole season of fixtures
+ * (with the `X-Unfold-*` headers, so each match writes the lean fixture doc +
+ * the rich `detail/full` split + the per-comp rollup), its teams (full squads +
+ * crests), and its standings. This is what makes activating a competition — or
+ * pressing "Re-sync fixtures" — populate everything in bulk, replacing the
+ * retired standalone fixtures/teams/standings schedulers. The live poll then
+ * keeps the in-window matches fresh.
+ *
+ * Each step is isolated: one failing (e.g. a free-tier comp with no standings)
+ * never sinks the others; its error is collected and returned.
+ */
+async function ingestCompetition(token: string, compId: string): Promise<IngestResult> {
+  const result: IngestResult = { fixtures: null, teams: false, standings: false, errors: [] };
+  const note = (label: string, e: unknown): void => {
+    result.errors.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+    logger.warn(`[${compId}] ingest ${label} failed`, { error: String(e) });
+  };
+
+  try {
+    const s = await runPollFootballData(token, compId, true);
+    result.fixtures = { ok: s.ok, fetched: s.fetched, written: s.written };
+  } catch (e) {
+    note('fixtures', e);
+  }
+  try {
+    await runPollTeams(token, compId);
+    result.teams = true;
+  } catch (e) {
+    note('teams', e);
+  }
+  try {
+    await runPollStandings(token, compId);
+    result.standings = true;
+  } catch (e) {
+    note('standings', e);
+  }
+  return result;
+}
+
+/**
+ * Admin toggle for the `active` flag on a competition doc.
+ *
+ * Flipping to `true` flips the flag AND kicks off a one-shot full ingest
+ * (`ingestCompetition`) so the comp's fixtures, teams and standings populate
+ * immediately — the live poll then keeps in-window matches fresh. Flipping to
+ * `false` stops the live poll considering it but does NOT delete its data.
  */
 export const setCompetitionActive = onCall(
-  { region: 'europe-west1' },
+  { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN], timeoutSeconds: 300 },
   async (request) => {
     await requireAdminOrEmulator(request);
 
@@ -234,8 +289,61 @@ export const setCompetitionActive = onCall(
       active,
       activeChangedAt: FieldValue.serverTimestamp(),
     });
-
     logger.info(`Competition ${compId} active=${active}`);
-    return { ok: true, compId, active };
+
+    // Best-effort ingest on activation — the flag is already flipped, so a
+    // failed ingest leaves the comp active and retryable via "Re-sync fixtures".
+    let ingest: IngestResult | null = null;
+    if (active) {
+      const token = FOOTBALL_DATA_TOKEN.value();
+      if (!token) {
+        logger.error('FOOTBALL_DATA_TOKEN secret missing — activated without ingest');
+      } else {
+        ingest = await ingestCompetition(token, compId);
+        logger.info(`Competition ${compId} ingest complete`, { ingest });
+      }
+    }
+
+    return { ok: true, compId, active, ingest };
+  },
+);
+
+/**
+ * Re-run the full ingest for an already-known competition without touching its
+ * `active` flag. Surfaced as the "Re-sync fixtures" action on the competition
+ * card — the way to pull far-future schedule changes (reschedules, knockout
+ * team fill-ins) that fall outside the live poll's [-1d, +2d] window, now that
+ * there's no periodic full-season sync behind it.
+ */
+export const resyncCompetition = onCall(
+  { region: 'europe-west1', secrets: [FOOTBALL_DATA_TOKEN], timeoutSeconds: 300 },
+  async (request) => {
+    await requireAdminOrEmulator(request);
+
+    const { compId } = request.data ?? {};
+    if (typeof compId !== 'string' || compId.length === 0) {
+      throw new HttpsError('invalid-argument', 'compId required');
+    }
+
+    const token = FOOTBALL_DATA_TOKEN.value();
+    if (!token) {
+      throw new HttpsError(
+        'failed-precondition',
+        'FOOTBALL_DATA_TOKEN secret missing — set it via `firebase functions:secrets:set FOOTBALL_DATA_TOKEN`.',
+      );
+    }
+
+    const db = getFirestore();
+    const snap = await db.collection('competitions').doc(compId).get();
+    if (!snap.exists) {
+      throw new HttpsError(
+        'not-found',
+        `Competition ${compId} not found — sync from API first.`,
+      );
+    }
+
+    const ingest = await ingestCompetition(token, compId);
+    logger.info(`Competition ${compId} re-synced`, { ingest });
+    return { ok: true, compId, ingest };
   },
 );

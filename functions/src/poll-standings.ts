@@ -1,7 +1,5 @@
 import * as logger from 'firebase-functions/logger';
-import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { FOOTBALL_DATA_TOKEN } from './poll-football-data';
 import {
   CompetitionContext,
   resolveCompetitionContexts,
@@ -163,23 +161,8 @@ async function pollOneCompetitionStandings(
   return { compId: ctx.id, ok: true, tables: tables.length, written: 1 };
 }
 
-export const pollStandings = onSchedule(
-  {
-    // Standings only move when matches finish, so a slower cadence than the
-    // 10-minute fixtures poll is plenty — and it keeps free-tier quota use
-    // modest given this doubles the per-comp request count.
-    schedule: 'every 30 minutes',
-    region: 'europe-west1',
-    secrets: [FOOTBALL_DATA_TOKEN],
-    maxInstances: 1,
-    timeoutSeconds: 540,
-  },
-  async () => {
-    const token = FOOTBALL_DATA_TOKEN.value();
-    if (!token) {
-      logger.error('FOOTBALL_DATA_TOKEN secret missing');
-      return;
-    }
-    await runPollStandings(token);
-  },
-);
+// The 30-minute `pollStandings` scheduler was retired. Standings now refresh
+// (a) once when a competition is activated / re-synced (see sync-competitions.ts)
+// and (b) event-driven whenever a match in that comp finishes (see score-match.ts),
+// both via `runPollStandings(token, compId)`. `devPollStandingsNow` still wraps
+// the same helper for on-demand runs.
