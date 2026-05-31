@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   computed,
@@ -14,6 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { Fixture, LegInfo, isLocked, isTbd } from '../../core/models/fixture.model';
+import { MatchTransitionService } from '../../core/services/match-transition.service';
 import {
   MatchPrediction,
   PredictionsService,
@@ -59,6 +61,8 @@ export class FixtureRowComponent {
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
+  private readonly matchTransition = inject(MatchTransitionService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   private readonly nowTick = signal(Date.now());
 
@@ -88,6 +92,29 @@ export class FixtureRowComponent {
   /** The bare football-data id (our doc id minus the `fd-` prefix) — the
    *  segment the `/matches/:id` detail route expects. */
   protected readonly detailFdid = computed(() => this.fixture().id.replace(/^fd-/, ''));
+
+  /** True when this row is the one morphing into the detail view, so it should
+   *  paint the shared `view-transition-name`s. Only ever one row at a time —
+   *  the names must stay unique across the page during a transition. */
+  protected readonly sharedTransition = computed(
+    () => this.matchTransition.activeFdid() === this.detailFdid(),
+  );
+
+  /** Claim the shared transition for this fixture just before the detail
+   *  navigation, so this row's score/crest/name carry the paired names into
+   *  the outgoing (list) snapshot.
+   *
+   *  The synchronous `detectChanges()` is load-bearing: routerLink kicks off
+   *  navigation and the router captures the OLD (list) snapshot for the view
+   *  transition before zoneless CD would otherwise flush this signal change to
+   *  the DOM. Without it, the `view-transition-name`s aren't painted in time,
+   *  the list snapshot has no shared elements, and only the back navigation
+   *  morphs. Flushing here writes them synchronously, inside the click event,
+   *  ahead of the snapshot. */
+  protected openDetail(): void {
+    this.matchTransition.activate(this.detailFdid());
+    this.cdr.detectChanges();
+  }
 
   protected readonly kickoffLabel = computed(() =>
     this.fixture().utcKickoff.toLocaleString(undefined, {
