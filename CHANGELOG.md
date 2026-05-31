@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/eric-sandstrom/goalden/compare/v1.4.0...v1.5.0) (2026-05-31)
+
+
+### Features
+
+* live match detail (line-ups, events, head2head) ([#34](https://github.com/eric-sandstrom/goalden/issues/34)) ([7161532](https://github.com/eric-sandstrom/goalden/commit/7161532492fefb1558313869bab5fab6a6fd3be2))
+
 ## [1.4.0](https://github.com/eric-sandstrom/goalden/compare/v1.3.1...v1.4.0) (2026-05-31)
 
 
