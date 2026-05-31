@@ -45,13 +45,33 @@
 
 .meta-line {
   display: flex;
-  flex-wrap: wrap;
+  // Single line, always: the venue arrives async once detail() loads, and a
+  // wrap to a second line would shove the scoreboard down. Keep one line and
+  // let the venue ellipsize instead of reflowing.
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-width: 0;
   margin-bottom: 12px;
   font-size: 0.72rem;
   color: var(--mat-sys-on-surface-variant);
+
+  // Fixed bits never shrink or truncate; the venue absorbs any overflow.
+  .nowrap,
+  .sep,
+  .comp {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .venue {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .sep {
     color: var(--mat-sys-outline);
@@ -147,6 +167,10 @@
   }
 
   .ht {
+    // Reserve the line even when there's no half-time score yet, so the score
+    // below doesn't drop when detail() resolves and HT appears.
+    min-height: 0.95rem;
+    line-height: 0.95rem;
     font-size: 0.72rem;
     font-variant-numeric: tabular-nums;
     color: var(--mat-sys-on-surface-variant);
@@ -160,6 +184,11 @@
   }
 
   .result-note {
+    // Reserve the line so the status word below holds position whether or not
+    // the match was decided in ET / on penalties.
+    min-height: 0.95rem;
+    line-height: 0.95rem;
+    white-space: nowrap;
     font-size: 0.72rem;
     color: var(--mat-sys-on-surface-variant);
   }

@@ -12,10 +12,10 @@
       <!-- ===== Pinned header: meta line + scoreboard ===== -->
       <div class="header">
         <div class="meta-line">
-          <span>{{ kickoffLabel() }}</span>
+          <span class="nowrap">{{ kickoffLabel() }}</span>
           @if (detail()?.venue; as venue) {
             <span class="sep" aria-hidden="true">·</span>
-            <span>{{ venue }}</span>
+            <span class="venue">{{ venue }}</span>
           }
           <span class="sep" aria-hidden="true">·</span>
           <span class="comp">
@@ -44,9 +44,9 @@
           </div>
 
           <div class="centre">
-            @if (halfTimeLabel(); as ht) {
-              <span class="ht">HT {{ ht }}</span>
-            }
+            <!-- HT / result-note slots always render (empty when N/A) so the
+                 score + status stay put as detail() loads in. -->
+            <span class="ht">@if (halfTimeLabel(); as ht) {HT {{ ht }}}</span>
             @if (displayScore(); as s) {
               <div class="score" style="view-transition-name: mvt-score">
                 <span class="num">{{ s.home }}</span>
@@ -56,9 +56,7 @@
             } @else {
               <div class="score vs"><span class="dash">vs</span></div>
             }
-            @if (resultNote(); as note) {
-              <span class="result-note">{{ note }}</span>
-            }
+            <span class="result-note">@if (resultNote(); as note) {{{ note }}}</span>
             <span class="status">{{ statusLabel() }}</span>
           </div>
 
