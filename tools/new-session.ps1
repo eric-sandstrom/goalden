@@ -62,8 +62,9 @@ function Get-UsedPorts {
 }
 
 if ($Port -eq 0) {
+  # Start at 4201 -- 4200 is reserved for the main checkout's dev server.
   $used = Get-UsedPorts
-  $Port = 4200
+  $Port = 4201
   while ($used -contains $Port) { $Port++ }
 }
 

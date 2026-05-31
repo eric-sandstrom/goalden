@@ -1,26 +1,28 @@
-// Port-aware `ng serve` wrapper. Each git worktree serves the frontend on its
-// own port so multiple dev sessions don't collide on :4200.
+// Port-aware `npm start`.
+//   - In the MAIN checkout: starts the full dev stack -- Firebase emulator +
+//     functions tsc --watch + ng serve -- on the RESERVED port 4200, via
+//     concurrently (which forwards SIGINT so the emulator still runs its
+//     --export-on-exit on Ctrl+C).
+//   - In a git worktree: starts ng serve ONLY, on the worktree's assigned port
+//     (4201+; 4200 is reserved for main). The emulator is the single shared
+//     instance running from main.
 //
-// Port resolution order:
-//   1. PORT env var            - explicit override, e.g. `$env:PORT=4205; npm start`
-//   2. .worktree.json "port"   - written by tools/new-session.ps1 per worktree
-//   3. first free port from 4200 upward - auto
-//
-// Run via `npm start`: npm prepends node_modules/.bin to PATH, so `ng` resolves.
+// Worktree port resolution: PORT env -> .worktree.json "port" -> first free >= 4201.
 
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const extra = process.argv.slice(2);
 
 function isFree(port) {
-  return new Promise((resolve) => {
+  return new Promise((res) => {
     const srv = createServer();
-    srv.once('error', () => resolve(false));
-    srv.once('listening', () => srv.close(() => resolve(true)));
+    srv.once('error', () => res(false));
+    srv.once('listening', () => srv.close(() => res(true)));
     srv.listen(port, '127.0.0.1');
   });
 }
@@ -42,26 +44,42 @@ function configuredPort() {
     const cfg = JSON.parse(raw);
     if (cfg.port) return Number(cfg.port);
   } catch {
-    // no per-worktree config - fall through to auto-detect
+    // no per-worktree config
   }
   return null;
 }
 
-const wanted = configuredPort();
-const port = wanted ?? (await firstFree(4200));
-
-if (wanted && !(await isFree(wanted))) {
-  console.warn(`Port ${wanted} is busy - ng serve will likely fail. ` +
-    `Free it, or override with PORT / .worktree.json.`);
+// Is this checkout the primary worktree (main), or a linked worktree?
+function isPrimaryCheckout() {
+  try {
+    const common = execFileSync('git', ['-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim();
+    const top = execFileSync('git', ['-C', root, 'rev-parse', '--path-format=absolute', '--show-toplevel'], { encoding: 'utf8' }).trim();
+    if (!common || !top) return false;
+    return resolve(dirname(common)) === resolve(top);
+  } catch {
+    return false; // unsure -> treat as a worktree (never auto-start the emulator)
+  }
 }
 
-console.log(`ng serve on http://localhost:${port}`);
-
-// Forward any extra args, e.g. `npm start -- --open`.
-const extra = process.argv.slice(2);
-const child = spawn('ng', ['serve', '--port', String(port), ...extra], {
-  cwd: root,
-  stdio: 'inherit',
-  shell: true,
-});
-child.on('exit', (code) => process.exit(code ?? 0));
+if (isPrimaryCheckout()) {
+  // MAIN: full dev stack on the reserved port 4200.
+  const port = process.env.PORT ? Number(process.env.PORT) : 4200;
+  const ng = `ng serve --port ${port}${extra.length ? ' ' + extra.join(' ') : ''}`;
+  console.log(`main: starting emulator + functions watch + ng serve on http://localhost:${port}`);
+  // Single quoted command string (not an args array) so the shell keeps each
+  // concurrently command intact and to avoid the shell-args deprecation warning.
+  const cmd = `concurrently -n emu,fn,ng -c blue,magenta,green "npm run emulators" "npm run functions:watch" "${ng}"`;
+  const child = spawn(cmd, { cwd: root, stdio: 'inherit', shell: true });
+  child.on('exit', (code) => process.exit(code ?? 0));
+} else {
+  // WORKTREE: frontend only, on this worktree's assigned port (4201+, never 4200).
+  const wanted = configuredPort();
+  const port = wanted ?? (await firstFree(4201));
+  if (wanted && !(await isFree(wanted))) {
+    console.warn(`Port ${wanted} is busy -- ng serve will likely fail. Free it or override with PORT.`);
+  }
+  console.log(`ng serve on http://localhost:${port}`);
+  const cmd = `ng serve --port ${port}${extra.length ? ' ' + extra.join(' ') : ''}`;
+  const child = spawn(cmd, { cwd: root, stdio: 'inherit', shell: true });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
