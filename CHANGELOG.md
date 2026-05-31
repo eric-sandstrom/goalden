@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/eric-sandstrom/goalden/compare/v1.7.0...v1.7.1) (2026-05-31)
+
+
+### Improvements
+
+* cut Firestore reads in the football-data pollers ([#41](https://github.com/eric-sandstrom/goalden/issues/41)) ([5fd9d01](https://github.com/eric-sandstrom/goalden/commit/5fd9d01b4a81a1887cf201ecf67656482172ceba))
+
 ## [1.7.0](https://github.com/eric-sandstrom/goalden/compare/v1.6.0...v1.7.0) (2026-05-31)
 
 
