@@ -61,12 +61,6 @@ export interface DetailPollSummary {
   deferred: number;
 }
 
-/** True when the stored detail doc already carries a non-empty lineup. */
-function hasLineups(detail: Json | null): boolean {
-  if (!detail) return false;
-  return len(obj(detail['home'])?.['lineup']) > 0 || len(obj(detail['away'])?.['lineup']) > 0;
-}
-
 /**
  * True when the freshly-mapped detail differs from what's stored in a way worth
  * a write. Compares event/lineup counts (events only grow) and the full-time
@@ -118,34 +112,24 @@ export async function runPollLiveDetail(
     return { ok: true, candidates: 0, fetched: 0, detailWrites: 0, head2headWrites: 0, deferred: 0 };
   }
 
-  // Bulk-read each candidate's detail/full so the fetch decision + the
-  // detailChanged diff are one round-trip, not one read per match.
-  const fullRefs = fixtures.map(({ id }) =>
-    db.collection('fixtures').doc(id).collection('detail').doc('full'),
-  );
-  const fullSnaps = await db.getAll(...fullRefs);
-  const fullById = new Map<string, Json | null>();
-  fixtures.forEach(({ id }, i) => {
-    const s = fullSnaps[i];
-    fullById.set(id, s && s.exists ? (s.data() ?? {}) : null);
-  });
-
-  // Decide which to fetch, and in what priority order (live first, then the
-  // soonest pre-match, then finished) so the budget goes to the most dynamic.
+  // Decide which to fetch from the FIXTURE doc's capture flags (which the window
+  // query above already returned) -- NOT by reading every candidate's detail
+  // subdoc. Live matches always fetch; a TIMED match fetches until its lineup is
+  // captured; a finished match gets one closing capture. Priority steers the
+  // budget toward the most dynamic (live, then soonest pre-match, then finished).
   type Candidate = { id: string; fx: FixtureDoc; priority: number };
   const toFetch: Candidate[] = [];
   for (const { id, fx } of fixtures) {
-    const detail = fullById.get(id) ?? null;
     let fetch = false;
     let priority = 3;
     if (fx.status === 'IN_PLAY' || fx.status === 'PAUSED') {
       fetch = true;
       priority = 0;
     } else if (fx.status === 'TIMED') {
-      fetch = !hasLineups(detail); // until the lineup is captured
+      fetch = fx.lineupCaptured !== true; // until the lineup is captured
       priority = 1;
     } else if (fx.status === 'FINISHED' || fx.status === 'AWARDED') {
-      fetch = !detail || detail['finalCaptured'] !== true; // one closing capture
+      fetch = fx.finalCaptured !== true; // one closing capture
       priority = 2;
     }
     if (fetch) toFetch.push({ id, fx, priority });
@@ -153,6 +137,22 @@ export async function runPollLiveDetail(
   toFetch.sort(
     (a, b) => a.priority - b.priority || a.fx.utcKickoff.toMillis() - b.fx.utcKickoff.toMillis(),
   );
+
+  // Read detail/full ONLY for the fixtures we'll actually fetch (for the
+  // detailChanged write-dedup) -- the static, already-captured fixtures were
+  // skipped above and are never read. This replaces the per-minute getAll over
+  // every in-window fixture's detail subdoc with one read per fetched match.
+  const fullById = new Map<string, Json | null>();
+  if (toFetch.length > 0) {
+    const fullRefs = toFetch.map((c) =>
+      db.collection('fixtures').doc(c.id).collection('detail').doc('full'),
+    );
+    const fullSnaps = await db.getAll(...fullRefs);
+    toFetch.forEach((c, i) => {
+      const s = fullSnaps[i];
+      fullById.set(c.id, s && s.exists ? (s.data() ?? {}) : null);
+    });
+  }
 
   let budget = maxRequests;
   let fetched = 0;
@@ -203,8 +203,18 @@ export async function runPollLiveDetail(
       detailWrites++;
     }
 
-    // --- 2. Head2head (once, when the lineup is known) ------------------------
+    // Promote capture flags onto the lean fixture doc so subsequent polls can
+    // skip this fixture without reading its detail subdoc. Write only when a
+    // flag newly flips true -> at most one tiny merge write per fixture per flag.
     const lineupNow = mapped.home.lineup.length > 0 || mapped.away.lineup.length > 0;
+    const flags: Record<string, boolean> = {};
+    if (lineupNow && cand.fx.lineupCaptured !== true) flags['lineupCaptured'] = true;
+    if (terminal && cand.fx.finalCaptured !== true) flags['finalCaptured'] = true;
+    if (Object.keys(flags).length > 0) {
+      await db.collection('fixtures').doc(cand.id).set(flags, { merge: true });
+    }
+
+    // --- 2. Head2head (once, when the lineup is known) ------------------------
     if (lineupNow && budget > 0) {
       const h2hRef = db.collection('fixtures').doc(cand.id).collection('detail').doc('head2head');
       const h2hSnap = await h2hRef.get();
