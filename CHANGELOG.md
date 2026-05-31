@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/eric-sandstrom/goalden/compare/v1.5.0...v1.6.0) (2026-05-31)
+
+
+### Features
+
+* fade the match detail in/out instead of side-sliding ([#37](https://github.com/eric-sandstrom/goalden/issues/37)) ([599c61b](https://github.com/eric-sandstrom/goalden/commit/599c61b615f03f7905ba83eb39632c53bc8567d5))
+
 ## [1.5.0](https://github.com/eric-sandstrom/goalden/compare/v1.4.0...v1.5.0) (2026-05-31)
 
 
