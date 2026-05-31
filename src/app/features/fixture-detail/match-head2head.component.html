@@ -1,0 +1,41 @@
+@if (hasData()) {
+  @if (aggregates(); as a) {
+    <div class="summary">
+      <div class="team home">
+        <span class="name">{{ a.home.name ?? 'Home' }}</span>
+        <span class="wins">{{ a.home.wins ?? 0 }}</span>
+        <span class="wins-label">wins</span>
+      </div>
+      <div class="centre">
+        <span class="meetings">{{ a.numberOfMatches ?? matches().length }} meetings</span>
+        <span class="draws">{{ a.home.draws ?? 0 }} drawn</span>
+        <span class="goals">{{ a.totalGoals ?? 0 }} goals</span>
+      </div>
+      <div class="team away">
+        <span class="name">{{ a.away.name ?? 'Away' }}</span>
+        <span class="wins">{{ a.away.wins ?? 0 }}</span>
+        <span class="wins-label">wins</span>
+      </div>
+    </div>
+  }
+
+  @if (matches().length > 0) {
+    <ul class="matches">
+      @for (m of matches(); track $index) {
+        <li class="match">
+          <span class="date">{{ matchDateLabel(m.utcDate) }}</span>
+          <span class="teams">
+            <span class="side">{{ m.homeTeam ?? '—' }}</span>
+            <span class="score">{{ m.home ?? '-' }}–{{ m.away ?? '-' }}</span>
+            <span class="side">{{ m.awayTeam ?? '—' }}</span>
+          </span>
+          @if (m.competition) {
+            <span class="comp">{{ m.competition }}</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+} @else {
+  <p class="empty">No head-to-head data yet.</p>
+}

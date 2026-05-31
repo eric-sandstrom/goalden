@@ -116,6 +116,14 @@
             </div>
           </mat-tab>
         }
+
+        @if (hasHead2Head()) {
+          <mat-tab label="Head2head">
+            <div class="tab-content">
+              <app-match-head2head [head2head]="head2head()" />
+            </div>
+          </mat-tab>
+        }
       </mat-tab-group>
     </mat-card>
   } @else {

@@ -7,6 +7,7 @@ import {
   FootballDataMatch,
   FootballDataResponse,
   fixtureChanged,
+  fixtureListFieldsChanged,
   mapFixture,
 } from './lib/fixture-mapper';
 import {
@@ -21,6 +22,7 @@ import {
   mapEspnEvent,
   naturalKey,
 } from './lib/espn-live';
+import { runPollLiveDetail } from './poll-live-detail';
 
 export const FOOTBALL_DATA_TOKEN = defineSecret('FOOTBALL_DATA_TOKEN');
 
@@ -263,10 +265,238 @@ async function writeLegacyRollup(db: FirebaseFirestore.Firestore): Promise<void>
   });
 }
 
-/** How far ahead of kickoff the live cadence kicks in, so we catch the
- *  TIMED→IN_PLAY transition (and have fresh data on screen) right around
- *  kickoff rather than up to a poll-interval late. */
-const MATCH_LOOKAHEAD_MS = 15 * 60 * 1000;
+// =============================================================================
+// Bulk live poll
+// =============================================================================
+//
+// The frequent (every-minute) path. Where `runPollFootballData` makes one
+// request PER competition against the full-season `/competitions/{id}/matches`
+// list, this makes ONE request total against the cross-competition
+// `/v4/matches?competitions=…&dateFrom&dateTo` endpoint, narrowed to the
+// matches that can change soon (yesterday → tomorrow). That single request
+// covers every active comp's in-window matches, so live scoring costs 1 req/min
+// instead of N — freeing the rate-limit budget for the per-match detail polls.
+//
+// It is NOT a replacement for the per-comp full fetch: the date window means it
+// never sees the rest of the season, so it can't rebuild a comp's rollup from
+// scratch (that would drop every out-of-window fixture). Instead it PATCHES the
+// affected rollup entries in place, and the periodic full sync (see the
+// scheduler below) stays responsible for ingesting new/out-of-window fixtures
+// and rebuilding rollups wholesale.
+
+/** How wide the bulk window reaches back/forward from "now", in days. One day
+ *  back catches late-finishing matches across the UTC midnight boundary; two
+ *  forward (dateTo is exclusive) covers today + tomorrow, so a match whose
+ *  lineup window opens just before midnight is still in range. */
+const LIVE_WINDOW_BACK_DAYS = 1;
+const LIVE_WINDOW_FWD_DAYS = 2;
+
+function isoDay(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function shiftDays(d: Date, days: number): Date {
+  return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * One bulk `/v4/matches` request across every active comp's in-window matches.
+ * Diffs each against its stored canonical doc, writes only the changed ones
+ * (same `fixtureChanged` gate the full poll uses), then patches the affected
+ * per-comp rollups so the list view reflects the change without a full refetch.
+ */
+export async function runPollLiveWindow(token: string): Promise<PollSummary> {
+  const db = getFirestore();
+  const contexts = await resolveCompetitionContexts(db, undefined);
+
+  // Only comps with a numeric fdId can go in the `competitions=` filter. Any
+  // legacy doc without one is left to the periodic full sync (it addresses
+  // comps by id there); log so a missing fdId doesn't silently drop a comp.
+  const pollable = contexts.filter((c) => c.fdId !== null);
+  const skipped = contexts.filter((c) => c.fdId === null);
+  if (skipped.length > 0) {
+    logger.info(`Live poll: ${skipped.length} comp(s) without fdId excluded from bulk call`, {
+      comps: skipped.map((c) => c.id),
+    });
+  }
+  if (pollable.length === 0) {
+    return { ok: true, fetched: 0, written: 0, competitions: [], message: 'No comps with fdId' };
+  }
+
+  const ctxByFdId = new Map<number, CompetitionContext>();
+  for (const c of pollable) ctxByFdId.set(c.fdId as number, c);
+
+  const now = new Date();
+  const dateFrom = isoDay(shiftDays(now, -LIVE_WINDOW_BACK_DAYS));
+  const dateTo = isoDay(shiftDays(now, LIVE_WINDOW_FWD_DAYS)); // exclusive upper bound
+  const comps = pollable.map((c) => c.fdId).join(',');
+  const url =
+    `https://api.football-data.org/v4/matches?competitions=${comps}` +
+    `&dateFrom=${dateFrom}&dateTo=${dateTo}`;
+
+  const res = await fetch(url, { headers: { 'X-Auth-Token': token } });
+  if (!res.ok) {
+    const body = await res.text();
+    logger.error('Live poll bulk fetch failed', { status: res.status, body });
+    return {
+      ok: false,
+      fetched: 0,
+      written: 0,
+      competitions: [],
+      message: `HTTP ${res.status}: ${body}`,
+    };
+  }
+
+  const data = (await res.json()) as FootballDataResponse;
+  const matches = data.matches ?? [];
+
+  // Bulk-read the canonical docs we might touch so the diff is one round-trip.
+  const refs = matches.map((m) => db.collection('fixtures').doc(`fd-${m.id}`));
+  const snapshots = refs.length > 0 ? await db.getAll(...refs) : [];
+  const existing = new Map<string, FixtureDoc>();
+  for (const s of snapshots) {
+    if (s.exists) existing.set(s.id, s.data() as FixtureDoc);
+  }
+
+  const batch = db.batch();
+  let writes = 0;
+  // Changed fixtures grouped by comp, so we patch each rollup once.
+  const changedByComp = new Map<
+    string,
+    { ctx: CompetitionContext; entries: Array<{ id: string; doc: FixtureDoc }> }
+  >();
+
+  for (const m of matches) {
+    const ctx = m.competition ? ctxByFdId.get(m.competition.id) : undefined;
+    if (!ctx) continue; // a match for a comp we don't actively track — ignore
+    const id = `fd-${m.id}`;
+    const prev = existing.get(id);
+    const next = mapFixture(m as FootballDataMatch, {
+      competitionId: ctx.id,
+      season: ctx.season,
+    });
+    if (!fixtureChanged(prev, next)) continue;
+
+    // Always write the canonical doc — a live clock tick (the common case for
+    // an in-play match) re-anchors the client clock and feeds the live
+    // listeners.
+    batch.set(
+      db.collection('fixtures').doc(id),
+      { ...next, lastSyncedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    writes++;
+
+    // Only patch the rollup when a field the LIST shows changed (status, score,
+    // kickoff) — not for a pure clock tick, which the rollup never displays.
+    if (fixtureListFieldsChanged(prev, next)) {
+      let bucket = changedByComp.get(ctx.id);
+      if (!bucket) {
+        bucket = { ctx, entries: [] };
+        changedByComp.set(ctx.id, bucket);
+      }
+      bucket.entries.push({ id, doc: next });
+    }
+  }
+
+  if (writes > 0) {
+    await batch.commit();
+    for (const { ctx, entries } of changedByComp.values()) {
+      await patchRollup(db, ctx, entries);
+    }
+    // WC also has the legacy single rollup the client still falls back to.
+    if (changedByComp.has('WC')) {
+      await writeLegacyRollup(db);
+    }
+  }
+
+  logger.info(`Live poll: ${matches.length} matches in window, ${writes} changed`, {
+    comps: [...changedByComp.keys()],
+  });
+
+  return {
+    ok: true,
+    fetched: matches.length,
+    written: writes,
+    competitions: [...changedByComp.values()].map(({ ctx, entries }) => ({
+      compId: ctx.id,
+      ok: true,
+      fetched: entries.length,
+      written: entries.length,
+    })),
+  };
+}
+
+/**
+ * Updates a comp's rollup doc in place with the fixtures that changed this
+ * poll. Replaces entries by id (appends any not yet present — e.g. a brand-new
+ * in-window match), keeping the same `{ id, ...FixtureDoc }` shape the full
+ * sync writes. No-op if the rollup hasn't been built yet; the periodic full
+ * sync creates it, and the client falls back to a collection scan meanwhile.
+ */
+async function patchRollup(
+  db: FirebaseFirestore.Firestore,
+  ctx: CompetitionContext,
+  entries: Array<{ id: string; doc: FixtureDoc }>,
+): Promise<void> {
+  const ref = db.collection('cache').doc(`fixtures-${ctx.id}`);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+
+  const data = snap.data() ?? {};
+  const current = Array.isArray(data['fixtures'])
+    ? (data['fixtures'] as Array<Record<string, unknown>>)
+    : [];
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const f of current) {
+    const id = typeof f['id'] === 'string' ? f['id'] : null;
+    if (id) byId.set(id, f);
+  }
+  for (const { id, doc } of entries) {
+    byId.set(id, { id, ...doc });
+  }
+  const merged = [...byId.values()];
+
+  await ref.set(
+    {
+      competitionId: ctx.id,
+      season: ctx.season,
+      fixtures: merged,
+      count: merged.length,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+/** Minimum gap between full per-comp syncs. The bulk live poll keeps in-window
+ *  matches fresh every minute; the full sync only needs to run often enough to
+ *  pick up newly-scheduled fixtures, reschedules, and knockout team fill-ins —
+ *  none of which move minute-to-minute. */
+const FULL_SYNC_INTERVAL_MS = 15 * 60 * 1000;
+
+/** True when the last full sync is older than FULL_SYNC_INTERVAL_MS (or never
+ *  ran). Tracked in `cache/poll-meta` so the cadence survives cold starts. */
+async function fullSyncDue(db: FirebaseFirestore.Firestore): Promise<boolean> {
+  const snap = await db.collection('cache').doc('poll-meta').get();
+  const ts = snap.exists ? snap.data()?.['fixturesFullSyncAt'] : null;
+  const lastMs = ts && typeof ts.toMillis === 'function' ? ts.toMillis() : 0;
+  return Date.now() - lastMs >= FULL_SYNC_INTERVAL_MS;
+}
+
+async function markFullSync(db: FirebaseFirestore.Firestore): Promise<void> {
+  await db
+    .collection('cache')
+    .doc('poll-meta')
+    .set({ fixturesFullSyncAt: FieldValue.serverTimestamp() }, { merge: true });
+}
+
+/** How far ahead of kickoff the poller wakes. Set to the line-up window
+ *  (~75 min before kickoff) so the per-match detail poll can capture line-ups
+ *  as soon as football-data publishes them — must stay >= the detail poll's
+ *  LINEUP_LOOKAHEAD_MS or the gate would skip the runs that fetch them. Also
+ *  catches the TIMED→IN_PLAY transition promptly, as before. */
+const MATCH_LOOKAHEAD_MS = 75 * 60 * 1000;
 
 /** Upper bound on how long after kickoff a match could still be running
  *  (90' + stoppage + extra time + penalties + provider lag before it
@@ -433,15 +663,17 @@ function liveOverlayChanged(fx: FixtureDoc, ev: MappedEspnEvent): boolean {
 
 export const pollFootballData = onSchedule(
   {
-    // Wake often, but the isMatchWindow gate below means we only do real
-    // work when a match is live or imminent — see runPollFootballData.
-    schedule: 'every 2 minutes',
+    // Wake every minute, but the isMatchWindow gate below means we only do
+    // real work when a match is live or imminent. The frequent work is now a
+    // single bulk request (runPollLiveWindow); the expensive per-comp full
+    // fetch is throttled to FULL_SYNC_INTERVAL_MS via fullSyncDue.
+    schedule: 'every 1 minutes',
     region: 'europe-west1',
     secrets: [FOOTBALL_DATA_TOKEN],
     maxInstances: 1,
-    // Bumped from 60s — polling 12 comps sequentially with a 200ms
-    // pause between requests + Firestore writes can easily push past
-    // a minute when several comps have changes to commit.
+    // A full sync still polls every comp sequentially with a 200ms pause +
+    // Firestore writes, which can push past a minute — keep the wide timeout
+    // for the polls where fullSyncDue fires.
     timeoutSeconds: 540,
   },
   async () => {
@@ -455,6 +687,26 @@ export const pollFootballData = onSchedule(
       logger.debug('No match live or imminent — skipping poll');
       return;
     }
-    await runPollFootballData(token);
+
+    // Frequent path: one bulk request refreshes every in-window match across
+    // all comps. Live scores reach clients via the live onSnapshot listeners;
+    // the rollup patches keep the list view current for finals.
+    await runPollLiveWindow(token);
+
+    // Depth pass: per-match lineups (pre-kickoff) + events (live) + head2head
+    // (once) into the detail subcollection. Budgeted so detail + the bulk poll
+    // (+ the full sync when it runs) stay under the account's req/min cap —
+    // leave more headroom on a full-sync minute since that fires ~1 req/comp.
+    const doFullSync = await fullSyncDue(db);
+    const detailBudget = doFullSync ? 10 : 25;
+    await runPollLiveDetail(token, detailBudget);
+
+    // Periodic path: the full per-comp fetch ingests new/out-of-window fixtures
+    // (newly scheduled matches, reschedules, knockout team fill-ins) and
+    // rebuilds rollups wholesale. Throttled so it isn't the every-minute cost.
+    if (doFullSync) {
+      await runPollFootballData(token);
+      await markFullSync(db);
+    }
   },
 );

@@ -28,6 +28,7 @@ export { devSignInAsAdmin } from './dev-sign-in-admin';
 export { grantAdminRole, revokeAdminRole } from './admin-roles';
 export { devPollTeamsNow } from './dev-poll-teams';
 export { devPollFixturesNow } from './dev-poll-fixtures';
+export { devPollLiveDetailNow } from './dev-poll-live-detail';
 export { devPollStandingsNow } from './dev-poll-standings';
 export { syncCompetitionsFromApi, setCompetitionActive } from './sync-competitions';
 export { migrateToMultiComp } from './migrate-to-multi-comp';

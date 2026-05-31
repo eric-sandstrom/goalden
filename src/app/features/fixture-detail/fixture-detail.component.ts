@@ -18,12 +18,13 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Fixture } from '../../core/models/fixture.model';
-import { MatchDetail } from '../../core/models/match-detail.model';
+import { Head2Head, MatchDetail } from '../../core/models/match-detail.model';
 import { CompetitionsService } from '../../core/services/competitions.service';
 import { FixturesService } from '../../core/services/fixtures.service';
 import { MatchDetailService } from '../../core/services/match-detail.service';
 import { MatchTransitionService } from '../../core/services/match-transition.service';
 import { SkelComponent } from '../../shared/components/skel.component';
+import { MatchHead2HeadComponent } from './match-head2head.component';
 import { MatchPitchComponent } from './match-pitch.component';
 import { MatchTimelineComponent } from './match-timeline.component';
 
@@ -37,6 +38,7 @@ import { MatchTimelineComponent } from './match-timeline.component';
     MatProgressSpinnerModule,
     MatTabsModule,
     SkelComponent,
+    MatchHead2HeadComponent,
     MatchPitchComponent,
     MatchTimelineComponent,
   ],
@@ -58,7 +60,27 @@ export class FixtureDetailComponent {
     // the detail back to the list morphs the scoreboard into the right row
     // (covers browser-back and deep-link → back paths the forward click can't).
     effect(() => this.matchTransition.activate(this.fdid()));
+
+    // Stream detail/full live while the match is in play, so goals/cards/subs
+    // tick into the timeline + line-ups without a manual refresh. Only while
+    // live — a listener costs a read per write, and line-ups/finals don't
+    // change outside play, so the one-shot resource covers everything else.
+    // Tag the value with the match id so a stale value from a previous match
+    // (the component is reused across `/matches/:id` navigations) is ignored.
+    effect((onCleanup) => {
+      const id = this.matchId();
+      const status = this.fixture()?.status;
+      if (status !== 'IN_PLAY' && status !== 'PAUSED') return;
+      const unsub = this.matchDetail.subscribeDetail(id, (d) =>
+        this.liveDetail.set({ id, detail: d }),
+      );
+      onCleanup(() => unsub());
+    });
   }
+
+  /** Latest live `detail/full`, tagged with the match it belongs to. Kept after
+   *  full-time so the final events don't revert to the stale one-shot read. */
+  private readonly liveDetail = signal<{ id: string; detail: MatchDetail | null } | null>(null);
 
   /** football-data match id from the route (`/matches/:id`), bound via
    *  withComponentInputBinding(). Aliased so the `:id` route param maps onto
@@ -122,9 +144,31 @@ export class FixtureDetailComponent {
   // read). value() throws on an errored resource, which would take the whole
   // view down; instead we treat any non-resolved state as "no detail yet" so
   // the scoreboard + Info tab still render and the refresh path stays open.
-  protected readonly detail = computed<MatchDetail | null>(() =>
-    this.detailResource.hasValue() ? this.detailResource.value() : null,
+  //
+  // Live overlay: while a match is in play the subscription above keeps
+  // `liveDetail` fresh; prefer it (for THIS match) over the one-shot resource
+  // so the timeline updates in real time. Falls back to the resource for
+  // pre-match line-ups and finished matches that aren't being streamed.
+  protected readonly detail = computed<MatchDetail | null>(() => {
+    const live = this.liveDetail();
+    if (live && live.id === this.matchId() && live.detail) return live.detail;
+    return this.detailResource.hasValue() ? this.detailResource.value() : null;
+  });
+
+  /** Head-to-head doc — one-shot (the poller writes it once, it never changes).
+   *  Keyed on the route id like the detail read. */
+  private readonly head2headResource = resource<Head2Head | null, string>({
+    params: () => this.matchId(),
+    loader: ({ params }) => this.matchDetail.loadHead2Head(params),
+    defaultValue: null,
+  });
+  protected readonly head2head = computed<Head2Head | null>(() =>
+    this.head2headResource.hasValue() ? this.head2headResource.value() : null,
   );
+  protected readonly hasHead2Head = computed<boolean>(() => {
+    const h = this.head2head();
+    return !!h && (h.aggregates !== null || h.matches.length > 0);
+  });
 
   protected readonly refreshing = signal(false);
 
@@ -270,16 +314,29 @@ export class FixtureDetailComponent {
     initialValue: this.route.snapshot.queryParamMap,
   });
 
-  /** Active tab index, restored from `?tab=`. Line-ups is index 1 and only
-   *  exists once its data is loaded; anything else falls back to Events (0). */
-  protected readonly selectedTabIndex = computed<number>(() =>
-    this.queryMap().get('tab') === 'lineups' && this.hasLineups() ? 1 : 0,
-  );
+  /** Tab keys in render order. Optional tabs (line-ups, head2head) appear only
+   *  once their data loads, so positional indices shift — deriving them here
+   *  keeps index ↔ key correct. MUST match the template's tab order. */
+  protected readonly tabKeys = computed<readonly string[]>(() => {
+    const keys = ['events'];
+    if (this.hasLineups()) keys.push('lineups');
+    if (this.hasHead2Head()) keys.push('h2h');
+    return keys;
+  });
+
+  /** Active tab index, restored from `?tab=`; falls back to Events (0) when the
+   *  requested tab isn't present (e.g. its data hasn't loaded). */
+  protected readonly selectedTabIndex = computed<number>(() => {
+    const want = this.queryMap().get('tab') ?? 'events';
+    const i = this.tabKeys().indexOf(want);
+    return i >= 0 ? i : 0;
+  });
 
   protected onTabChange(index: number): void {
+    const tab = this.tabKeys()[index] ?? 'events';
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { tab: index === 1 ? 'lineups' : 'events' },
+      queryParams: { tab },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
