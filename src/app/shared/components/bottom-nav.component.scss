@@ -44,6 +44,26 @@
   color: var(--mat-sys-on-secondary-container);
   background: var(--mat-sys-secondary-container);
 }
+
+/* Variable-font fill animation: the icon sits unfilled (FILL 0) and morphs to
+   filled (FILL 1) when its tab becomes active. Both states list the same single
+   axis so the browser interpolates the weight of the glyph. Material Symbols is
+   a variable font, so this is a continuous tween rather than a swap between two
+   glyphs. */
+.nav-item mat-icon {
+  font-variation-settings: 'FILL' 0;
+  transition: font-variation-settings 200ms ease;
+}
+.nav-item.active mat-icon {
+  font-variation-settings: 'FILL' 1;
+}
+
+/* Respect reduced-motion: keep the filled end state, drop the tween. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-item mat-icon {
+    transition: none;
+  }
+}
 .label {
   font-size: 11px;
   line-height: 1;
