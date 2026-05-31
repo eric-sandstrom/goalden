@@ -7,6 +7,7 @@ import {
   resource,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -76,6 +77,7 @@ export class PredictComponent {
   private readonly leagues = inject(LeaguesService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly location = inject(Location);
 
   /** `{ comp, tab }` read off the URL query string (`?comp=…&tab=…`).
    *  Re-derives whenever the query params change; the map signal is seeded
@@ -96,10 +98,14 @@ export class PredictComponent {
    *  load so the bar reserves its space instead of popping in. */
   protected readonly compTabSkels = ['44px', '32px', '38px'];
 
-  /** Active filter chip, driven by the `:tab` URL segment. Defaults to
-   *  UPCOMING when the segment is absent or unrecognised. */
+  /** Active filter chip. The `?tab` query param wins while you're on the page;
+   *  on a *bare* `/matches` entry (no `?tab`) it falls back to the last-viewed
+   *  tab from localStorage — same precedence as `selectedComp`. This lets a
+   *  bare entry restore the filter from storage alone, so canonicalising the
+   *  URL can be a silent `replaceState` (see the constructor effect) rather
+   *  than a second router navigation. Defaults to UPCOMING. */
   protected readonly filter = computed<Filter>(
-    () => parseFilter(this.urlParams().tab) ?? 'UPCOMING',
+    () => parseFilter(this.urlParams().tab) ?? parseFilter(readSelectedTab()) ?? 'UPCOMING',
   );
 
   /** Comps the user is in (one entry per unique competitionId+season
@@ -269,18 +275,25 @@ export class PredictComponent {
       writeSelectedComp(sel.key);
       if (url.tab) writeSelectedTab(url.tab);
       // Canonicalise the URL when it doesn't already name the resolved comp:
-      //   - bare /matches (no ?comp) — restores the saved comp/tab into the
-      //     query string, or resolves a sensible default on a first visit;
+      //   - bare /matches (no ?comp) — write the restored saved comp/tab (or a
+      //     resolved first-visit default) into the query string;
       //   - a stale/unknown ?comp the user can't see any more (left the
       //     league, season rolled over) — selectedComp fell back to the
       //     first tab, so realign the URL to it.
-      // replaceUrl keeps these out of history; once the URL matches it's a
-      // no-op. A bare entry restores the saved tab; a stale-comp realign
-      // keeps whatever tab the URL already carries.
+      //
+      // Do this with a SILENT `replaceState`, not a router navigation. The
+      // signals above already reflect the resolved comp/tab (both selectedComp
+      // and filter fall back to localStorage), so nothing in the view depends
+      // on the route carrying these params — all that's left is to make the
+      // address bar / a future refresh / share URL carry them. A second
+      // `router.navigate` here would run another `withViewTransitions` cycle
+      // right after the bottom-nav tab switch: the visible double-step the user
+      // sees ( /matches  →  /matches?comp=…&tab=… ). replaceState rewrites the
+      // URL in place with no navigation, so there's no second transition and no
+      // content re-render. (filter() already carries the saved-tab fallback.)
       if (url.comp !== sel.key) {
-        const tab =
-          url.comp === null ? parseFilter(readSelectedTab()) ?? 'UPCOMING' : this.filter();
-        void this.navigateTo(sel.key, tab, { replaceUrl: true });
+        const qs = new URLSearchParams({ comp: sel.key, tab: this.filter().toLowerCase() });
+        this.location.replaceState('/matches', qs.toString());
       }
     });
   }
