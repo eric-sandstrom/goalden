@@ -63,7 +63,7 @@ jobs:
     steps:
       - name: Run release-please
         id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           # Author the release PR with a PAT (not the default GITHUB_TOKEN) so
           # opening it triggers the required checks — see the header note. Falls
