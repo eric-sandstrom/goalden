@@ -314,26 +314,24 @@ export class FixtureDetailComponent {
     initialValue: this.route.snapshot.queryParamMap,
   });
 
-  /** Tab keys in render order. Optional tabs (line-ups, head2head) appear only
-   *  once their data loads, so positional indices shift — deriving them here
-   *  keeps index ↔ key correct. MUST match the template's tab order. */
-  protected readonly tabKeys = computed<readonly string[]>(() => {
-    const keys = ['events'];
-    if (this.hasLineups()) keys.push('lineups');
-    if (this.hasHead2Head()) keys.push('h2h');
-    return keys;
-  });
+  /** All three tabs always render (Line-ups / Head2head are disabled when their
+   *  data isn't available), so the index ↔ key map is fixed and matches the
+   *  template's tab order. */
+  private readonly tabKeys: readonly string[] = ['events', 'lineups', 'h2h'];
 
-  /** Active tab index, restored from `?tab=`; falls back to Events (0) when the
-   *  requested tab isn't present (e.g. its data hasn't loaded). */
+  /** Active tab index, restored from `?tab=`. Falls back to Events (0) when the
+   *  requested tab is disabled (its data hasn't loaded) — we never select a
+   *  disabled tab. */
   protected readonly selectedTabIndex = computed<number>(() => {
     const want = this.queryMap().get('tab') ?? 'events';
-    const i = this.tabKeys().indexOf(want);
+    if (want === 'lineups' && !this.hasLineups()) return 0;
+    if (want === 'h2h' && !this.hasHead2Head()) return 0;
+    const i = this.tabKeys.indexOf(want);
     return i >= 0 ? i : 0;
   });
 
   protected onTabChange(index: number): void {
-    const tab = this.tabKeys()[index] ?? 'events';
+    const tab = this.tabKeys[index] ?? 'events';
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { tab },

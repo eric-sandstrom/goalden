@@ -32,8 +32,13 @@
 
 .header {
   flex: none;
+  // Pinned to a constant height so the scoreboard's variable bits (half-time
+  // line, result note, 1- vs 2-line team names, the refresh row) never shift
+  // the tabs below between matches.
+  height: 170px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 // ===== Inline meta line: date · venue · competition =====
